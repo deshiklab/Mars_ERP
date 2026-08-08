@@ -188,3 +188,172 @@ def demo_confirm(ref=None, **kwargs):
 
 	ok, message, pe = verify_and_settle(rec["gateway"].lower(), ref)
 	return {"ok": ok, "message": message, "payment_entry": pe}
+
+
+# --------------------------------------------------------------------------
+# Land Acquisition pipeline (C milestone): PWA <-> real doctype
+# --------------------------------------------------------------------------
+# Stage mapping: doctype uses "Lead"/"Due Diligence"/... ; the V10 PWA uses
+# identification/due_diligence/negotiation/agreement/registration/possession.
+PWA_STAGE_MAP = {
+    "Lead": "identification",
+    "Due Diligence": "due_diligence",
+    "Negotiation": "negotiation",
+    "Agreement": "agreement",
+    "Registration": "registration",
+    "Possession": "possession",
+}
+DOCTYPE_STAGE_MAP = {v: k for k, v in PWA_STAGE_MAP.items()}
+
+
+def _fmt_bdt(value):
+    """BDT number -> PWA-friendly string (Cr / Lac / plain)."""
+    if not value:
+        return "৳ 0"
+    v = float(value)
+    if v >= 10000000:
+        return "৳ {0:.1f} Cr".format(v / 10000000)
+    if v >= 100000:
+        return "৳ {0:.1f} Lac".format(v / 100000)
+    return "৳ {0:,.0f}".format(v)
+
+
+def _la_to_pwa(la):
+    """Map a Land Acquisition doctype doc to the PWA's land_proposals shape."""
+    owners = [
+        {"name": o.owner_name, "share": str(o.share_pct or "") + "%"}
+        for o in (la.get("owners") or [])
+        if o.get("owner_name")
+    ]
+    docs = [
+        {"name": d.document_name, "type": d.document_type or "Doc", "status": d.document_status or "Pending"}
+        for d in (la.get("documents") or [])
+        if d.get("document_name")
+    ]
+    deal = la.deal_value or la.negotiated_price or la.asking_price or 0
+    area = ""
+    if la.get("area_bigha"):
+        area = "{0} Bigha".format(la.area_bigha)
+    elif la.get("area_katha"):
+        area = "{0} Katha".format(la.area_katha)
+    return {
+        "id": la.name,
+        "name": la.land_acquisition_title,
+        "location": la.land_location or "",
+        "stage": PWA_STAGE_MAP.get(la.current_stage, la.current_stage or "identification"),
+        "status": la.status or "Open",
+        "risk": la.risk_rating or "Low",
+        "priority": la.priority or "Medium",
+        "price": deal,
+        "priceF": _fmt_bdt(deal),
+        "area": area,
+        "roi": ("{0}%".format(la.estimated_roi) if la.get("estimated_roi") else ""),
+        "progress": la.legal_checklist_progress or la.feasibility_score or 0,
+        "nextAction": la.next_action or "",
+        "archived": la.status in ("Closed", "Rejected"),
+        "owners": owners,
+        "documents": docs,
+        "mouza": la.mouza or "",
+        "dag": ("Dag {0}".format(la.dag) if la.get("dag") else ""),
+        "cs": ("CS {0}".format(la.khatian_cs) if la.get("khatian_cs") else ""),
+        "rs": ("RS {0}".format(la.khatian_rs) if la.get("khatian_rs") else ""),
+        "commission": ("{0}%".format(la.commission_pct) if la.get("commission_pct") else ""),
+        "roadAccess": la.road_access or "",
+        "landUse": la.land_use or "",
+        "soilCondition": la.soil_condition or "",
+        "floodRisk": la.flood_risk or "Low",
+        "litigationCheck": la.litigation_check or "Pending",
+        "landmarks": la.landmarks or "",
+        "coordinates": la.coordinates or "",
+        "targetProject": la.target_project or "",
+        "expectedRevenue": la.expected_revenue or 0,
+        "totalCost": la.total_project_cost or 0,
+        "netProfit": la.net_profit_est or 0,
+        "mutationStatus": la.mutation_status or "Not Started",
+        "feasibilityStatus": la.feasibility_status or "Pending Visit",
+        "surveyStatus": la.survey_status or "Pending",
+        "rajukStatus": la.rajuk_status or "Not Required",
+        "envClearanceStatus": la.env_clearance_status or "Not Required",
+        "layoutStatus": la.layout_status or "Not Started",
+    }
+
+
+@frappe.whitelist()
+def land_pipeline():
+    """Return every Land Acquisition record in the PWA's land_proposals shape."""
+    rows = frappe.get_all(
+        "Land Acquisition",
+        fields=[
+            "name", "land_acquisition_title", "current_stage", "status",
+            "land_location", "mouza", "dag", "khatian_cs", "khatian_sa",
+            "khatian_rs", "area_katha", "area_bigha", "priority", "next_action",
+            "asking_price", "negotiated_price", "deal_value", "commission_pct",
+            "estimated_roi", "risk_rating", "legal_checklist_progress",
+            "feasibility_score", "litigation_check", "flood_risk", "road_access",
+            "land_use", "soil_condition", "landmarks", "coordinates",
+            "target_project", "expected_revenue", "total_project_cost",
+            "net_profit_est", "mutation_status", "feasibility_status",
+            "survey_status", "rajuk_status", "env_clearance_status",
+            "layout_status", "acquisition_date",
+        ],
+        order_by="modified desc",
+        limit_page_length=500,
+    )
+    proposals = []
+    for r in rows:
+        la = frappe.get_doc("Land Acquisition", r.name)
+        proposals.append(_la_to_pwa(la))
+    return {"proposals": proposals, "count": len(proposals)}
+
+
+@frappe.whitelist()
+def land_sync(proposals=None):
+    """Upsert proposals pushed from the PWA into the Land Acquisition doctype.
+
+    Each proposal must carry a Frappe name (id starts with 'LA-') to update an
+    existing record; otherwise a new record is created with the mapped stage.
+    Returns {created, updated, errors}.
+    """
+    if not proposals:
+        return {"created": 0, "updated": 0, "errors": []}
+    if not isinstance(proposals, list):
+        frappe.throw(_("proposals must be a list"), frappe.ValidationError)
+
+    created = updated = 0
+    errors = []
+    for p in proposals:
+        try:
+            if not isinstance(p, dict) or not p.get("name"):
+                continue
+            name = p.get("id") or ""
+            stage = DOCTYPE_STAGE_MAP.get(p.get("stage"), "Lead")
+            payload = {
+                "land_acquisition_title": p.get("name"),
+                "land_location": p.get("location"),
+                "current_stage": stage,
+                "status": p.get("status") or "Open",
+                "mouza": p.get("mouza"),
+                "priority": p.get("priority") or "Medium",
+                "risk_rating": p.get("risk") or "Low",
+                "next_action": p.get("nextAction"),
+            }
+            if name.startswith("LA-") and frappe.db.exists("Land Acquisition", name):
+                doc = frappe.get_doc("Land Acquisition", name)
+                for f, v in payload.items():
+                    if v not in (None, ""):
+                        doc.set(f, v)
+                doc.flags.ignore_permissions = True
+                doc.save(ignore_permissions=True)
+                updated += 1
+            else:
+                doc = frappe.new_doc("Land Acquisition")
+                for f, v in payload.items():
+                    if v not in (None, ""):
+                        doc.set(f, v)
+                doc.flags.ignore_permissions = True
+                doc.insert(ignore_permissions=True)
+                created += 1
+        except Exception as e:
+            errors.append({"name": p.get("name"), "error": str(e)})
+    frappe.db.commit()
+    return {"created": created, "updated": updated, "errors": errors}

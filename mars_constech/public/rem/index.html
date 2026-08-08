@@ -1124,7 +1124,10 @@ const API = {
       if(res.status===401){ this.connected=false; localStorage.removeItem('rem_api_token'); this.token=''; }
       if(raw) return res;
       const data = await res.json().catch(()=>({}));
-      return {status:res.status, data};
+      // Frappe wraps whitelisted-method returns in {message: ...} — unwrap so
+      // the rest of the PWA keeps reading r.data.token / r.data.collections.
+      const body = (data && typeof data.message !== 'undefined') ? data.message : data;
+      return {status:res.status, data: body};
     }catch(e){ return {status:0, data:{error:'Network error — is the server running at '+this._base()+'?'}}; }
   },
   async login(email, pass){
@@ -2039,6 +2042,26 @@ window.mockLandProposals = DB.init('land_proposals', [  {id:'LP-001',name:'Purba
 {id:'LP-016',name:'Bashundhara Block K',area:'6 Bigha',price:110000000,priceF:'৳11 Cr',location:'Bashundhara',stage:'identification',status:'Site Identified',risk:'Low',roi:'41%',contact:'Rofiqul Islam',notes:'Contiguous parcel near Block J, seller motivated. Quick due diligence possible.',date:'2024-11-02',owner:'Mahmuda Rahman',budget:'৳9.5 Cr',priority:'Medium',progress:15,nextAction:'Title search & seller verification',owners:[{name:'Mahmuda Rahman',share:'100%'}],documents:[{name:'Sale Deed 2019',type:'Deed',status:'Pending'}],mouza:'Bashundhara Block K',dag:'Dag 28',cs:'CS 52',rs:'RS 96',commission:'2%',roadAccess:'60ft Block K Road',landUse:'Residential (RAJUK)',soilCondition:'Good',floodRisk:'Low',landmarks:'2km from Bashundhara City',coordinates:'23.8210° N, 90.4380° E',litigationCheck:'Pending',targetProject:'Bashundhara Block K Residency'},
 {id:'LP-017',name:'Ashulia Smart Town Land',area:'25 Bigha',price:325000000,priceF:'৳32.5 Cr',location:'Ashulia',stage:'negotiation',status:'JV Discussion',risk:'Medium',roi:'47%',contact:'MD Hasanul Banna',notes:'Joint venture with Ashulia Development Ltd — 60/40 split. Land for Smart Town Phase 1.',date:'2024-11-08',owner:'Ashulia Development Ltd',budget:'৳28 Cr',priority:'High',progress:40,nextAction:'JV term sheet review',owners:[{name:'Ashulia Development Ltd',share:'100%'}],documents:[{name:'Corporate Deed',type:'Deed',status:'Verified'},{name:'JV Draft Agreement',type:'Legal',status:'Draft'}],mouza:'Ashulia',dag:'Dag 210',cs:'CS 305',rs:'RS 420',commission:'',roadAccess:'120ft Dhaka-Ashulia Highway',landUse:'Residential (RAJUK)',soilCondition:'Good — farmland',floodRisk:'Medium',landmarks:'Near Abdullahpur bus stand',coordinates:'23.9050° N, 90.3180° E',litigationCheck:'Pending',targetProject:'Ashulia Smart Town'},
 ]);
+
+// ═══ LAND PIPELINE — LIVE ERP SYNC (data layer only) ═══
+// Pulls the real Land Acquisition pipeline from ERPNext via the API bridge and
+// replaces the local land_proposals collection with the server's records.
+// Falls back silently to local data when the bridge is unreachable.
+function landPullFromERP(){
+  if(!API._base()){ showToast('ERP server not configured — check Settings','error'); return; }
+  showToast('Pulling land pipeline from ERP…','info');
+  API._req('GET','.land_pipeline').then(function(r){
+    if(r.status!==200){ showToast((r.data&&r.data.error)||'ERP pull failed','error'); return; }
+    const list = (r.data&&r.data.proposals)||[];
+    if(!list.length){ showToast('No land proposals on the server','info'); return; }
+    mockLandProposals = list;
+    DB._data['land_proposals'] = list;
+    DB.save('land_proposals');
+    Object.keys(_PG).forEach(function(k){ delete _PG[k]; });
+    renderModule();
+    showToast('Loaded '+list.length+' proposals from ERPNext','success');
+  });
+}
 window.mockDesigns = DB.init('designs', [
   {id:'DSG-001',name:'Muktodhara Master Layout',type:'Master Plan',typeIcon:'\uD83D\uDCCB',version:'v2.3',status:'Approved',project:'Muktodhara Green Park',designer:'Ar. Hasan Mahmud',description:'Complete master layout plan for Muktodhara Green Park residential project including plot division, road network, amenities, and utility corridors.',submitted:'2024-06-01',approved:'2024-09-15',versions:[{v:'v1.0',date:'2024-01-10',status:'Draft'},{v:'v2.0',date:'2024-04-15',status:'Approved'},{v:'v2.3',date:'2024-09-15',status:'Approved'}],downloadUrl:'#'},
   {id:'DSG-002',name:'Jolshiri Tower A Architecture',type:'Architecture',typeIcon:'\uD83C\uDFD7\uFE0F',version:'v4.1',status:'In Review',project:'Jolshiri Abason',designer:'Ar. Farzana Rahman',description:'Architectural design for Tower A \u2014 12-story residential building with 3 BHK and 4 BHK units, rooftop garden, and basement parking.',submitted:'2024-08-20',approved:'',versions:[{v:'v1.0',date:'2024-08-20',status:'Draft'},{v:'v2.0',date:'2024-09-05',status:'In Review'},{v:'v3.0',date:'2024-09-25',status:'Rejected'},{v:'v4.1',date:'2024-10-20',status:'In Review'}],downloadUrl:'#'},
@@ -6194,6 +6217,7 @@ function renderLandMgmt(el){
     <div class="toolbar" style="margin-bottom:6px">
       <div class="tabs">${['dashboard','pipeline','proposals'].map(t=>`<div class="tab ${landTab===t?'active':''}" onclick="landTab='${t}';Object.keys(_PG).forEach(function(k){delete _PG[k]});renderModule()">${{'dashboard':'\uD83D\uDCCA Dashboard','pipeline':'\uD83D\uDCCB Pipeline','proposals':'\uD83D\uDCC4 Proposals'}[t]}</div>`).join('')}</div>
       <div class="spacer"></div>
+      <button class="action-btn" onclick="landPullFromERP()" style="padding:3px 8px;font-size:10px" title="Pull the live Land Acquisition pipeline from ERPNext" data-perm="Project Acquisition:View">🔄 Sync from ERP</button>
       <button class="action-btn primary" onclick="crudProposal()" style="padding:3px 8px;font-size:10px" data-perm="Project Acquisition:Create">+ New Proposal</button>
     </div>
     ${landTab==='dashboard'?renderLandDashboard():
