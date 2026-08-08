@@ -2,7 +2,7 @@
  "actions": [],
  "allow_rename": 1,
  "autoname": "format:BKG-{#####}",
- "creation": "2026-08-08 19:10:00.000000",
+ "creation": "2026-08-08 19:10:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -165,17 +165,12 @@
   }
  ],
  "index_web_pages_for_search": 1,
- "links": [
-  {
-   "link_doctype": "Sales Invoice",
-   "link_fieldname": "custom_booking"
-  }
- ],
- "modified": "2026-08-08 19:10:00.000000",
+ "links": [],
+ "modified": "2026-08-08 23:48:10.052904",
  "modified_by": "Administrator",
  "module": "Mars Constech",
  "name": "Booking",
- "naming_rule": "Expression",
+ "naming_rule": "Expression (old style)",
  "owner": "Administrator",
  "permissions": [
   {
@@ -189,8 +184,43 @@
    "role": "System Manager",
    "share": 1,
    "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "MARS Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "MARS Agent",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "MARS Customer",
+   "share": 1,
+   "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
