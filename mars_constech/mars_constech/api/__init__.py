@@ -249,6 +249,8 @@ def _la_to_pwa(la):
         "area": area,
         "roi": ("{0}%".format(la.estimated_roi) if la.get("estimated_roi") else ""),
         "progress": la.legal_checklist_progress or la.feasibility_score or 0,
+        "legalStatus": la.legal_status or "Pending",
+        "legalItems": len(la.get("legal_checklist") or []),
         "nextAction": la.next_action or "",
         "archived": la.status in ("Closed", "Rejected"),
         "owners": owners,

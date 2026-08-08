@@ -16047,6 +16047,7 @@ function crudQCReport(item){
 
 // ═══ COMPLIANCE MODULE ═══
 var cmpTab='dashboard';
+var cmpVettingSynced=0;
 function renderCompliance(el){
   cmpTab=cmpTab||'dashboard';
   var total=mockCompliance.length,compliant=mockCompliance.filter(function(c){return c.status==='Compliant'}).length;
@@ -16059,11 +16060,13 @@ function renderCompliance(el){
         ['dashboard','📊 Dashboard'],
         ['items','📋 Compliance Items'],
         ['audits','🔎 Audits'],
-        ['certificates','📜 Certificates']
+        ['certificates','📜 Certificates'],
+        ['vetting','⚖️ Legal Vetting']
       ].map(function(t){
-        return '<div class="tab '+(cmpTab===t[0]?'active':'')+'" onclick="cmpTab=\x27'+t[0]+'\x27;Object.keys(_PG).forEach(function(k){delete _PG[k]});renderModule()">'+t[1]+'</div>';
+        return '<div class="tab '+(cmpTab===t[0]?'active':'')+'" onclick="cmpTab=\x27'+t[0]+'\x27;Object.keys(_PG).forEach(function(k){delete _PG[k]});renderModule();if(\x27'+t[0]+'\x27===\x27vetting\x27&&!cmpVettingSynced){cmpVettingSynced=1;landPullFromERP()}">'+t[1]+'</div>';
       }).join('')+'</div>'+
       '<div class="spacer"></div>'+
+      '<button class="action-btn" onclick="landPullFromERP()" style="padding:3px 8px;font-size:10px;display:'+(cmpTab==='vetting'?'':'none')+'\">🔄 Sync from ERP</button>'+
       '<button class="action-btn primary" onclick="crudCompliance()" style="padding:3px 8px;font-size:10px;display:'+(cmpTab==='items'?'':'none')+'\">+ Add Item</button>'+
       '<button class="action-btn primary" onclick="crudAudit()" style="padding:3px 8px;font-size:10px;display:'+(cmpTab==='audits'?'':'none')+'\">+ Schedule Audit</button>'+
       '<button class="action-btn primary" onclick="crudCertificate()" style="padding:3px 8px;font-size:10px;display:'+(cmpTab==='certificates'?'':'none')+'\">+ Add Certificate</button>'+
@@ -16071,8 +16074,43 @@ function renderCompliance(el){
     (cmpTab==='dashboard'?renderCmpDashboard():
      cmpTab==='items'?renderCmpItems():
      cmpTab==='audits'?renderCmpAudits():
-     cmpTab==='certificates'?renderCmpCertificates():'')+
+     cmpTab==='certificates'?renderCmpCertificates():
+     cmpTab==='vetting'?renderCmpVetting():'')+
   '</div>';
+}
+function renderCmpVetting(){
+  var rows=(mockLandProposals||[]).filter(function(p){return !p.archived;});
+  var cleared=rows.filter(function(p){return (p.legalStatus||'')==='Cleared';}).length;
+  var gen=rows.filter(function(p){return (p.legalItems||0)>0;}).length;
+  var issues=rows.filter(function(p){return (p.progress||0)<100 && (p.legalItems||0)>0;}).length;
+  var stats='<div class="stats-row" style="margin-bottom:6px">'+[
+    ['Acquisitions',rows.length,'#1565c0'],
+    ['Checklists Generated',gen,'#2e7d32'],
+    ['Legal Cleared',cleared,'#7b1fa2'],
+    ['Needs Vetting',issues,issues>0?'#e65100':'#999']
+  ].map(function(s){return '<div class="stat-card"><div class="label">'+s[0]+'</div><div class="value" style="color:'+s[2]+'">'+s[1]+'</div></div>';}).join('')+'</div>';
+  if(!rows.length)return stats+'<div style="text-align:center;padding:28px;color:#888;font-size:11px;border:2px dashed #e0e0e0;border-radius:8px">No land proposals loaded.<br/><br/><button class="action-btn primary" style="padding:5px 12px;font-size:10px" onclick="landPullFromERP()">🔄 Sync from ERP</button></div>';
+  var stageCol={identification:'#3b82f6',due_diligence:'#06b6d4',negotiation:'#f97316',agreement:'#8b5cf6',registration:'#eab308',possession:'#22c55e'};
+  var body=rows.map(function(p){
+    var st=(p.legalStatus||'Pending');
+    var stCol=st==='Cleared'?'#2e7d32':'#e65100';
+    var prog=p.progress||0;
+    var items=p.legalItems||0;
+    return '<div style="border:1px solid #eee;border-radius:6px;padding:8px 10px;margin-bottom:6px;background:#fbfbfd;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+      '<div style="flex:1;min-width:180px"><div style="font-size:11px;font-weight:600">'+landEsc(p.name)+' <span style="font-size:8px;color:#999;font-weight:400">'+landEsc(p.id)+'</span></div>'+
+      '<div style="font-size:8px;color:#888;margin-top:2px">'+landEsc(p.location||'')+' · '+landEsc(p.area||'')+' · '+p.priceF+'</div>'+
+      '<div style="display:flex;gap:4px;margin-top:3px;flex-wrap:wrap"><span style="padding:0 4px;font-size:7px;border-radius:2px;background:'+(stageCol[p.stage]||'#888')+'22;color:'+(stageCol[p.stage]||'#888')+'">'+((stageLabels[p.stage]||p.stage||'').split(' ').slice(1).join(' ')||p.stage)+'</span>'+
+      '<span style="padding:0 4px;font-size:7px;border-radius:2px;background:'+(p.risk==='Low'?'#e8f5e9;color:#2e7d32':p.risk==='Medium'?'#fff3e0;color:#e65100':'#ffebee;color:#c62828')+'">'+p.risk+'</span>'+
+      '<span style="padding:0 4px;font-size:7px;border-radius:2px;background:'+stCol+'18;color:'+stCol+'">⚖ '+st+'</span></div></div>'+
+      '<div style="width:140px"><div style="display:flex;justify-content:space-between;font-size:8px;margin-bottom:2px"><span>Legal checklist</span><span style="font-weight:600">'+(items?prog+'%':'—')+'</span></div>'+
+      '<div class="progress-bar" style="height:5px"><div class="fill" style="width:'+prog+'%;background:'+(prog>70?'#2e7d32':prog>40?'#e65100':'#1565c0')+'"></div></div>'+
+      '<div style="font-size:7px;color:#888;margin-top:2px">'+(items?items+' items':'no checklist yet')+'</div></div>'+
+      '<div style="display:flex;gap:4px">'+
+        '<button class="action-btn" style="padding:3px 8px;font-size:9px" onclick="landLegalLoad(\''+p.id+'\')" title="Generate the standard 14-item legal checklist">📋 Generate</button>'+
+        '<button class="action-btn primary" style="padding:3px 8px;font-size:9px" onclick="openProposal(\''+p.id+'\',\'legal\')" title="Open the Legal tab and vet documents">⚖️ Vet</button>'+
+      '</div></div>';
+  }).join('');
+  return stats+body;
 }
 function renderCmpDashboard(){
   var total=mockCompliance.length,compliant=mockCompliance.filter(function(c){return c.status==='Compliant'}).length;
