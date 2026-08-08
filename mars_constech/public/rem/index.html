@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="pwa/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="pwa/icon-192.png">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-  <title>REM ERP v10 — PWA Edition</title>
+  <title>REM ERP v2.0 — PWA Edition (ERPNext-integrated)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -939,7 +939,7 @@
   <div id="sidebar">
     <div class="sidebar-logo">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-      <div class="sidebar-brand-text">REM ERP <span class="sb-version">v10.0</span></div>
+      <div class="sidebar-brand-text">REM ERP <span class="sb-version">v2.0</span></div>
     </div>
     <div class="sidebar-scroll" id="sidebarNav">
       <!-- G1: Executive -->
@@ -1170,9 +1170,11 @@ const API = {
   },
   async login(email, pass){
     const r = await this._req('POST','.login',{email,password:pass});
-    if(r.status===200 && r.data.token){ this.token=r.data.token; this.connected=true; localStorage.setItem('rem_api_token',this.token); localStorage.setItem('rem_api_url',this.url); if(r.data.user)localStorage.setItem('rem_api_user',r.data.user); }
+    if(r.status===200 && r.data.token){ this.token=r.data.token; this.connected=true; localStorage.setItem('rem_api_token',this.token); localStorage.setItem('rem_api_url',this.url); if(r.data.user)localStorage.setItem('rem_api_user',r.data.user); this._sessionExpiry=r.data.session_expiry||this._sessionExpiry; }
     return r;
   },
+  _sessionExpiry: null,
+  _serverSettings: null,
   async logout(){
     await this._req('POST','.logout',null);
     this.token=''; this.connected=false; localStorage.removeItem('rem_api_token');
@@ -1231,7 +1233,14 @@ const API = {
 setTimeout(function(){
   if(!API.token || !API._base())return;
   API._req('GET','.bootstrap').then(function(r){
-    if(r.status===200){ API.connected=true; API.lastSync=(r.data.meta||{}).server_time||null; localStorage.setItem('rem_last_sync',API.lastSync||''); }
+    if(r.status===200){
+      API.connected=true; API.lastSync=(r.data.meta||{}).server_time||null; localStorage.setItem('rem_last_sync',API.lastSync||'');
+      var _meta=r.data.meta||{};
+      API._serverSettings=_meta.settings||null;
+      API._sessionExpiry=_meta.session_expiry||API._sessionExpiry;
+      // v2.0 version check: server ships newer PWA → prompt reload
+      if(_meta.pwa_version && _meta.pwa_version!=='2.0.0'){ setTimeout(function(){ showToast('New PWA v'+_meta.pwa_version+' available — reload to update','info'); },2500); }
+    }
     else if(API.url.indexOf('mars_constech.mars_constech.api')<0 || API.url.indexOf(apiBaseUrl().split('/api/')[0])!==0){
       // Stale/wrong stored rem_api_url (wrong path like 'mars_constech.api', or
       // an origin that no longer matches this page / file:// opening) — heal
@@ -1275,14 +1284,41 @@ function syncPull(){
 
 
 // ═══ ERPNext CONNECTION CENTER (Settings › Server Sync) ═══
-function syncSaveCfg(){
+function syncSaveCfg(toServer){
   var cfg={};
   cfg.autoConnect=document.getElementById('cfgAutoConnect')?document.getElementById('cfgAutoConnect').checked:true;
   cfg.pushOnSave=document.getElementById('cfgPushSave')?document.getElementById('cfgPushSave').checked:true;
   cfg.autoHeal=document.getElementById('cfgHealUrl')?document.getElementById('cfgHealUrl').checked:true;
   cfg.liveLand=document.getElementById('cfgLiveLand')?document.getElementById('cfgLiveLand').checked:true;
   localStorage.setItem('rem_conn_cfg',JSON.stringify(cfg));
-  showToast('Connection config saved','success');
+  // v2.0: persist server-side (REM Settings) when connected — shared across devices
+  if(API.connected){
+    API._req('POST','.settings_set',{settings:{auto_connect:cfg.autoConnect?1:0,push_on_save:cfg.pushOnSave?1:0,auto_heal:cfg.autoHeal?1:0,live_land:cfg.liveLand?1:0}}).then(function(r){
+      if(r.status===200){ API._serverSettings=r.data; showToast('Config saved to ERPNext (REM Settings)','success'); }
+      else showToast((r.data&&r.data.error)||'Could not save config to ERPNext','error');
+    });
+  } else if(toServer){
+    showToast('Not connected — config kept locally only','info');
+  } else {
+    showToast('Connection config saved (local)','success');
+  }
+}
+function syncLoadFromERP(){
+  if(!API.connected){ showToast('Connect first to load settings from ERPNext','error'); return; }
+  API._req('GET','.settings_get').then(function(r){
+    if(r.status===200){
+      var s=r.data; API._serverSettings=s;
+      if(document.getElementById('cfgAutoConnect'))document.getElementById('cfgAutoConnect').checked=!!s.auto_connect;
+      if(document.getElementById('cfgPushSave'))document.getElementById('cfgPushSave').checked=!!s.push_on_save;
+      if(document.getElementById('cfgHealUrl'))document.getElementById('cfgHealUrl').checked=!!s.auto_heal;
+      if(document.getElementById('cfgLiveLand'))document.getElementById('cfgLiveLand').checked=!!s.live_land;
+      // mirror into local cache
+      localStorage.setItem('rem_conn_cfg',JSON.stringify({autoConnect:!!s.auto_connect,pushOnSave:!!s.push_on_save,autoHeal:!!s.auto_heal,liveLand:!!s.live_land}));
+      // version banner
+      if(s.pwa_version && s.pwa_version!=='2.0.0'){ showToast('New PWA version '+s.pwa_version+' available on server — reload to update','info'); }
+      showToast('Settings loaded from ERPNext','success');
+    } else showToast((r.data&&r.data.error)||'Load failed','error');
+  });
 }
 function syncResetUrl(){
   localStorage.removeItem('rem_api_url');
@@ -2836,7 +2872,7 @@ function renderDashboard(el){
   const a=mockPlots.filter(p=>p.status==='available').length, s=mockPlots.filter(p=>p.status==='sold').length, r=mockPlots.filter(p=>p.status==='reserved').length;
   const _saleVal=mockBookings.reduce((s,b)=>s+parseMoneyStr(b.price),0);
   const _sale26=mockBookings.filter(b=>String(b.date||'').indexOf('2026')>=0).reduce((s,b)=>s+parseMoneyStr(b.price),0);
-  el.innerHTML=`<div class="fade-in"><div class="page-title">Dashboard</div><div class="page-subtitle">REM ERP v10 · Role: ${currentRole} · ${Object.keys(GROUPS).reduce(function(s,g){return s+GROUPS[g].mods.length},0)} Modules</div>
+  el.innerHTML=`<div class="fade-in"><div class="page-title">Dashboard</div><div class="page-subtitle">REM ERP v2.0 · Role: ${currentRole} · ${Object.keys(GROUPS).reduce(function(s,g){return s+GROUPS[g].mods.length},0)} Modules</div>
     <div style="margin:8px 0"><button class="action-btn primary" onclick="printRoleReport()" style="padding:3px 12px;font-size:10px">🖨 Print Report</button></div>
     <div class="stats-row" style="margin-bottom:12px">${[
       ['Available Plots',a,'#4caf50','+2 this month'],['Sold Plots',s,'#e53935',''],['Reserved',r,'#1e88e5',''],
@@ -2889,7 +2925,7 @@ function renderDashSales(el){
   var stages=LEAD_STAGES.slice();var maxC=0;stages.forEach(function(s){if((stCount[s]||0)>maxC)maxC=stCount[s];});
   var hotLeads=mockLeads.slice().sort(function(a,b){var p={High:0,Medium:1,Low:2};return (p[a.priority]||9)-(p[b.priority]||9)}).slice(0,6);
   var recentB=mockBookings.slice().sort(function(a,b){return String(b.date).localeCompare(String(a.date))}).slice(0,6);
-  el.innerHTML='<div class="fade-in"><div class="page-title">Dashboard</div><div class="page-subtitle">REM ERP v10 · Role: Sales Agent · Pipeline &amp; Performance</div><div style="margin:8px 0"><button class="action-btn primary" onclick="printRoleReport()" style="padding:3px 12px;font-size:10px">🖨 Print Report</button></div>'
+  el.innerHTML='<div class="fade-in"><div class="page-title">Dashboard</div><div class="page-subtitle">REM ERP v2.0 · Role: Sales Agent · Pipeline &amp; Performance</div><div style="margin:8px 0"><button class="action-btn primary" onclick="printRoleReport()" style="padding:3px 12px;font-size:10px">🖨 Print Report</button></div>'
     +dashStats([['Pipeline Value','৳'+(pipeVal/10000000).toFixed(1)+' Cr','#2e7d32',''],['Hot Leads',hot,'#c62828',''],['Open Deals',openDeals,'#1565c0',''],['Sales YTD 2026','৳'+(sale26/10000000).toFixed(1)+' Cr','#2F80ED',''],['Confirmed Bookings',booked,'#00838f',''],['Conversion',conv+'%','#7b1fa2','']])
     +dashQuick([['CRM & Leads',mockLeads.length+' leads','crm','#fff3e0','#e65100'],['Bookings',mockBookings.length+' active','bookings','#e3f2fd','#1565c0'],['Proposals',(window.mockProposals||[]).length+' total','proposals','#ede7f6','#5e35b1'],['Dues & Recovery',mockDues.length+' accts','dues_recovery','#fce4ec','#c62828'],['Customers',mockCustomers.length+' clients','customers','#e0f2f1','#00695c']])
     +'<div class="dash-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
@@ -2925,7 +2961,7 @@ function renderDashFinance(el){
   var overInvs=mockInvoices.filter(function(i){return i.status==='Overdue'}).slice(0,6);
   var topDues=mockDues.slice().sort(function(a,b){return (b.due||0)-(a.due||0)}).slice(0,6);
   var recentTx=mockTransactions.slice().sort(function(a,b){return String(b.date).localeCompare(String(a.date))}).slice(0,6);
-  el.innerHTML='<div class="fade-in"><div class="page-title">Dashboard</div><div class="page-subtitle">REM ERP v10 · Role: Finance · Cash Position &amp; Receivables</div><div style="margin:8px 0"><button class="action-btn primary" onclick="printRoleReport()" style="padding:3px 12px;font-size:10px">🖨 Print Report</button></div>'
+  el.innerHTML='<div class="fade-in"><div class="page-title">Dashboard</div><div class="page-subtitle">REM ERP v2.0 · Role: Finance · Cash Position &amp; Receivables</div><div style="margin:8px 0"><button class="action-btn primary" onclick="printRoleReport()" style="padding:3px 12px;font-size:10px">🖨 Print Report</button></div>'
     +dashStats([['Bank Balance','৳'+(bankTotal/10000000).toFixed(2)+' Cr','#1565c0',''],['Cash Inflow','৳'+(inflow/100000).toFixed(1)+' L','#2e7d32',''],['Cash Outflow','৳'+(outflow/100000).toFixed(1)+' L','#c62828',''],['Receivables','৳'+(receiv/100000).toFixed(1)+' L','#e65100',''],['Overdue Invoices',overInv,'#c62828',''],['Dues Accounts',duesActive+' active','#e65100','']])
     +dashQuick([['Finance',mockTransactions.length+' txns','finance','#fce4ec','#c62828'],['Bookings',mockBookings.length+' active','bookings','#e8f5e9','#2e7d32'],['Dues & Recovery',mockDues.length+' accts','dues_recovery','#fff3e0','#e65100'],['Investment & Loans','6 inv · 5 loans','investment_loans','#ede7f6','#5e35b1'],['Customers',mockCustomers.length+' clients','customers','#e0f7fa','#00838f']])
     +'<div class="dash-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
@@ -2958,7 +2994,7 @@ function renderDashEngineer(el){
   var pA=mockPlots.filter(function(p){return p.status==='available'}).length;
   var lowInv=mockInventory.filter(function(i){return i.status!=='Adequate'||(i.reorder&&i.qty<=i.reorder);});
   var unitsByProj=mockProperties.slice().sort(function(a,b){return (b.units||[]).length-(a.units||[]).length}).slice(0,5);
-  el.innerHTML='<div class="fade-in"><div class="page-title">Dashboard</div><div class="page-subtitle">REM ERP v10 · Role: Site Engineer · Projects &amp; Construction</div><div style="margin:8px 0"><button class="action-btn primary" onclick="printRoleReport()" style="padding:3px 12px;font-size:10px">🖨 Print Report</button></div>'
+  el.innerHTML='<div class="fade-in"><div class="page-title">Dashboard</div><div class="page-subtitle">REM ERP v2.0 · Role: Site Engineer · Projects &amp; Construction</div><div style="margin:8px 0"><button class="action-btn primary" onclick="printRoleReport()" style="padding:3px 12px;font-size:10px">🖨 Print Report</button></div>'
     +dashStats([['Active Projects',actP,'#2e7d32',''],['Avg Progress',avgProg+'%','#2F80ED',''],['Units Sold',uS,'#c62828',''],['Units Available',uA,'#2e7d32',''],['Plots Available',pA,'#4caf50',''],['Stock Alerts',lowInv.length,'#e65100','']])
     +dashQuick([['Projects',mockProjects.length+' active','projects','#e0f2f1','#00695c'],['Flats & Units',mockProperties.length+' props','properties_units','#e3f2fd','#1565c0'],['Plots & Blocks',mockPlots.length+' plots','plots','#e8f5e9','#2e7d32'],['Stock & Procurement',mockInventory.length+' items','stock','#fff3e0','#e65100'],['Contractors',mockContractors.length+' vendors','contractors','#fce4ec','#c62828']])
     +'<div class="dash-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
@@ -2987,7 +3023,7 @@ function renderDashEngineerCharts(){
 // ═══ ROLE REPORT PACKS (B1) — one-click printable per-role reports ═══
 function printRoleReport(){
   var role=currentRole;
-  var title='REM ERP v10 — '+(role==='Super Admin'?'Executive':role)+' Report';
+  var title='REM ERP v2.0 — '+(role==='Super Admin'?'Executive':role)+' Report';
   var when=new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
   function row(l,v){return '<tr><td style="padding:5px 10px;border-bottom:1px solid #eee;font-size:11px;color:#555">'+l+'</td><td style="padding:5px 10px;border-bottom:1px solid #eee;font-size:12px;font-weight:600;text-align:right">'+v+'</td></tr>';}
   function sec(t){return '<div style="font-size:13px;font-weight:700;color:#2F80ED;margin:16px 0 6px">'+t+'</div>';}
@@ -3035,7 +3071,7 @@ function printRoleReport(){
     body+=sec('Recent Bookings')+'<table style="width:100%;border-collapse:collapse"><tr>'+th('ID')+th('Client')+th('Amount','right')+th('Status')+'</tr>'+mockBookings.slice().sort(function(a,b){return String(b.date).localeCompare(String(a.date))}).slice(0,8).map(function(b){return '<tr>'+td(b.id)+td(b.client)+td(b.price,'right')+td(b.status)+'</tr>';}).join('')+'</table>';
   }
   var html='<div style="font-family:Inter,Arial,sans-serif;max-width:720px;margin:0 auto;padding:24px;color:#222">'
-    +'<div style="border-bottom:3px solid #2F80ED;padding-bottom:12px;margin-bottom:14px"><div style="font-size:18px;font-weight:800;color:#2F80ED">REM ERP v10</div><div style="font-size:14px;font-weight:600;margin-top:2px">'+title+'</div><div style="font-size:10px;color:#888;margin-top:3px">Generated '+when+' · Role: '+role+' · '+mockProjects.length+' projects · '+mockBookings.length+' bookings</div></div>'
+    +'<div style="border-bottom:3px solid #2F80ED;padding-bottom:12px;margin-bottom:14px"><div style="font-size:18px;font-weight:800;color:#2F80ED">REM ERP v2.0</div><div style="font-size:14px;font-weight:600;margin-top:2px">'+title+'</div><div style="font-size:10px;color:#888;margin-top:3px">Generated '+when+' · Role: '+role+' · '+mockProjects.length+' projects · '+mockBookings.length+' bookings</div></div>'
     +body
     +'<div style="margin-top:18px;border-top:1px solid #ddd;padding-top:8px;font-size:9px;color:#999;text-align:center">REM Real Estate Management Ltd — 50 modules · 11 groups · Confidential demo data · MARS Construction proposal</div>'
     +'</div>';
@@ -9621,7 +9657,7 @@ window.mockCreditNotes = DB.init('credit_notes', [
 ]);
 function _balNum(s){return parseInt(String(s||'').replace(/[^0-9]/g,''))||0;}
 window.mockLicense = DB.init('license', {
-  product:'REM ERP v10',client:'MARS CONSTECH LIMITED',licenseKey:'MMC-2026-REM10-4831',status:'Active',issued:'2026-07-01',expires:'2027-01-31',serverFee:12000,supportFee:10000,
+  product:'REM ERP v2.0',client:'MARS CONSTECH LIMITED',licenseKey:'MMC-2026-REM10-4831',status:'Active',issued:'2026-07-01',expires:'2027-01-31',serverFee:12000,supportFee:10000,
   contract:800000,
   installments:[
     {no:1,label:'Advance (15%)',amount:120000,due:'2026-07-15',status:'Paid',paidDate:'2026-07-14'},
@@ -9649,7 +9685,7 @@ function renderLicense(el){
   var doneCheck=L.checklist.filter(function(c){return c.status==='Done';}).length;
   var stCol={Active:'#2e7d32',Grace:'#e65100',Suspended:'#c62828'}[L.status]||'#888';
   var stBg={Active:'#e8f5e9',Grace:'#fff3e0',Suspended:'#ffebee'}[L.status]||'#f5f5f5';
-  el.innerHTML='<div class="fade-in"><div class="page-title">License & SLA</div><div class="page-subtitle">REM ERP v10 · '+L.client+' · Contract \u09F3'+L.contract.toLocaleString('en-IN')+' · '+pct+'% collected</div>'+
+  el.innerHTML='<div class="fade-in"><div class="page-title">License & SLA</div><div class="page-subtitle">REM ERP v2.0 · '+L.client+' · Contract \u09F3'+L.contract.toLocaleString('en-IN')+' · '+pct+'% collected</div>'+
     (L.status==='Suspended'?'<div style="margin-bottom:8px;padding:10px 14px;background:#ffebee;border:1px solid #ffcdd2;border-radius:8px;font-size:11px;color:#c62828;font-weight:600">⛔ LICENSE SUSPENDED — subscription payments overdue. System is in read-only mode until reconciliation. Contact BITSCOL support (server ৳'+L.serverFee.toLocaleString('en-IN')+'/mo · support ৳'+L.supportFee.toLocaleString('en-IN')+'/mo).</div>':'')+
     (L.status==='Grace'?'<div style="margin-bottom:8px;padding:10px 14px;background:#fff3e0;border:1px solid #ffe0b2;border-radius:8px;font-size:11px;color:#e65100;font-weight:600">⚠ GRACE PERIOD — installment '+L.installments.filter(function(i){return i.status==='Due';}).map(function(i){return '#'+i.no;}).join(', ')+' is due. Pay within 15 days to avoid suspension.</div>':'')+
     '<div class="stats-row" style="margin-bottom:8px">'+[
@@ -12149,6 +12185,7 @@ function renderSettings(el){
     mc='<div class="card"><div class="card-header"><h3>🗂️ Menu Setup</h3><div style="font-size:9px;color:#888">Show/hide sidebar groups & reorder them (sidebar, mobile nav & search follow this order)</div></div><div class="card-body" style="padding:8px;max-height:560px;overflow-y:auto">'+grpRows+'</div></div>'+
       '<div style="margin-top:6px;padding:8px 10px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;font-size:9px;color:#2e7d32">💡 Hiding a group hides its sidebar icon and removes it from the mobile nav & search — module permissions are unchanged.</div>';
   }else if(settingsTab==='sync'){
+    var _sv=(API._serverSettings||{});
     var _lastSync=API.lastSync?String(API.lastSync).slice(0,19).replace('T',' '):'—';
     var _storedUrl=localStorage.getItem('rem_api_url')||'';
     var _connCfg=JSON.parse(localStorage.getItem('rem_conn_cfg')||'{}');
@@ -12177,8 +12214,9 @@ function renderSettings(el){
       (_storedUrl&&_storedUrl!==API._base()?'<div style="font-size:9px;color:#e65100;margin-bottom:4px">⚠ Stored URL ('+landEsc(_storedUrl)+') differs from the field above — Connect will use the field value; Reset URL clears the stored one.</div>':'')+
       '<div style="font-size:9px;color:#999">URL is auto-derived from the page origin when empty; stored URL (localStorage rem_api_url) overrides it until Reset. If the stored URL is stale the app auto-heals on any failed call.</div>'+
     '</div></div>'+
-    // ---------- 2. CONFIGURATION ----------
-    '<div class="card" style="margin-bottom:10px"><div class="card-header"><h3>⚙️ Connection Configuration</h3><span style="font-size:9px;color:#888">persisted in this browser (localStorage)</span></div><div class="card-body">'+
+    // ---------- 2. CONFIGURATION (server-backed: REM Settings in ERPNext) ----------
+    '<div class="card" style="margin-bottom:10px"><div class="card-header"><h3>⚙️ Connection Configuration</h3><span class="badge-status '+(API.connected?'badge-active':'badge-closed')+'" style="margin-left:6px;font-size:9px">'+(API.connected?'synced to ERPNext (REM Settings)':'local only · connect to sync')+'</span></div><div class="card-body">'+
+      '<div style="font-size:9px;color:#666;line-height:1.6;margin-bottom:8px">'+(API.connected?'Settings are stored in the <b>REM Settings</b> doctype on the ERPNext server and shared across every browser/device. Changes below save immediately to ERPNext.':'Settings are cached in this browser. Connect to ERPNext to persist them server-side (REM Settings doctype) and share them across devices.')+'</div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'+
         '<label style="display:flex;align-items:center;gap:6px;font-size:10px;padding:5px 8px;background:#f9f9fb;border-radius:4px;cursor:pointer"><input type="checkbox" id="cfgAutoConnect" '+( _autoConn?'checked':'')+' onchange="syncSaveCfg()"/> Auto-connect on load</label>'+
         '<label style="display:flex;align-items:center;gap:6px;font-size:10px;padding:5px 8px;background:#f9f9fb;border-radius:4px;cursor:pointer"><input type="checkbox" id="cfgPushSave" '+( _pushSave?'checked':'')+' onchange="syncSaveCfg()"/> Push on every save (debounced)</label>'+
@@ -12186,15 +12224,26 @@ function renderSettings(el){
         '<label style="display:flex;align-items:center;gap:6px;font-size:10px;padding:5px 8px;background:#f9f9fb;border-radius:4px;cursor:pointer"><input type="checkbox" id="cfgLiveLand" '+( _connCfg.liveLand?'checked':'')+' onchange="syncSaveCfg()"/> Live land pipeline (Legal Vetting reads ERP)</label>'+
       '</div>'+
       '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
-        '<button class="action-btn secondary" onclick="syncClearStorage()" style="padding:3px 10px;font-size:9px">🧹 Clear stored connection (token/URL)</button>'+
-        '<button class="action-btn secondary" onclick="syncSaveCfg(true)" style="padding:3px 10px;font-size:9px">💾 Save config</button>'+
+        (API.connected?'<button class="action-btn secondary" onclick="syncLoadFromERP()" style="padding:3px 10px;font-size:9px">⬇ Reload settings from ERP</button>':'')+
+        (API.connected?'<button class="action-btn secondary" onclick="syncSaveCfg(true)" style="padding:3px 10px;font-size:9px">💾 Save config to ERP</button>':'')+
+        '<button class="action-btn secondary" onclick="syncClearStorage()" style="padding:3px 10px;font-size:9px">🧹 Clear local connection (token/URL)</button>'+
       '</div>'+
+    '</div></div>'+
+    // ---------- 2b. SYSTEM (ERPNext System Settings mirror) ----------
+    '<div class="card" style="margin-bottom:10px"><div class="card-header"><h3>🖥️ ERPNext System Info</h3><span style="font-size:9px;color:#888">read from the Frappe server</span></div><div class="card-body">'+
+      (API.connected?('<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">'+
+        '<div style="padding:6px 8px;background:#f9f9fb;border-radius:6px;font-size:10px"><div style="color:#888;font-size:9px">PWA version (server)</div><div style="font-weight:600" id="sysPwaVersion">'+(_sv.pwa_version||'—')+'</div></div>'+
+        '<div style="padding:6px 8px;background:#f9f9fb;border-radius:6px;font-size:10px"><div style="color:#888;font-size:9px">Session expiry (System Settings)</div><div style="font-weight:600" id="sysSessionExpiry">'+(_sv.session_expiry||'—')+'</div></div>'+
+        '<div style="padding:6px 8px;background:#f9f9fb;border-radius:6px;font-size:10px"><div style="color:#888;font-size:9px">Last connected user</div><div style="font-weight:600">'+(_sv.last_connected_user||'—')+'</div></div>'+
+        '<div style="padding:6px 8px;background:#f9f9fb;border-radius:6px;font-size:10px"><div style="color:#888;font-size:9px">Last sync (server)</div><div style="font-weight:600">'+(_sv.last_sync_time||'—')+'</div></div>'+
+      '</div>') : '<div style="font-size:9px;color:#888">Connect to see ERPNext System Settings (session expiry, versions, last activity).</div>')+
+      '<div style="font-size:9px;color:#999;margin-top:6px">Session auth is native ERPNext: login mints a Frappe session (sid) which every call passes as <code>?sid=</code> — no custom tokens. If the session expires, reconnect with your ERPNext credentials.</div>'+
     '</div></div>'+
     // ---------- 3. API TESTER ----------
     '<div class="card" style="margin-bottom:10px"><div class="card-header"><h3>🧪 API Tester</h3><span style="font-size:9px;color:#888">call any bridge endpoint from here</span></div><div class="card-body">'+
       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'+
         '<div class="form-group"><label class="form-label">Endpoint</label><select class="form-input" id="apiTestEp">'+
-          ['index','login','logout','bootstrap','sync','land_pipeline','land_sync','land_legal_checklist','land_legal_update','land_legal_load_standard','download_invoice','demo_confirm'].map(function(e){return '<option value="'+e+'">'+e+'</option>';}).join('')+
+          ['index','login','logout','bootstrap','sync','land_pipeline','land_sync','land_legal_checklist','land_legal_update','land_legal_load_standard','download_invoice','demo_confirm','settings_get','settings_set'].map(function(e){return '<option value="'+e+'">'+e+'</option>';}).join('')+
         '</select></div>'+
         '<div class="form-group"><label class="form-label">Method</label><select class="form-input" id="apiTestMethod"><option>GET</option><option>POST</option></select></div>'+
         '<div class="form-group"><label class="form-label">Query / name (optional)</label><input class="form-input" id="apiTestQ" placeholder="name=LA-00021&amp;invoice=ACC-SINV-2026-00002"/></div>'+
@@ -12499,7 +12548,7 @@ function printReport(){
     h+=t.outerHTML;
     rows+=t.querySelectorAll('tbody tr').length;
   });
-  h+='<div class="pr-foot"><span>Total Records: '+rows+'</span><span>REM ERP v10</span><span>Generated: '+dateStr+'</span></div>';
+  h+='<div class="pr-foot"><span>Total Records: '+rows+'</span><span>REM ERP v2.0</span><span>Generated: '+dateStr+'</span></div>';
   pr.innerHTML=h;
   pr.style.display='block';
   setTimeout(function(){

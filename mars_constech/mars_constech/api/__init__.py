@@ -42,10 +42,20 @@ def login(usr=None, pwd=None, email=None, password=None):
 
 	token = frappe.local.session.sid if frappe.local.session else frappe.session.sid
 	frappe.db.commit()
+	# Track last connected user server-side (REM Settings) so other browsers see it.
+	try:
+		doc = frappe.get_single("REM Settings")
+		doc.last_connected_user = user
+		doc.last_sync_time = frappe.utils.now()
+		doc.save(ignore_permissions=True)
+		frappe.db.commit()
+	except Exception:
+		frappe.db.rollback()
 	return {
 		"token": token,
 		"full_name": frappe.utils.get_fullname(user),
 		"user": user,
+		"session_expiry": _session_expiry_hint(),
 	}
 
 
@@ -72,7 +82,14 @@ def bootstrap():
 			collections[r.collection_key] = []
 	return {
 		"collections": collections,
-		"meta": {"server_time": frappe.utils.now(), "source": "frappe"},
+		"meta": {
+			"server_time": frappe.utils.now(),
+			"source": "frappe",
+			"pwa_version": _rem_settings().get("pwa_version", "2.0.0"),
+			"settings": _rem_settings(),
+			"session_expiry": _session_expiry_hint(),
+			"user": frappe.session.user,
+		},
 	}
 
 
@@ -489,6 +506,99 @@ def land_legal_load_standard(name=None):
 # --------------------------------------------------------------------------
 
 
+# ═══ REM SETTINGS (PWA v2.0 server-backed connection config) ═══
+
+def _rem_settings():
+	"""REM Settings single as a plain dict (never raises)."""
+	try:
+		doc = _rem_settings_doc()
+		return {
+			"pwa_version": doc.pwa_version or "2.0.0",
+			"api_base_override": doc.api_base_override or "",
+			"auto_connect": bool(doc.auto_connect),
+			"push_on_save": bool(doc.push_on_save),
+			"auto_heal": bool(doc.auto_heal),
+			"live_land": bool(doc.live_land),
+			"session_expiry": doc.session_expiry_hint or "",
+			"last_connected_user": doc.last_connected_user or "",
+			"last_sync_time": doc.last_sync_time or "",
+		}
+	except Exception:
+		return {
+			"pwa_version": "2.0.0",
+			"api_base_override": "",
+			"auto_connect": True,
+			"push_on_save": True,
+			"auto_heal": True,
+			"live_land": True,
+			"session_expiry": "",
+			"last_connected_user": "",
+			"last_sync_time": "",
+		}
+
+
+def _rem_settings_doc():
+	"""Get-or-create the REM Settings single document.
+
+	NOTE: frappe.db.exists() on a Single doctype name matches the DocType row
+	in tabDocType, NOT the singles record — always get-or-create via try/except.
+	"""
+	try:
+		return frappe.get_doc("REM Settings", "REM Settings")
+	except frappe.DoesNotExistError:
+		# Create via db_set (no permission checks, no sbool coercion).
+		doc = frappe.new_doc("REM Settings")
+		doc.pwa_version = "2.0.0"
+		doc.auto_connect = 1
+		doc.push_on_save = 1
+		doc.auto_heal = 1
+		doc.live_land = 1
+		doc.flags.ignore_permissions = True
+		doc.insert(ignore_permissions=True)
+		frappe.db.commit()
+		return frappe.get_doc("REM Settings", "REM Settings")
+
+
+def _session_expiry_hint():
+	"""Mirror ERPNext System Settings session_expiry (e.g. '06:00:00')."""
+	try:
+		return frappe.db.get_single_value("System Settings", "session_expiry") or ""
+	except Exception:
+		return ""
+
+
+@frappe.whitelist()
+def settings_get():
+	"""Return the server-backed connection config (REM Settings)."""
+	return _rem_settings()
+
+
+@frappe.whitelist()
+def settings_set(settings=None):
+	"""Persist PWA connection config into REM Settings (server-side, shared)."""
+	if not settings or not isinstance(settings, dict):
+		frappe.throw(_("settings must be an object"), frappe.ValidationError)
+	allowed = {
+		"pwa_version", "api_base_override", "auto_connect", "push_on_save",
+		"auto_heal", "live_land",
+	}
+	doc = _rem_settings_doc()  # ensure the single exists
+	for k, v in settings.items():
+		if k not in allowed:
+			continue
+		# db_set() bypasses doctype permissions (the whitelisted endpoint is the
+		# guard) and does NOT sbool-coerce — set_single_value() turns "2.0.0"
+		# into 1 via sbool, corrupting Data fields.
+		if k in ("auto_connect", "push_on_save", "auto_heal", "live_land"):
+			doc.db_set(k, 1 if v else 0)
+		else:
+			doc.db_set(k, str(v or ""))
+	# keep the session-expiry hint current from System Settings
+	doc.db_set("session_expiry_hint", _session_expiry_hint())
+	frappe.db.commit()
+	return _rem_settings()
+
+
 @frappe.whitelist(allow_guest=True)
 def index():
     """GET-able landing for the API base URL: endpoint map + health."""
@@ -505,6 +615,8 @@ def index():
         "land_legal_load_standard",
         "download_invoice",
         "demo_confirm",
+        "settings_get",
+        "settings_set",
     ]
     return {
         "service": "MARS Constech REM ERP API bridge",
