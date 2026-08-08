@@ -43,6 +43,7 @@ class LandAcquisition(Document):
 		self.update_feasibility_score()
 		self.update_risk_rating()
 		self.compute_commission()
+		self.compute_financials()
 		self.load_standard_checklist_on_due_diligence()
 		self.update_legal_checklist_progress()
 		self.log_stage_transition()
@@ -257,6 +258,88 @@ class LandAcquisition(Document):
 	def compute_commission(self):
 		if self.deal_value and self.commission_pct:
 			self.commission_amount = round(self.deal_value * self.commission_pct / 100.0, 0)
+
+	# ------------------------------------------------------------------
+	# Financial model (mirrors the V10 landFinancials() exactly):
+	#   total cost = deal + registration fee + commission + legal +
+	#                soil test + earth filling + boundary wall + misc
+	#   ROI = (expected revenue - total cost) / total cost
+	# ------------------------------------------------------------------
+	def compute_financials(self):
+		deal = self.deal_value or self.negotiated_price or self.asking_price or 0
+		if not deal:
+			self.total_project_cost = 0
+			self.net_profit_est = 0
+			self.estimated_roi = 0
+			return
+
+		reg_fee = deal * (self.registration_pct or 12) / 100.0
+		misc = deal * (self.misc_pct or 5) / 100.0
+		dev_costs = (
+			(self.legal_cost or 0)
+			+ (self.soil_test_cost or 0)
+			+ (self.earth_filling_cost or 0)
+			+ (self.boundary_wall_cost or 0)
+		)
+		self.total_project_cost = round(
+			deal + reg_fee + (self.commission_amount or 0) + dev_costs + misc, 0
+		)
+
+		if self.expected_revenue:
+			self.net_profit_est = round(self.expected_revenue - self.total_project_cost, 0)
+			if self.total_project_cost:
+				self.estimated_roi = round(
+					(self.net_profit_est / self.total_project_cost) * 100.0, 1
+				)
+			else:
+				self.estimated_roi = 0
+		else:
+			self.net_profit_est = 0
+			self.estimated_roi = 0
+
+	# ------------------------------------------------------------------
+	# Handoff: turn an acquired land parcel into a real ERPNext Project
+	# (B milestone — the prototype's "Merge to Project / Create Project")
+	# ------------------------------------------------------------------
+	@frappe.whitelist()
+	def create_project_from_acquisition(self):
+		"""At Possession, create (or link) a real ERPNext Project so the land
+		becomes a development project with its own budget and lifecycle.
+
+		- If target_project is already set: just returns it.
+		- Otherwise creates a Project named after the parcel and links it.
+		"""
+		if self.current_stage not in ("Registration", "Possession"):
+			frappe.throw(
+				_("Project handoff is only available from the Registration or "
+				  "Possession stage."),
+				title=_("Project Handoff"),
+			)
+		if self.target_project:
+			return {"project": self.target_project, "created": False}
+
+		project_name = "{0} - {1}".format(
+			self.land_acquisition_title or "Land Parcel",
+			self.mouza or self.land_location or self.name,
+		)
+		project = frappe.get_doc(
+			{
+				"doctype": "Project",
+				"project_name": project_name,
+				"status": "Open",
+				"expected_start_date": self.acquisition_date,
+				"notes": "Created from Land Acquisition {0} (deal {1}).".format(
+					self.name, self.deal_value or 0
+				),
+				"custom_acquisition_reference": self.name,
+			}
+		)
+		project.flags.ignore_permissions = True
+		project.insert(ignore_permissions=True)
+
+		self.target_project = project.name
+		self.save(ignore_permissions=True)
+		return {"project": project.name, "created": True}
 
 	# ------------------------------------------------------------------
 	# Stage audit trail

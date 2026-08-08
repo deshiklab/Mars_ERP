@@ -43,7 +43,27 @@
   "budget",
   "commission_pct",
   "commission_amount",
+  "registration_pct",
+  "misc_pct",
+  "legal_cost",
+  "soil_test_cost",
+  "earth_filling_cost",
+  "boundary_wall_cost",
+  "expected_revenue",
+  "total_project_cost",
+  "net_profit_est",
   "estimated_roi",
+  "section_break_acquisition",
+  "bayna_amount",
+  "saf_kabala_amount",
+  "mutation_status",
+  "section_break_feasibility",
+  "survey_status",
+  "feasibility_status",
+  "section_break_planning",
+  "env_clearance_status",
+  "rajuk_status",
+  "layout_status",
   "section_break_documents",
   "documents",
   "section_break_legal",
@@ -270,9 +290,133 @@
    "read_only": 1
   },
   {
+   "default": "12",
+   "fieldname": "registration_pct",
+   "fieldtype": "Percent",
+   "label": "Registration Fee (%)",
+   "description": "Stamp duty + registration, typically ~12% of deal value (Bangladesh)"
+  },
+  {
+   "default": "5",
+   "fieldname": "misc_pct",
+   "fieldtype": "Percent",
+   "label": "Miscellaneous (%)",
+   "description": "Contingency percentage applied on top of the deal value"
+  },
+  {
+   "fieldname": "legal_cost",
+   "fieldtype": "Currency",
+   "label": "Legal / Vetting Cost",
+   "description": "Lawyer fees, due diligence costs"
+  },
+  {
+   "fieldname": "soil_test_cost",
+   "fieldtype": "Currency",
+   "label": "Soil Test / Survey Cost"
+  },
+  {
+   "fieldname": "earth_filling_cost",
+   "fieldtype": "Currency",
+   "label": "Earth Filling Cost"
+  },
+  {
+   "fieldname": "boundary_wall_cost",
+   "fieldtype": "Currency",
+   "label": "Boundary Wall Cost"
+  },
+  {
+   "fieldname": "expected_revenue",
+   "fieldtype": "Currency",
+   "label": "Expected Revenue",
+   "description": "Projected sales value after development (mirrors V10 financial model)"
+  },
+  {
+   "fieldname": "total_project_cost",
+   "fieldtype": "Currency",
+   "label": "Total Project Cost",
+   "read_only": 1,
+   "description": "Deal + registration + commission + dev costs + misc (auto)"
+  },
+  {
+   "fieldname": "net_profit_est",
+   "fieldtype": "Currency",
+   "label": "Net Profit (Est.)",
+   "read_only": 1,
+   "description": "Expected Revenue − Total Project Cost (auto)"
+  },
+  {
    "fieldname": "estimated_roi",
    "fieldtype": "Percent",
-   "label": "Estimated ROI (%)"
+   "label": "Estimated ROI (%)",
+   "read_only": 1,
+   "description": "Net Profit / Total Project Cost (auto)"
+  },
+  {
+   "fieldname": "section_break_acquisition",
+   "fieldtype": "Section Break",
+   "label": "Acquisition & Mutation"
+  },
+  {
+   "fieldname": "bayna_amount",
+   "fieldtype": "Currency",
+   "label": "Bayna / Advance Paid"
+  },
+  {
+   "fieldname": "saf_kabala_amount",
+   "fieldtype": "Currency",
+   "label": "Saf Kabala (Final) Amount"
+  },
+  {
+   "default": "Not Started",
+   "fieldname": "mutation_status",
+   "fieldtype": "Select",
+   "label": "Mutation Status",
+   "options": "Not Started\nApplication Submitted\nHearing Done\nDCR & Parcha Received\nCompleted"
+  },
+  {
+   "fieldname": "section_break_feasibility",
+   "fieldtype": "Section Break",
+   "label": "Feasibility & Survey"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "survey_status",
+   "fieldtype": "Select",
+   "label": "Digital Survey Status",
+   "options": "Pending\nScheduled\nIn Progress\nCompleted"
+  },
+  {
+   "default": "Pending Visit",
+   "fieldname": "feasibility_status",
+   "fieldtype": "Select",
+   "label": "Feasibility Status",
+   "options": "Pending Visit\nSurveying\nFinancial Modeling\nFeasible\nRejected"
+  },
+  {
+   "fieldname": "section_break_planning",
+   "fieldtype": "Section Break",
+   "label": "Planning & Approvals"
+  },
+  {
+   "default": "Not Required",
+   "fieldname": "env_clearance_status",
+   "fieldtype": "Select",
+   "label": "Environment Clearance",
+   "options": "Not Required\nNot Started\nSubmitted\nApproved\nRejected"
+  },
+  {
+   "default": "Not Required",
+   "fieldname": "rajuk_status",
+   "fieldtype": "Select",
+   "label": "RAJUK / Town Planning",
+   "options": "Not Required\nNot Started\nSubmitted\nApproved\nRejected"
+  },
+  {
+   "default": "Not Started",
+   "fieldname": "layout_status",
+   "fieldtype": "Select",
+   "label": "Master Layout Status",
+   "options": "Not Started\nDrafting\nSubmitted\nApproved"
   },
   {
    "fieldname": "section_break_documents",
