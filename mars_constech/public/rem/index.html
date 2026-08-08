@@ -1157,7 +1157,7 @@ const API = {
   },
   async login(email, pass){
     const r = await this._req('POST','.login',{email,password:pass});
-    if(r.status===200 && r.data.token){ this.token=r.data.token; this.connected=true; localStorage.setItem('rem_api_token',this.token); localStorage.setItem('rem_api_url',this.url); }
+    if(r.status===200 && r.data.token){ this.token=r.data.token; this.connected=true; localStorage.setItem('rem_api_token',this.token); localStorage.setItem('rem_api_url',this.url); if(r.data.user)localStorage.setItem('rem_api_user',r.data.user); }
     return r;
   },
   async logout(){
@@ -1240,7 +1240,7 @@ function syncConnect(){
   API.url=url;
   API.login(em,pw).then(function(r){
     if(r.status===200){
-      showToast('Connected to server','success');
+      if(r.data.user)localStorage.setItem('rem_api_user',r.data.user); showToast('Connected to server','success');
       // First push local (rich seed) to the server so the server has full shapes
       API.pushAll().then(function(pr){
         if(pr.status===200)showToast('Pushed '+pr.data.rows+' rows to server','success');
@@ -1260,6 +1260,90 @@ function syncPull(){
 
 
 
+
+// ═══ ERPNext CONNECTION CENTER (Settings › Server Sync) ═══
+function syncSaveCfg(){
+  var cfg={};
+  cfg.autoConnect=document.getElementById('cfgAutoConnect')?document.getElementById('cfgAutoConnect').checked:true;
+  cfg.pushOnSave=document.getElementById('cfgPushSave')?document.getElementById('cfgPushSave').checked:true;
+  cfg.autoHeal=document.getElementById('cfgHealUrl')?document.getElementById('cfgHealUrl').checked:true;
+  cfg.liveLand=document.getElementById('cfgLiveLand')?document.getElementById('cfgLiveLand').checked:true;
+  localStorage.setItem('rem_conn_cfg',JSON.stringify(cfg));
+  showToast('Connection config saved','success');
+}
+function syncResetUrl(){
+  localStorage.removeItem('rem_api_url');
+  API.url=location.origin+'/api/method/mars_constech.mars_constech.api';
+  localStorage.setItem('rem_api_url',API.url);
+  showToast('URL reset to '+API.url,'success');
+  renderModule();
+}
+function syncClearStorage(){
+  localStorage.removeItem('rem_api_url');
+  localStorage.removeItem('rem_api_token');
+  localStorage.removeItem('rem_api_user');
+  API.token=''; API.connected=false;
+  showToast('Stored connection cleared — reconnect to ERPNext','info');
+  renderModule();
+}
+function apiTestSend(){
+  var ep=(document.getElementById('apiTestEp')||{}).value||'index';
+  var method=((document.getElementById('apiTestMethod')||{}).value||'GET').toUpperCase();
+  var q=(document.getElementById('apiTestQ')||{}).value||'';
+  var bodyRaw=(document.getElementById('apiTestBody')||{}).value||'';
+  var el=document.getElementById('apiTestResult');
+  var path='.'+ep+(q?'?'+q:'');
+  var body=null;
+  if(bodyRaw.trim()){ try{ body=JSON.parse(bodyRaw); }catch(e){ el.textContent='❌ Invalid JSON body: '+e.message; return; } }
+  el.textContent='⏳ '+method+' '+path+' …';
+  var t0=Date.now();
+  API._req(method,path,body).then(function(r){
+    var ms=Date.now()-t0;
+    var pretty=JSON.stringify(r.data,null,2);
+    if(r.status===200)el.textContent='✅ 200 OK · '+ms+' ms\n\n'+pretty;
+    else el.textContent='⚠ HTTP '+r.status+' · '+ms+' ms\n\n'+pretty;
+  });
+}
+function apiTestQuick(which){
+  if(which==='index'){ apiTestSet('.index','GET',''); }
+  else if(which==='pipeline'){ apiTestSet('.land_pipeline','GET',''); }
+  else if(which==='legal'){ apiTestSet('.land_legal_checklist?name=LA-00021','GET',''); }
+  else if(which==='login'){ apiTestSet('.login','POST','{"email":"'+(localStorage.getItem('rem_api_user')||'manager@mars.com')+'","password":"Bismillah@123"}'); }
+  apiTestSend();
+}
+function apiTestSet(path,method,body){
+  var ep=path.replace(/^\./,'').split('?')[0];
+  var sel=document.getElementById('apiTestEp'); if(sel){ for(var i=0;i<sel.options.length;i++){ if(sel.options[i].value===ep)sel.selectedIndex=i; } }
+  var mm=document.getElementById('apiTestMethod'); if(mm)mm.value=method;
+  var q=document.getElementById('apiTestQ'); if(q)q.value=path.split('?')[1]||'';
+  var b=document.getElementById('apiTestBody'); if(b)b.value=body;
+}
+function syncTestAll(){
+  showToast('Running API diagnostics…','info');
+  var out=document.getElementById('apiTestResult');
+  var log=[]; var ok=0, fail=0;
+  var tests=[
+    ['index (guest)','.index','GET',null],
+    ['bootstrap (auth)','.bootstrap','GET',null],
+    ['land_pipeline','.land_pipeline','GET',null],
+    ['legal checklist LA-00021','.land_legal_checklist?name=LA-00021','GET',null]
+  ];
+  (function run(i){
+    if(i>=tests.length){
+      var summary='\n════ SUMMARY ════\n✅ '+ok+' passed · ❌ '+fail+' failed'+(API.connected?'':'\nℹ Not connected — auth endpoints may 403 (expected)');
+      out.textContent=log.join('\n')+summary;
+      showToast(fail===0?'All '+ok+' API tests passed':'API tests: '+ok+' ok, '+fail+' failed',fail===0?'success':'error');
+      return;
+    }
+    var t=tests[i];
+    API._req(t[2],t[1],t[3]).then(function(r){
+      var ms=' ('+(r.status===200?'200 OK':'HTTP '+r.status)+')';
+      log.push((r.status===200?'✅ ':'❌ ')+t[0]+ms);
+      if(r.status===200)ok++;else fail++;
+      run(i+1);
+    });
+  })(0);
+}
 window.mockLeads = DB.init('leads', [
   {id:1,name:'Tariqul Islam',territory:'Dhaka North',phone:'+880 1711 000000',email:'tariqul@example.com',property:'Muktodhara - 5 Katha',status:'Negotiation',priority:'High',type:'Local',source:'Bikroy.com',value:'৳1.5 Cr',lastContact:'2h ago',owner:'Hasanul Banna',nextFollowUp:'Today, 3:00 PM',paymentStatus:'Up to Date',facingDir:'South',floorPref:'Any',flatType:'Land',sizeSqFt:'1800 sqft',paymentPlan:'Construction Link',brokerId:null,
    installments:[{date:'Oct 01, 2024',amount:'৳5,00,000',status:'Paid'},{date:'Nov 01, 2024',amount:'৳5,00,000',status:'Due'}],
@@ -12053,38 +12137,67 @@ function renderSettings(el){
       '<div style="margin-top:6px;padding:8px 10px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;font-size:9px;color:#2e7d32">💡 Hiding a group hides its sidebar icon and removes it from the mobile nav & search — module permissions are unchanged.</div>';
   }else if(settingsTab==='sync'){
     var _lastSync=API.lastSync?String(API.lastSync).slice(0,19).replace('T',' '):'—';
-    mc='<div class="card" style="margin-bottom:10px"><div class="card-header"><h3>🔄 Server Sync</h3><span class="badge-status '+(API.connected?'badge-active':'badge-closed')+'" style="margin-left:6px">'+(API.connected?'Connected':'Disconnected')+'</span></div><div class="card-body">'+
-      '<div style="font-size:10px;color:#666;line-height:1.6;margin-bottom:10px">Connect the PWA to the MARS ERPNext bridge. While connected, the Project Acquisition pipeline and Legal Vetting read live ERP data, and every save is pushed to the server automatically.</div>'+
+    var _storedUrl=localStorage.getItem('rem_api_url')||'';
+    var _connCfg=JSON.parse(localStorage.getItem('rem_conn_cfg')||'{}');
+    var _autoConn=_connCfg.autoConnect===undefined?true:_connCfg.autoConnect;
+    var _pushSave=_connCfg.pushOnSave===undefined?true:_connCfg.pushOnSave;
+    var _healUrl=_connCfg.autoHeal===undefined?true:_connCfg.autoHeal;
+    // ---------- 1. CONNECTION ----------
+    mc='<div class="card" style="margin-bottom:10px"><div class="card-header"><h3>🔌 ERPNext (Frappe) Connection</h3><span class="badge-status '+(API.connected?'badge-active':'badge-closed')+'" style="margin-left:6px">'+(API.connected?'Connected':'Disconnected')+'</span></div><div class="card-body">'+
+      '<div style="font-size:10px;color:#666;line-height:1.6;margin-bottom:10px">Connect this PWA to the MARS ERPNext (Frappe) server. The bridge exposes login/bootstrap/sync plus live-data endpoints (land pipeline, legal vetting). When connected, Project Acquisition and Legal Vetting read real ERP records.</div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'+
-        '<div class="form-group"><label class="form-label">Server URL</label><input class="form-input" id="syncUrl" value="'+API._base()+'" placeholder="http://localhost:8000/api/method/mars_constech.mars_constech.api"/></div>'+
-        '<div class="form-group"><label class="form-label">Status</label><div style="padding:6px 8px;font-size:10px;background:'+(API.connected?'#e8f5e9':'#f5f5f5')+';border:1px solid '+(API.connected?'#c8e6c9':'#e0e0e0')+';border-radius:6px;color:'+(API.connected?'#2e7d32':'#888')+'">'+(API.connected?'Connected · last sync '+_lastSync:'Not connected')+'</div></div>'+
+        '<div class="form-group"><label class="form-label">API Base URL</label><input class="form-input" id="syncUrl" value="'+API._base()+'" placeholder="http://localhost:8000/api/method/mars_constech.mars_constech.api"/></div>'+
+        '<div class="form-group"><label class="form-label">Status</label><div style="padding:6px 8px;font-size:10px;background:'+(API.connected?'#e8f5e9':'#f5f5f5')+';border:1px solid '+(API.connected?'#c8e6c9':'#e0e0e0')+';border-radius:6px;color:'+(API.connected?'#2e7d32':'#888')+'">'+(API.connected?('Connected · user '+(localStorage.getItem('rem_api_user')||'—')+' · last sync '+_lastSync):'Not connected')+'</div></div>'+
       '</div>'+
       (API.connected?'':'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'+
-        '<div class="form-group"><label class="form-label">Email</label><input class="form-input" id="syncEmail" placeholder="admin@rembd.com"/></div>'+
+        '<div class="form-group"><label class="form-label">Email</label><input class="form-input" id="syncEmail" value="'+(localStorage.getItem('rem_api_user')||'')+'" placeholder="manager@mars.com"/></div>'+
         '<div class="form-group"><label class="form-label">Password</label><input class="form-input" id="syncPass" type="password" placeholder="••••••••"/></div>'+
       '</div>')+
-      '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+
         (API.connected?'':'<button class="action-btn primary" onclick="syncConnect()" style="padding:4px 12px;font-size:10px">🔌 Connect</button>')+
         (API.connected?'<button class="action-btn secondary" onclick="syncPush()" style="padding:4px 12px;font-size:10px">⬆ Push local → server</button>':'')+
         (API.connected?'<button class="action-btn secondary" onclick="syncPull()" style="padding:4px 12px;font-size:10px">⬇ Pull server → local</button>':'')+
-        (API.connected?'<button class="action-btn secondary" onclick="API.logout().then(function(){renderModule();showToast(\'Disconnected\',\'info\')})" style="padding:4px 12px;font-size:10px;color:#c62828">Disconnect</button>':'')+
+        (API.connected?'<button class="action-btn secondary" onclick="API.logout().then(function(){localStorage.removeItem(\'rem_api_token\');API.token=\'\';API.connected=false;renderModule();showToast(\'Disconnected\',\'info\')})" style="padding:4px 12px;font-size:10px;color:#c62828">Disconnect</button>':'')+
+        '<button class="action-btn secondary" onclick="syncResetUrl()" style="padding:4px 12px;font-size:10px" title="Reset stored URL to this page\'s origin">↺ Reset URL</button>'+
+        '<button class="action-btn secondary" onclick="syncTestAll()" style="padding:4px 12px;font-size:10px">🧪 Test APIs</button>'+
+      '</div>'+
+      (_storedUrl&&_storedUrl!==API._base()?'<div style="font-size:9px;color:#e65100;margin-bottom:4px">⚠ Stored URL ('+landEsc(_storedUrl)+') differs from the field above — Connect will use the field value; Reset URL clears the stored one.</div>':'')+
+      '<div style="font-size:9px;color:#999">URL is auto-derived from the page origin when empty; stored URL (localStorage rem_api_url) overrides it until Reset. If the stored URL is stale the app auto-heals on any failed call.</div>'+
+    '</div></div>'+
+    // ---------- 2. CONFIGURATION ----------
+    '<div class="card" style="margin-bottom:10px"><div class="card-header"><h3>⚙️ Connection Configuration</h3><span style="font-size:9px;color:#888">persisted in this browser (localStorage)</span></div><div class="card-body">'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'+
+        '<label style="display:flex;align-items:center;gap:6px;font-size:10px;padding:5px 8px;background:#f9f9fb;border-radius:4px;cursor:pointer"><input type="checkbox" id="cfgAutoConnect" '+( _autoConn?'checked':'')+' onchange="syncSaveCfg()"/> Auto-connect on load</label>'+
+        '<label style="display:flex;align-items:center;gap:6px;font-size:10px;padding:5px 8px;background:#f9f9fb;border-radius:4px;cursor:pointer"><input type="checkbox" id="cfgPushSave" '+( _pushSave?'checked':'')+' onchange="syncSaveCfg()"/> Push on every save (debounced)</label>'+
+        '<label style="display:flex;align-items:center;gap:6px;font-size:10px;padding:5px 8px;background:#f9f9fb;border-radius:4px;cursor:pointer"><input type="checkbox" id="cfgHealUrl" '+( _healUrl?'checked':'')+' onchange="syncSaveCfg()"/> Auto-heal stale URL</label>'+
+        '<label style="display:flex;align-items:center;gap:6px;font-size:10px;padding:5px 8px;background:#f9f9fb;border-radius:4px;cursor:pointer"><input type="checkbox" id="cfgLiveLand" '+( _connCfg.liveLand?'checked':'')+' onchange="syncSaveCfg()"/> Live land pipeline (Legal Vetting reads ERP)</label>'+
+      '</div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+        '<button class="action-btn secondary" onclick="syncClearStorage()" style="padding:3px 10px;font-size:9px">🧹 Clear stored connection (token/URL)</button>'+
+        '<button class="action-btn secondary" onclick="syncSaveCfg(true)" style="padding:3px 10px;font-size:9px">💾 Save config</button>'+
       '</div>'+
     '</div></div>'+
-    '<div class="card"><div class="card-header"><h3>📄 Server Reports (PDF / CSV / Excel)</h3><span style="font-size:9px;color:#888">generated server-side from synced data</span></div><div class="card-body">'+
-      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px">'+
-        [['invoice','🧾 Invoice PDF (INV-2026-0001)','API.download(\'/api/reports/invoice/INV-2026-0001.pdf\',\'INV-2026-0001.pdf\')'],
-         ['vat','📊 VAT Register PDF','API.download(\'/api/reports/vat-register.pdf\',\'vat-register.pdf\')'],
-         ['csv','📄 Leads CSV','API.download(\'/api/reports/csv/leads.csv\',\'leads.csv\')'],
-         ['xlsx','📗 Leads Excel','API.download(\'/api/reports/xlsx/leads.xlsx\',\'leads.xlsx\')'],
-         ['bcsv','📄 Bookings CSV','API.download(\'/api/reports/csv/bookings.csv\',\'bookings.csv\')'],
-         ['bxl','📗 Bookings Excel','API.download(\'/api/reports/xlsx/bookings.xlsx\',\'bookings.xlsx\')']].map(function(r){
-           return '<div class="card" style="cursor:pointer;margin:0" onclick="'+r[2]+'"><div class="card-body" style="padding:8px 10px"><div style="font-size:11px;font-weight:600">'+r[1]+'</div><div style="font-size:9px;color:#888;margin-top:2px">Server-side '+r[0]+' export</div></div></div>';
-         }).join('')+
+    // ---------- 3. API TESTER ----------
+    '<div class="card" style="margin-bottom:10px"><div class="card-header"><h3>🧪 API Tester</h3><span style="font-size:9px;color:#888">call any bridge endpoint from here</span></div><div class="card-body">'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'+
+        '<div class="form-group"><label class="form-label">Endpoint</label><select class="form-input" id="apiTestEp">'+
+          ['index','login','logout','bootstrap','sync','land_pipeline','land_sync','land_legal_checklist','land_legal_update','land_legal_load_standard','download_invoice','demo_confirm'].map(function(e){return '<option value="'+e+'">'+e+'</option>';}).join('')+
+        '</select></div>'+
+        '<div class="form-group"><label class="form-label">Method</label><select class="form-input" id="apiTestMethod"><option>GET</option><option>POST</option></select></div>'+
+        '<div class="form-group"><label class="form-label">Query / name (optional)</label><input class="form-input" id="apiTestQ" placeholder="name=LA-00021&amp;invoice=ACC-SINV-2026-00002"/></div>'+
       '</div>'+
-      '<div style="margin-top:8px;font-size:9px;color:#999">⚠ Requires an active server connection. Data is pushed automatically on every save (debounced 800 ms).</div>'+
+      '<div class="form-group" style="margin-bottom:8px"><label class="form-label">JSON body (POST)</label><textarea class="form-input" id="apiTestBody" rows="3" style="font-family:monospace;font-size:10px" placeholder="e.g. {&quot;name&quot;:&quot;LA-00021&quot;,&quot;items&quot;:[{&quot;check_item&quot;:&quot;CS Khatian&quot;,&quot;status&quot;:&quot;Verified&quot;}]}"></textarea></div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+
+        '<button class="action-btn primary" onclick="apiTestSend()" style="padding:4px 14px;font-size:10px">▶ Send Request</button>'+
+        '<button class="action-btn secondary" onclick="apiTestQuick(\'index\')" style="padding:3px 10px;font-size:9px">⚡ Index</button>'+
+        '<button class="action-btn secondary" onclick="apiTestQuick(\'pipeline\')" style="padding:3px 10px;font-size:9px">⚡ Land Pipeline</button>'+
+        '<button class="action-btn secondary" onclick="apiTestQuick(\'legal\')" style="padding:3px 10px;font-size:9px">⚡ Legal Checklist (LA-00021)</button>'+
+        '<button class="action-btn secondary" onclick="apiTestQuick(\'login\')" style="padding:3px 10px;font-size:9px">⚡ Login</button>'+
+      '</div>'+
+      '<div id="apiTestResult" style="font-size:9px;line-height:1.5;white-space:pre-wrap;word-break:break-all;background:#0d1117;color:#c9d1d9;border-radius:6px;padding:8px;max-height:220px;overflow:auto;font-family:monospace">Ready — pick an endpoint and press Send.</div>'+
     '</div></div>';
   }
-  el.innerHTML='<div class="fade-in settings-wrap" style="display:flex;gap:8px;height:100%;flex:1"><div class="settings-nav" style="width:180px;min-width:180px;background:#fff;border:1px solid #e8e8e8;border-radius:6px;padding:6px;display:flex;flex-direction:column;overflow-y:auto"><div class="settings-nav-title" style="font-size:12px;font-weight:700;color:#222;margin-bottom:6px;padding:0 4px">Settings</div>'+sidebar+'<div class="settings-nav-actions" style="margin-top:auto;padding-top:6px;border-top:1px solid #f0f0f0"><button onclick="showToast(\'All settings saved!\',\'success\')" style="width:100%;padding:5px 0;background:#2F80ED;color:#fff;border:none;border-radius:6px;font-size:10px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save</button><button onclick="resetAllAppData()" style="width:100%;padding:4px 0;background:transparent;color:#c62828;border:1px solid #f5c6cb;border-radius:6px;font-size:9px;font-weight:500;cursor:pointer;margin-top:3px">↺ Reset All Data</button></div></div><div class="settings-content" style="flex:1;overflow-y:auto">'+mc+'<div class="content-footer" style="margin-top:8px"><div class="breadcrumb">Settings <span>›</span> '+settingsTab+'</div></div></div></div>';
+el.innerHTML='<div class="fade-in settings-wrap" style="display:flex;gap:8px;height:100%;flex:1"><div class="settings-nav" style="width:180px;min-width:180px;background:#fff;border:1px solid #e8e8e8;border-radius:6px;padding:6px;display:flex;flex-direction:column;overflow-y:auto"><div class="settings-nav-title" style="font-size:12px;font-weight:700;color:#222;margin-bottom:6px;padding:0 4px">Settings</div>'+sidebar+'<div class="settings-nav-actions" style="margin-top:auto;padding-top:6px;border-top:1px solid #f0f0f0"><button onclick="showToast(\'All settings saved!\',\'success\')" style="width:100%;padding:5px 0;background:#2F80ED;color:#fff;border:none;border-radius:6px;font-size:10px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save</button><button onclick="resetAllAppData()" style="width:100%;padding:4px 0;background:transparent;color:#c62828;border:1px solid #f5c6cb;border-radius:6px;font-size:9px;font-weight:500;cursor:pointer;margin-top:3px">↺ Reset All Data</button></div></div><div class="settings-content" style="flex:1;overflow-y:auto">'+mc+'<div class="content-footer" style="margin-top:8px"><div class="breadcrumb">Settings <span>›</span> '+settingsTab+'</div></div></div></div>';
 }
 
 // ═══ FEEDBACK & POLISH ═══
