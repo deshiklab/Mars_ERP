@@ -1,0 +1,107 @@
+{%- from "templates/print_formats/standard_macros.html" import add_header with context -%}
+
+{% set customer = frappe.get_doc("Customer", doc.customer) %}
+<style>
+	@page { margin: 14mm 12mm; }
+	body { font-family: "Helvetica Neue", Arial, sans-serif; color: #1e293b; font-size: 12px; }
+	.mars-invoice { max-width: 190mm; margin: 0 auto; }
+	.mars-head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; }
+	.mars-brand { font-size: 22px; font-weight: 800; color: #0f172a; }
+	.mars-brand span { color: #22c55e; }
+	.mars-company { color: #64748b; font-size: 11px; margin-top: 4px; line-height: 1.5; }
+	.mars-title { text-align: right; }
+	.mars-title h2 { margin: 0; font-size: 26px; color: #0f172a; letter-spacing: .02em; }
+	.mars-title .inv-no { font-size: 13px; color: #64748b; margin-top: 2px; }
+	.mars-title .status { display: inline-block; margin-top: 6px; padding: 3px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+	.status-paid { background: #dcfce7; color: #166534; }
+	.status-overdue { background: #fee2e2; color: #991b1b; }
+	.status-draft { background: #f1f5f9; color: #475569; }
+	.status-sent { background: #dbeafe; color: #1e40af; }
+	.mars-parties { display: flex; justify-content: space-between; margin-bottom: 20px; }
+	.mars-party { width: 48%; }
+	.mars-party .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; font-weight: 700; margin-bottom: 4px; }
+	.mars-party .nm { font-size: 14px; font-weight: 700; color: #0f172a; }
+	.mars-party .dt { font-size: 11px; color: #64748b; line-height: 1.5; }
+	table.items { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+	table.items th { background: #0f172a; color: #fff; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; padding: 8px 10px; text-align: left; }
+	table.items td { padding: 9px 10px; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
+	table.items tr:nth-child(even) td { background: #f8fafc; }
+	.mars-totals { width: 55%; margin-left: auto; }
+	.mars-totals table { width: 100%; border-collapse: collapse; }
+	.mars-totals td { padding: 6px 10px; font-size: 12px; color: #475569; }
+	.mars-totals td:last-child { text-align: right; font-weight: 600; color: #0f172a; }
+	.mars-totals tr.grand td { border-top: 2px solid #0f172a; font-size: 15px; font-weight: 800; color: #0f172a; }
+	.mars-foot { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 12px; display: flex; justify-content: space-between; color: #94a3b8; font-size: 10px; }
+	.mars-note { background: #f8fafc; border-left: 3px solid #22c55e; padding: 10px 14px; font-size: 11px; color: #475569; margin-bottom: 16px; }
+</style>
+
+<div class="mars-invoice">
+	{{ add_header(letterhead, doc, no_letterhead, footer, print_settings) }}
+
+	<div class="mars-head">
+		<div>
+			<div class="mars-brand">MARS <span>Constech</span></div>
+			<div class="mars-company">
+				Plot 12, Road 5, Gulshan-1, Dhaka 1212, Bangladesh<br>
+				+880 1711-000000 · accounts@marsconstech.com
+			</div>
+		</div>
+		<div class="mars-title">
+			<h2>INVOICE</h2>
+			<div class="inv-no">{{ doc.name }}</div>
+			{% if doc.status == "Paid" %}<span class="status status-paid">PAID</span>
+			{% elif doc.status == "Overdue" %}<span class="status status-overdue">OVERDUE</span>
+			{% elif doc.status == "Draft" %}<span class="status status-draft">DRAFT</span>
+			{% else %}<span class="status status-sent">{{ doc.status|upper }}</span>{% endif %}
+		</div>
+	</div>
+
+	<div class="mars-parties">
+		<div class="mars-party">
+			<div class="lbl">Billed To</div>
+			<div class="nm">{{ doc.customer }}</div>
+			{% if customer.primary_address %}<div class="dt">{{ customer.primary_address }}</div>{% endif %}
+			{% if customer.mobile_no %}<div class="dt">{{ customer.mobile_no }}</div>{% endif %}
+		</div>
+		<div class="mars-party">
+			<div class="lbl">Invoice Details</div>
+			<div class="dt">Invoice Date: {{ frappe.utils.formatdate(doc.posting_date) }}<br>
+			{% if doc.due_date %}Due Date: {{ frappe.utils.formatdate(doc.due_date) }}<br>{% endif %}
+			Currency: BDT</div>
+		</div>
+	</div>
+
+	{% if doc.remarks %}<div class="mars-note">{{ doc.remarks }}</div>{% endif %}
+
+	<table class="items">
+		<thead>
+			<tr><th style="width:5%;">#</th><th>Description</th><th style="width:10%;">Qty</th><th style="width:18%;">Rate</th><th style="width:20%;">Amount</th></tr>
+		</thead>
+		<tbody>
+			{% for item in doc.items %}
+			<tr>
+				<td>{{ loop.index }}</td>
+				<td>{{ item.item_name or item.item_code }}</td>
+				<td>{{ item.qty }}</td>
+				<td>৳{{ frappe.utils.fmt_money(item.rate, 0, "BDT") }}</td>
+				<td>৳{{ frappe.utils.fmt_money(item.amount, 0, "BDT") }}</td>
+			</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+
+	<div class="mars-totals">
+		<table>
+			<tr><td>Subtotal</td><td>৳{{ frappe.utils.fmt_money(doc.net_total, 0, "BDT") }}</td></tr>
+			{% if doc.total_taxes_and_charges %}<tr><td>Taxes &amp; Charges</td><td>৳{{ frappe.utils.fmt_money(doc.total_taxes_and_charges, 0, "BDT") }}</td></tr>{% endif %}
+			{% if doc.total_advance %}<tr><td>Advance Applied</td><td>৳{{ frappe.utils.fmt_money(doc.total_advance, 0, "BDT") }}</td></tr>{% endif %}
+			<tr class="grand"><td>Grand Total</td><td>৳{{ frappe.utils.fmt_money(doc.grand_total, 0, "BDT") }}</td></tr>
+			{% if doc.outstanding_amount > 0 %}<tr><td>Outstanding</td><td>৳{{ frappe.utils.fmt_money(doc.outstanding_amount, 0, "BDT") }}</td></tr>{% endif %}
+		</table>
+	</div>
+
+	<div class="mars-foot">
+		<div>MARS Constech Ltd. · VAT Reg: 001234567-0001</div>
+		<div>Thank you for your business.</div>
+	</div>
+</div>

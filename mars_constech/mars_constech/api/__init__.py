@@ -1,6 +1,6 @@
 # Copyright (c) 2026, MARS Constech and contributors
 # For license information, please see license.txt
-"""REM ERP server-sync bridge.
+"""REM ERP server-sync bridge + portal actions.
 
 Implements the API contract the V10 PWA expects (originally Flask). The PWA
 calls <base>/login, <base>/bootstrap, <base>/sync, <base>/logout where base is
@@ -104,3 +104,87 @@ def sync(collections=None):
 
 	frappe.db.commit()
 	return {"rows": total, "collections": len(collections)}
+
+
+# --------------------------------------------------------------------------
+# Portal actions
+# --------------------------------------------------------------------------
+def _portal_customer():
+	"""Resolve the portal user's Customer (via User Permission)."""
+	perms = frappe.get_all(
+		"User Permission",
+		filters={"user": frappe.session.user, "allow": "Customer"},
+		fields=["for_value"],
+		limit=1,
+	)
+	return perms[0].for_value if perms else None
+
+
+def _owns_invoice(invoice_name):
+	"""Portal user must own the invoice."""
+	customer = _portal_customer()
+	if not customer:
+		return False
+	inv = frappe.get_doc("Sales Invoice", invoice_name)
+	return inv.customer == customer
+
+
+@frappe.whitelist()
+def download_invoice(invoice_name):
+	"""Stream the MARS-branded invoice PDF (portal users: own invoices only)."""
+	if not _owns_invoice(invoice_name):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+	from frappe.utils.print_format import download_pdf
+
+	# download_pdf sets frappe.local.response (filename/filecontent/type) itself
+	download_pdf("Sales Invoice", invoice_name, "MARS Sales Invoice")
+	return None
+
+
+@frappe.whitelist()
+def pay_invoice(invoice_name, gateway="bkash"):
+	"""Start payment for an invoice. Returns {redirect, payment_id}."""
+	if not _owns_invoice(invoice_name):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+	from mars_constech.mars_constech.payments.gateways import create_payment
+
+	return create_payment(invoice_name, gateway)
+
+
+@frappe.whitelist(allow_guest=True)
+def payment_callback(gateway=None, payment_id=None, invoice=None, amount=None, **kwargs):
+	"""Gateway callback: verify + settle. Also used by the demo payment page."""
+	if not gateway:
+		gateway = kwargs.get("gateway") or frappe.form_dict.get("gateway")
+	if not payment_id:
+		payment_id = kwargs.get("paymentID") or frappe.form_dict.get("paymentID")
+	if not invoice:
+		invoice = kwargs.get("invoice") or frappe.form_dict.get("invoice")
+
+	from mars_constech.mars_constech.payments.gateways import verify_and_settle
+
+	ok, message, pe = verify_and_settle(gateway, payment_id, invoice, amount)
+	if not ok:
+		frappe.local.message = message
+		frappe.local.response.message = message
+		return {"ok": False, "message": message}
+	return {"ok": True, "message": message, "payment_entry": pe}
+
+
+@frappe.whitelist(allow_guest=True)
+def demo_confirm(ref=None, **kwargs):
+	"""Demo-mode confirm: mark the simulated payment as completed."""
+	if not ref:
+		ref = kwargs.get("ref") or frappe.form_dict.get("ref")
+	if not ref:
+		frappe.throw(_("Missing ref"), frappe.ValidationError)
+	rec = frappe.cache().get_value(f"mars_demo_pay_{ref}")
+	if not rec:
+		return {"ok": False, "message": _("Payment session not found or expired")}
+
+	from mars_constech.mars_constech.payments.gateways import verify_and_settle
+
+	ok, message, pe = verify_and_settle(rec["gateway"].lower(), ref)
+	return {"ok": ok, "message": message, "payment_entry": pe}

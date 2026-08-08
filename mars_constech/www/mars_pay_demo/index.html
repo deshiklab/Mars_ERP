@@ -1,0 +1,85 @@
+{% extends "templates/web.html" %}
+
+{% block title %}Demo Payment{% endblock %}
+
+{% block page_content %}
+<style>
+	.pay-demo { max-width: 440px; margin: 40px auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,.06); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+	.pay-head { background: #0f172a; color: #fff; padding: 20px 24px; display: flex; align-items: center; gap: 10px; }
+	.pay-head .gw { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; color: #fff; }
+	.gw-bkash { background: #e2136e; }
+	.gw-nagad { background: #f7941e; }
+	.pay-head .nm { font-weight: 700; font-size: 16px; }
+	.pay-body { padding: 24px; }
+	.pay-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+	.pay-row .k { color: #64748b; }
+	.pay-row .v { font-weight: 700; color: #0f172a; }
+	.pay-total { font-size: 26px; font-weight: 800; color: #0f172a; text-align: center; padding: 18px 0 4px; }
+	.pay-sandbox { text-align: center; color: #94a3b8; font-size: 12px; margin-bottom: 16px; }
+	.pay-btn { display: block; width: 100%; padding: 13px; border: 0; border-radius: 10px; background: #22c55e; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; }
+	.pay-btn:hover { background: #16a34a; }
+	.pay-cancel { display: block; text-align: center; margin-top: 12px; color: #94a3b8; font-size: 13px; text-decoration: none; }
+	.pay-status { text-align: center; padding: 12px; border-radius: 10px; margin-bottom: 14px; font-size: 14px; font-weight: 600; display: none; }
+	.pay-status.ok { background: #dcfce7; color: #166534; display: block; }
+	.pay-status.err { background: #fee2e2; color: #991b1b; display: block; }
+</style>
+
+<div class="pay-demo">
+	<div class="pay-head">
+		<div class="gw {{ 'gw-bkash' if gateway == 'bkash' else 'gw-nagad' }}">{{ "bK" if gateway == "bkash" else "NG" }}</div>
+		<div class="nm">{{ "bKash" if gateway == "bkash" else "Nagad" }} Secure Checkout</div>
+	</div>
+	<div class="pay-body">
+		{% if valid %}
+		<div class="pay-total">৳{{ "%.0f"|format(amount|float) }}</div>
+		<div class="pay-sandbox">SANDBOX MODE — no real money moves</div>
+		<div class="pay-row"><span class="k">Invoice</span><span class="v">{{ invoice }}</span></div>
+		<div class="pay-row"><span class="k">Payer</span><span class="v">{{ frappe.session.user }}</span></div>
+		<div class="pay-row"><span class="k">Gateway</span><span class="v">{{ "bKash" if gateway == "bkash" else "Nagad" }}</span></div>
+		<div class="pay-status" id="payStatus"></div>
+		<button class="pay-btn" id="confirmBtn">Pay ৳{{ "%.0f"|format(amount|float) }} — Simulate Success</button>
+		<a class="pay-cancel" href="/customer_portal">Cancel and return to dashboard</a>
+		{% else %}
+		<div class="pay-status err" style="display:block;">This payment session is invalid or expired.</div>
+		<a class="pay-cancel" href="/customer_portal">← Back to dashboard</a>
+		{% endif %}
+	</div>
+</div>
+
+{% if valid %}
+<script>
+	frappe.ready(function () {
+		document.getElementById("confirmBtn").addEventListener("click", function () {
+			const btn = this;
+			btn.disabled = true;
+			btn.textContent = "Processing…";
+			frappe.call({
+				method: "mars_constech.mars_constech.api.demo_confirm",
+				args: { ref: "{{ ref }}" },
+				callback: function (r) {
+					const st = document.getElementById("payStatus");
+					if (r.message && r.message.ok) {
+						st.className = "pay-status ok";
+						st.textContent = "✓ " + (r.message.message || "Payment successful");
+						btn.textContent = "Done — returning to dashboard…";
+						setTimeout(function () { window.location.href = "/customer_portal"; }, 1600);
+					} else {
+						st.className = "pay-status err";
+						st.textContent = "✗ " + ((r.message && r.message.message) || "Payment failed");
+						btn.disabled = false;
+						btn.textContent = "Try again";
+					}
+				},
+				error: function () {
+					const st = document.getElementById("payStatus");
+					st.className = "pay-status err";
+					st.textContent = "✗ Something went wrong. Please try again.";
+					btn.disabled = false;
+					btn.textContent = "Try again";
+				},
+			});
+		});
+	});
+</script>
+{% endif %}
+{% endblock %}

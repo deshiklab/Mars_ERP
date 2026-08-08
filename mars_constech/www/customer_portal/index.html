@@ -131,7 +131,7 @@
 		{% if invoices %}
 		<div style="overflow-x:auto;">
 		<table class="mars-table">
-			<thead><tr><th>{{ _("Invoice") }}</th><th>{{ _("Date") }}</th><th>{{ _("Amount") }}</th><th>{{ _("Outstanding") }}</th><th>{{ _("Status") }}</th><th>{{ _("Payments") }}</th></tr></thead>
+			<thead><tr><th>{{ _("Invoice") }}</th><th>{{ _("Date") }}</th><th>{{ _("Amount") }}</th><th>{{ _("Outstanding") }}</th><th>{{ _("Status") }}</th><th>{{ _("Payments") }}</th><th>{{ _("Actions") }}</th></tr></thead>
 			<tbody>
 			{% for inv in invoices %}
 				<tr>
@@ -151,6 +151,12 @@
 						{% endfor %}
 						{% if not invoice_payments.get(inv.name) %}<span style="color:#94a3b8;font-size:12px;">—</span>{% endif %}
 					</td>
+					<td style="white-space:nowrap;">
+						<a class="badge blue" style="text-decoration:none;" href="/api/method/mars_constech.mars_constech.api.download_invoice?invoice_name={{ inv.name }}" target="_blank">⬇ PDF</a>
+						{% if inv.outstanding_amount %}
+						<a class="badge green" style="text-decoration:none;margin-left:4px;" href="/api/method/mars_constech.mars_constech.api.pay_invoice?invoice_name={{ inv.name }}&gateway=bkash" onclick="return false;" data-invoice="{{ inv.name }}" data-amount="{{ inv.outstanding_amount }}" data-gateway="bkash">Pay Now</a>
+						{% endif %}
+					</td>
 				</tr>
 			{% endfor %}
 			</tbody>
@@ -166,4 +172,33 @@
 		<div class="item"><span class="ic">🏢</span> {{ _("MARS Constech Ltd., Dhaka, Bangladesh") }}</div>
 	</div>
 </div>
+
+<script>
+	frappe.ready(function () {
+		// Pay Now buttons: call pay_invoice, then redirect to the gateway/demo page
+		document.querySelectorAll("[data-invoice]").forEach(function (el) {
+			el.addEventListener("click", function () {
+				const invoice = el.dataset.invoice;
+				const gateway = el.dataset.gateway || "bkash";
+				el.textContent = "…";
+				frappe.call({
+					method: "mars_constech.mars_constech.api.pay_invoice",
+					args: { invoice_name: invoice, gateway: gateway },
+					callback: function (r) {
+						el.textContent = "Pay Now";
+						if (r.message && r.message.redirect) {
+							window.location.href = r.message.redirect;
+						} else {
+							frappe.msgprint("Could not start payment. Please contact support.");
+						}
+					},
+					error: function (e) {
+						el.textContent = "Pay Now";
+						frappe.msgprint("Could not start payment: " + (e && e.message ? e.message : "error"));
+					},
+				});
+			});
+		});
+	});
+</script>
 {% endblock %}
