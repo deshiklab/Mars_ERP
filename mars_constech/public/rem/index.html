@@ -1112,7 +1112,7 @@ const DB = {
 
 // ═══ SERVER SYNC — Phase 3 (Flask backend) ═══
 const API = {
-  url: localStorage.getItem('rem_api_url') || 'http://localhost:8000/api/method/mars_constech.mars_constech.api',
+  url: localStorage.getItem('rem_api_url') || (location.origin + '/api/method/mars_constech.mars_constech.api'),
   token: localStorage.getItem('rem_api_token') || '',
   connected: false, lastSync: localStorage.getItem('rem_last_sync') || null,
   _queue: {}, _timer: null,
@@ -1194,10 +1194,11 @@ setTimeout(function(){
   if(!API.token || !API._base())return;
   API._req('GET','.bootstrap').then(function(r){
     if(r.status===200){ API.connected=true; API.lastSync=(r.data.meta||{}).server_time||null; localStorage.setItem('rem_last_sync',API.lastSync||''); }
-    else if(API.url.indexOf('mars_constech.mars_constech.api')<0){
-      // Stale/wrong stored rem_api_url (e.g. 'mars_constech.api') — heal back to
-      // the known-good bridge URL and retry once.
-      API.url='http://localhost:8000/api/method/mars_constech.mars_constech.api';
+    else if(API.url.indexOf('mars_constech.mars_constech.api')<0 || API.url.indexOf(location.origin)!==0){
+      // Stale/wrong stored rem_api_url (wrong path like 'mars_constech.api', or
+      // an origin that no longer matches this page) — heal back to the
+      // same-origin bridge URL and retry once.
+      API.url=location.origin+'/api/method/mars_constech.mars_constech.api';
       localStorage.setItem('rem_api_url',API.url);
       API._req('GET','.bootstrap').then(function(r2){
         if(r2.status===200){ API.connected=true; API.lastSync=(r2.data.meta||{}).server_time||null; localStorage.setItem('rem_last_sync',API.lastSync||''); }
