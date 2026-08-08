@@ -1,0 +1,51 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-08-08 19:10:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "stage",
+  "changed_on",
+  "changed_by",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "stage",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Stage",
+   "options": "Planning\nLand Acquisition\nDesign & Approval\nConstruction\nMarketing & Sales\nHandover\nClosed"
+  },
+  {
+   "fieldname": "changed_on",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Changed On"
+  },
+  {
+   "fieldname": "changed_by",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Changed By"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-08 19:10:00.000000",
+ "modified_by": "Administrator",
+ "module": "Mars Constech",
+ "name": "Project Stage Log",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

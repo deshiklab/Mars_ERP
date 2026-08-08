@@ -1,0 +1,195 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:LA-{#####}",
+ "creation": "2026-08-08 19:10:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "land_acquisition_title",
+  "current_stage",
+  "status",
+  "column_break_0",
+  "acquisition_date",
+  "project",
+  "section_break_land",
+  "land_location",
+  "area_katha",
+  "land_owner",
+  "seller_contact",
+  "column_break_land",
+  "asking_price",
+  "negotiated_price",
+  "deal_value",
+  "section_break_scorecard",
+  "feasibility_score",
+  "scorecard",
+  "section_break_legal",
+  "legal_status",
+  "legal_checklist",
+  "section_break_audit",
+  "stage_log",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "land_acquisition_title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Land Acquisition Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "current_stage",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Current Stage",
+   "options": "Lead\nSurvey\nNegotiation\nAgreement\nRegistration\nHandover",
+   "reqd": 1
+  },
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Open\nIn Progress\nOn Hold\nCompleted\nRejected\nClosed"
+  },
+  {
+   "fieldname": "column_break_0",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "acquisition_date",
+   "fieldtype": "Date",
+   "label": "Acquisition Date"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "section_break_land",
+   "fieldtype": "Section Break",
+   "label": "Land Details"
+  },
+  {
+   "fieldname": "land_location",
+   "fieldtype": "Data",
+   "label": "Land Location",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "area_katha",
+   "fieldtype": "Float",
+   "label": "Area (Katha)"
+  },
+  {
+   "fieldname": "land_owner",
+   "fieldtype": "Data",
+   "label": "Land Owner / Seller"
+  },
+  {
+   "fieldname": "seller_contact",
+   "fieldtype": "Data",
+   "label": "Seller Contact"
+  },
+  {
+   "fieldname": "column_break_land",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "asking_price",
+   "fieldtype": "Currency",
+   "label": "Asking Price"
+  },
+  {
+   "fieldname": "negotiated_price",
+   "fieldtype": "Currency",
+   "label": "Negotiated Price"
+  },
+  {
+   "fieldname": "deal_value",
+   "fieldtype": "Currency",
+   "label": "Deal Value"
+  },
+  {
+   "fieldname": "section_break_scorecard",
+   "fieldtype": "Section Break",
+   "label": "Feasibility Scorecard"
+  },
+  {
+   "fieldname": "feasibility_score",
+   "fieldtype": "Percent",
+   "label": "Feasibility Score",
+   "read_only": 1
+  },
+  {
+   "fieldname": "scorecard",
+   "fieldtype": "Table",
+   "label": "Scorecard",
+   "options": "Land Acquisition Scorecard Item"
+  },
+  {
+   "fieldname": "section_break_legal",
+   "fieldtype": "Section Break",
+   "label": "Legal Vetting"
+  },
+  {
+   "fieldname": "legal_status",
+   "fieldtype": "Select",
+   "label": "Legal Status",
+   "options": "Not Started\nIn Progress\nCleared\nIssues Found"
+  },
+  {
+   "fieldname": "legal_checklist",
+   "fieldtype": "Table",
+   "label": "Legal Checklist",
+   "options": "Land Acquisition Legal Check"
+  },
+  {
+   "fieldname": "section_break_audit",
+   "fieldtype": "Section Break",
+   "label": "Stage Audit Trail"
+  },
+  {
+   "fieldname": "stage_log",
+   "fieldtype": "Table",
+   "label": "Stage Log",
+   "options": "Land Acquisition Stage Log",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Text",
+   "label": "Remarks"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-08 19:10:00.000000",
+ "modified_by": "Administrator",
+ "module": "Mars Constech",
+ "name": "Land Acquisition",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

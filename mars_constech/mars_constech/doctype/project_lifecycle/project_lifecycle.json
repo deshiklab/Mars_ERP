@@ -1,0 +1,127 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:PL-{#####}",
+ "creation": "2026-08-08 19:10:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "lifecycle_title",
+  "project",
+  "current_stage",
+  "status",
+  "column_break_0",
+  "start_date",
+  "expected_end_date",
+  "actual_end_date",
+  "section_break_stages",
+  "stage_transitions",
+  "section_break_progress",
+  "progress_percent",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "lifecycle_title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Lifecycle Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "default": "Planning",
+   "fieldname": "current_stage",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Current Stage",
+   "options": "Planning\nLand Acquisition\nDesign & Approval\nConstruction\nMarketing & Sales\nHandover\nClosed",
+   "reqd": 1
+  },
+  {
+   "default": "Active",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Active\nOn Hold\nCompleted\nCancelled"
+  },
+  {
+   "fieldname": "column_break_0",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Start Date"
+  },
+  {
+   "fieldname": "expected_end_date",
+   "fieldtype": "Date",
+   "label": "Expected End Date"
+  },
+  {
+   "fieldname": "actual_end_date",
+   "fieldtype": "Date",
+   "label": "Actual End Date"
+  },
+  {
+   "fieldname": "section_break_stages",
+   "fieldtype": "Section Break",
+   "label": "Stage Transitions"
+  },
+  {
+   "fieldname": "stage_transitions",
+   "fieldtype": "Table",
+   "label": "Stage Transitions",
+   "options": "Project Stage Log",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_progress",
+   "fieldtype": "Section Break",
+   "label": "Progress"
+  },
+  {
+   "fieldname": "progress_percent",
+   "fieldtype": "Percent",
+   "label": "Progress (%)"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Text",
+   "label": "Remarks"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-08 19:10:00.000000",
+ "modified_by": "Administrator",
+ "module": "Mars Constech",
+ "name": "Project Lifecycle",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
