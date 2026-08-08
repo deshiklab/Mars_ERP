@@ -72,7 +72,7 @@
    "fieldname": "type",
    "fieldtype": "Select",
    "label": "Type",
-   "options": "Apartment\nPlot\nCommercial\nVilla\nLand"
+   "options": "Apartment\nFlat\nPlot\nCommercial\nVilla\nLand"
   },
   {
    "default": "Pending Review",
