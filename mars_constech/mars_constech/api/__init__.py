@@ -482,3 +482,32 @@ def land_legal_load_standard(name=None):
     la.save(ignore_permissions=True)
     frappe.db.commit()
     return {"ok": True, "loaded": len(STANDARD_LEGAL_CHECKLIST), "progress": 0}
+# --------------------------------------------------------------------------
+# Friendly index for the API base URL (avoids the bare-path 500)
+# --------------------------------------------------------------------------
+
+
+@frappe.whitelist(allow_guest=True)
+def index():
+    """GET-able landing for the API base URL: endpoint map + health."""
+    endpoints = [
+        "index",
+        "login",
+        "logout",
+        "bootstrap",
+        "sync",
+        "land_pipeline",
+        "land_sync",
+        "land_legal_checklist",
+        "land_legal_update",
+        "land_legal_load_standard",
+        "download_invoice",
+        "demo_confirm",
+    ]
+    return {
+        "service": "MARS Constech REM ERP API bridge",
+        "status": "ok",
+        "usage": "Append an endpoint to this base URL, e.g. .../api.method.login",
+        "endpoints": endpoints,
+        "server_time": frappe.utils.now(),
+    }
