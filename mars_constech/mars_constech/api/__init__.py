@@ -357,3 +357,128 @@ def land_sync(proposals=None):
             errors.append({"name": p.get("name"), "error": str(e)})
     frappe.db.commit()
     return {"created": created, "updated": updated, "errors": errors}
+# --------------------------------------------------------------------------
+# --------------------------------------------------------------------------
+# Legal team feedback (PWA Legal Vetting tab)
+# --------------------------------------------------------------------------
+LEGAL_STATUSES = ["Pending", "Received", "Verified", "Issues Found", "Not Applicable"]
+
+
+@frappe.whitelist()
+def land_legal_checklist(name=None):
+    """Fetch the legal checklist (child rows) + progress for one Land Acquisition."""
+    if not name:
+        frappe.throw(_("Missing name"), frappe.ValidationError)
+    if not frappe.db.exists("Land Acquisition", name):
+        return {"items": [], "progress": 0, "legal_status": "Pending", "error": "not found"}
+    la = frappe.get_doc("Land Acquisition", name)
+    items = []
+    for row in (la.get("legal_checklist") or []):
+        items.append({
+            "check_item": row.check_item,
+            "is_required": row.is_required,
+            "status": row.status or "Pending",
+            "document_ref": row.document_ref or "",
+            "verified_by": row.verified_by or "",
+            "verified_on": str(row.verified_on) if row.verified_on else "",
+            "remarks": row.remarks or "",
+        })
+    return {
+        "items": items,
+        "progress": la.legal_checklist_progress or 0,
+        "legal_status": la.legal_status or "Pending",
+        "stage": la.current_stage or "Lead",
+        "count": len(items),
+    }
+
+
+@frappe.whitelist()
+def land_legal_update(name=None, items=None):
+    """Save legal team feedback back to the doctype legal_checklist child table.
+
+    items: [{"check_item": "...", "status": "Verified", "document_ref": "...",
+             "remarks": "..."}]
+    Only fields the legal team can set are accepted; verified_by/verified_on are
+    stamped server-side from the current user. Returns updated progress.
+    """
+    if not name:
+        frappe.throw(_("Missing name"), frappe.ValidationError)
+    if not items or not isinstance(items, list):
+        frappe.throw(_("items must be a list"), frappe.ValidationError)
+    if not frappe.db.exists("Land Acquisition", name):
+        frappe.throw(_("Land Acquisition {0} not found").format(name), frappe.ValidationError)
+
+    la = frappe.get_doc("Land Acquisition", name)
+    # map existing rows by check_item
+    by_item = {}
+    for row in (la.get("legal_checklist") or []):
+        by_item[row.check_item] = row
+
+    for it in items:
+        if not isinstance(it, dict) or not it.get("check_item"):
+            continue
+        ci = it["check_item"]
+        row = by_item.get(ci)
+        if not row:
+            continue  # never create rows from PWA; use Load Standard Checklist server-side
+        status = it.get("status") or row.status or "Pending"
+        if status not in LEGAL_STATUSES:
+            frappe.throw(_("Invalid status {0} for {1}").format(status, ci), frappe.ValidationError)
+        row.status = status
+        if it.get("document_ref") is not None:
+            row.document_ref = it["document_ref"]
+        if it.get("remarks") is not None:
+            row.remarks = it["remarks"]
+        if status == "Verified" or status == "Issues Found":
+            row.verified_by = frappe.session.user
+            row.verified_on = frappe.utils.today()
+        elif status == "Received":
+            row.verified_by = ""
+            row.verified_on = None
+
+    # recompute progress (mirror controller: Verified + N/A count / required total)
+    total = 0
+    done = 0
+    for row in (la.get("legal_checklist") or []):
+        if row.is_required:
+            total += 1
+            if row.status in ("Verified", "Not Applicable"):
+                done += 1
+    la.legal_checklist_progress = round(done * 100.0 / total, 1) if total else 0
+    la.flags.ignore_permissions = True
+    la.save(ignore_permissions=True)
+    frappe.db.commit()
+    return {
+        "ok": True,
+        "progress": la.legal_checklist_progress,
+        "legal_status": la.legal_status or "Pending",
+        "updated": len(items),
+    }
+
+
+@frappe.whitelist()
+def land_legal_load_standard(name=None):
+    """Load the standard 14-item checklist into a record if empty (mirrors form button)."""
+    if not name:
+        frappe.throw(_("Missing name"), frappe.ValidationError)
+    if not frappe.db.exists("Land Acquisition", name):
+        frappe.throw(_("Land Acquisition {0} not found").format(name), frappe.ValidationError)
+    la = frappe.get_doc("Land Acquisition", name)
+    from mars_constech.mars_constech.doctype.land_acquisition.land_acquisition import (
+        STANDARD_LEGAL_CHECKLIST,
+    )
+    if la.get("legal_checklist"):
+        return {"ok": True, "loaded": 0, "message": "Checklist already present"}
+    for item, req, _desc in STANDARD_LEGAL_CHECKLIST:
+        la.append(
+            "legal_checklist",
+            {
+                "check_item": item,
+                "is_required": 1 if req else 0,
+                "status": "Pending",
+            },
+        )
+    la.flags.ignore_permissions = True
+    la.save(ignore_permissions=True)
+    frappe.db.commit()
+    return {"ok": True, "loaded": len(STANDARD_LEGAL_CHECKLIST), "progress": 0}
