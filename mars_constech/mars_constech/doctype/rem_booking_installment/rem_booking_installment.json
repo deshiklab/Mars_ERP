@@ -1,0 +1,31 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-08-09 05:40:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "installment_no",
+  "due_date",
+  "amount",
+  "status"
+ ],
+ "fields": [
+  {"fieldname": "installment_no", "fieldtype": "Int", "label": "No"},
+  {"fieldname": "due_date", "fieldtype": "Date", "label": "Due Date", "reqd": 1},
+  {"fieldname": "amount", "fieldtype": "Currency", "label": "Amount (BDT)", "reqd": 1},
+  {"fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "\nUpcoming\nDue\nPaid", "default": "Upcoming"}
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-09 05:40:00.000000",
+ "modified_by": "Administrator",
+ "module": "MARS Constech",
+ "name": "REM Booking Installment",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

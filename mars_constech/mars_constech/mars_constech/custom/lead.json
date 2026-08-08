@@ -1,0 +1,36 @@
+{
+ "sync_on_migrate": 1,
+ "doctype": "Lead",
+ "fields": [
+  {
+   "fieldname": "custom_rem_status",
+   "fieldtype": "Select",
+   "label": "REM Status",
+   "options": "\nNew Inquiry\nSite Visit\nNegotiation\nBooking\nDownpayment\nInstallments\nConverted\nLost",
+   "default": "New Inquiry",
+   "insert_after": "status",
+   "description": "REM PWA sales funnel status"
+  },
+  {
+   "fieldname": "custom_rem_ref",
+   "fieldtype": "Data",
+   "label": "REM Ref",
+   "insert_after": "custom_rem_status",
+   "description": "PWA-side lead id (LD-xxx) for dedupe"
+  },
+  {
+   "fieldname": "custom_rem_value",
+   "fieldtype": "Currency",
+   "label": "REM Expected Value",
+   "insert_after": "custom_rem_ref",
+   "description": "Expected deal value in BDT"
+  },
+  {
+   "fieldname": "custom_rem_property",
+   "fieldtype": "Data",
+   "label": "REM Property Interest",
+   "insert_after": "custom_rem_value",
+   "description": "Project / unit the lead is interested in"
+  }
+ ]
+}

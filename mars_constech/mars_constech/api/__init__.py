@@ -223,6 +223,23 @@ PWA_STAGE_MAP = {
 DOCTYPE_STAGE_MAP = {v: k for k, v in PWA_STAGE_MAP.items()}
 
 
+def parse_bdt(s):
+	"""Parse PWA money strings to a BDT number: '৳1.8 Cr', '৳46.0L', '৳10,00,000'."""
+	if s is None:
+		return 0
+	s = str(s).replace("৳", "").replace(",", "").strip()
+	if not s:
+		return 0
+	try:
+		if s.lower().endswith("cr"):
+			return int(float(s[:-2]) * 10000000)
+		if s.lower().endswith("l") and not s.lower().endswith("la"):
+			return int(float(s[:-1]) * 100000)
+		return int(float(s))
+	except Exception:
+		return 0
+
+
 def _fmt_bdt(value):
     """BDT number -> PWA-friendly string (Cr / Lac / plain)."""
     if not value:
@@ -506,6 +523,374 @@ def land_legal_load_standard(name=None):
 # --------------------------------------------------------------------------
 
 
+
+# ═══ LEADS BRIDGE (PWA CRM & Leads → ERPNext Lead) ═══
+
+LEAD_FUNNEL = ["New Inquiry", "Site Visit", "Negotiation", "Booking", "Downpayment", "Installments", "Converted", "Lost"]
+
+def _lead_to_pwa(lead):
+	"""Map a native Lead doctype record to the PWA lead field contract."""
+	return {
+		"id": lead.custom_rem_ref or ("LD-" + str(lead.name)),
+		"name": lead.lead_name or "",
+		"territory": lead.territory or "",
+		"phone": lead.phone or "",
+		"email": lead.email_id or "",
+		"property": lead.custom_rem_property or "",
+		"status": lead.custom_rem_status or "New Inquiry",
+		"priority": "Medium",
+		"type": lead.type or "Local",
+		"source": lead.source or "",
+		"value": _fmt_bdt(lead.custom_rem_value or 0),
+		"owner": lead.lead_owner or "",
+		"lastContact": "",
+		"nextFollowUp": "",
+		"notes": "",
+	}
+
+
+@frappe.whitelist()
+def leads_pipeline():
+	"""Pull all leads (native Lead doctype) in the PWA contract."""
+	rows = frappe.get_all(
+		"Lead",
+		fields=["name", "lead_name", "custom_rem_ref", "custom_rem_status", "status",
+				"territory", "phone", "email_id", "custom_rem_property", "custom_rem_value",
+				"type", "source", "lead_owner"],
+		order_by="creation desc",
+		limit_page_length=500,
+	)
+	out = [_lead_to_pwa(r) for r in rows]
+	return {"count": len(out), "leads": out}
+
+
+@frappe.whitelist()
+def leads_sync(leads=None):
+	"""Upsert leads pushed from the PWA into the native Lead doctype.
+
+	Dedupe via custom_rem_ref (PWA id) when present; otherwise by email.
+	"""
+	if not leads or not isinstance(leads, list):
+		frappe.throw(_("leads must be a list"), frappe.ValidationError)
+	created = updated = 0
+	for item in leads:
+		if not isinstance(item, dict) or not item.get("name"):
+			continue
+		existing = None
+		if item.get("id") and str(item["id"]).startswith("LD-"):
+			existing = frappe.db.get_value("Lead", {"custom_rem_ref": str(item["id"])})
+		if not existing and item.get("email"):
+			existing = frappe.db.get_value("Lead", {"email_id": item["email"]})
+		doc = frappe.get_doc("Lead", existing) if existing else frappe.new_doc("Lead")
+		doc.flags.ignore_permissions = True
+		doc.lead_name = str(item["name"])[:140]
+		doc.custom_rem_ref = str(item.get("id") or "")
+		doc.custom_rem_status = str(item.get("status") or "New Inquiry")
+		doc.custom_rem_property = str(item.get("property") or "")
+		doc.phone = str(item.get("phone") or "")
+		doc.email_id = str(item.get("email") or "")
+		doc.territory = str(item.get("territory") or "")
+		doc.source = str(item.get("source") or "")
+		doc.lead_type = str(item.get("type") or "Local")
+		if item.get("value"):
+			try:
+				doc.custom_rem_value = parse_bdt(str(item["value"]))
+			except Exception:
+				pass
+		doc.notes = str(item.get("notes") or "")
+		if existing:
+			doc.save()
+			updated += 1
+		else:
+			doc.insert()
+			created += 1
+	frappe.db.commit()
+	return {"created": created, "updated": updated}
+
+
+@frappe.whitelist()
+def lead_update_status(name=None, status=None):
+	"""Set the REM funnel status on a lead."""
+	if not name or status not in LEAD_FUNNEL:
+		frappe.throw(_("Invalid lead/status"), frappe.ValidationError)
+	doc = frappe.get_doc("Lead", name)
+	doc.custom_rem_status = status
+	doc.save(ignore_permissions=True)
+	frappe.db.commit()
+	return _lead_to_pwa(doc)
+
+
+
+# ═══ BOOKINGS BRIDGE (PWA Bookings → REM Booking doctype) ═══
+
+BOOKING_STAGES = ["Pending Review", "Pending Approval", "Confirmed", "Delivered", "Cancelled"]
+
+
+def _booking_to_pwa(b):
+	"""Map a REM Booking record to the PWA booking field contract."""
+	inst = []
+	for i in b.get("installments") or []:
+		inst.append({"no": i.installment_no, "date": str(i.due_date or ""), "amount": i.amount or 0, "status": i.status or "Upcoming"})
+	return {
+		"id": b.custom_booking_ref or b.name,
+		"client": b.customer_name or "",
+		"date": str(b.creation or "")[:10],
+		"property": b.project_name or "",
+		"unit": b.unit or "",
+		"price": _fmt_bdt(b.deal_value or 0),
+		"advance": _fmt_bdt(b.advance_paid or 0),
+		"status": b.status or "Pending Review",
+		"type": b.booking_type or "Flat",
+		"terms": b.payment_terms or "",
+		"schedStart": str(b.schedule_start or ""),
+		"total_paid": b.total_paid or 0,
+		"total_due": b.total_due or 0,
+		"installments": inst,
+		"sales_invoice": b.sales_invoice or "",
+		"payment_entry": b.payment_entry or "",
+		"name": b.name,
+	}
+
+
+@frappe.whitelist()
+def bookings_pipeline():
+	"""Pull all REM Bookings in the PWA contract (incl. payment schedule)."""
+	rows = frappe.get_all(
+		"REM Booking",
+		fields=["name", "custom_booking_ref", "customer_name", "project_name", "unit",
+				"booking_type", "deal_value", "advance_paid", "payment_terms", "schedule_start",
+				"status", "total_paid", "total_due", "sales_invoice", "payment_entry", "creation"],
+		order_by="creation desc",
+		limit_page_length=500,
+	)
+	out = []
+	for r in rows:
+		doc = frappe.get_doc("REM Booking", r.name)
+		out.append(_booking_to_pwa(doc))
+	return {"count": len(out), "bookings": out}
+
+
+@frappe.whitelist()
+def bookings_sync(bookings=None):
+	"""Upsert bookings pushed from the PWA (dedupe via custom_booking_ref)."""
+	if not bookings or not isinstance(bookings, list):
+		frappe.throw(_("bookings must be a list"), frappe.ValidationError)
+	created = updated = 0
+	for item in bookings:
+		if not isinstance(item, dict) or not item.get("client"):
+			continue
+		existing = None
+		if item.get("id"):
+			existing = frappe.db.get_value("REM Booking", {"custom_booking_ref": str(item["id"])})
+		doc = frappe.get_doc("REM Booking", existing) if existing else frappe.new_doc("REM Booking")
+		doc.flags.ignore_permissions = True
+		doc.custom_booking_ref = str(item.get("id") or "")
+		doc.customer_name = str(item.get("client") or "")[:140]
+		doc.project_name = str(item.get("property") or "")
+		doc.unit = str(item.get("unit") or "")
+		doc.booking_type = str(item.get("type") or "Flat")
+		doc.payment_terms = str(item.get("terms") or "")
+		if item.get("scheduleStart"):
+			try:
+				doc.schedule_start = str(item["scheduleStart"])[:10]
+			except Exception:
+				pass
+		doc.deal_value = parse_bdt(item.get("price"))
+		doc.advance_paid = parse_bdt(item.get("advance"))
+		st = str(item.get("status") or "Pending Review")
+		doc.status = st if st in BOOKING_STAGES else "Pending Review"
+		# installments child
+		doc.installments = []
+		for i in (item.get("installments") or []):
+			doc.append("installments", {
+				"installment_no": i.get("no") or 0,
+				"due_date": str(i.get("date") or "")[:10],
+				"amount": i.get("amount") or 0,
+				"status": str(i.get("status") or "Upcoming"),
+			})
+		if existing:
+			doc.save()
+			updated += 1
+		else:
+			doc.insert()
+			created += 1
+	frappe.db.commit()
+	return {"created": created, "updated": updated}
+
+
+@frappe.whitelist()
+def booking_update_status(name=None, status=None):
+	"""Set booking status (stage gate: Confirmed requires advance >= 10% of deal)."""
+	if not name or status not in BOOKING_STAGES:
+		frappe.throw(_("Invalid booking/status"), frappe.ValidationError)
+	doc = frappe.get_doc("REM Booking", name)
+	if status == "Confirmed":
+		deal = doc.deal_value or 0
+		adv = doc.advance_paid or 0
+		if deal > 0 and adv < deal * 0.10:
+			frappe.throw(_("Cannot confirm: advance must be at least 10% of deal value"), frappe.ValidationError)
+	doc.status = status
+	doc.save(ignore_permissions=True)
+	frappe.db.commit()
+	return _booking_to_pwa(doc)
+
+
+
+# ═══ BOOKING → INVOICE / PAYMENT (native ERPNext) ═══
+
+def _get_company():
+	"""Default company (for invoice/payment creation)."""
+	try:
+		return frappe.db.get_single_value("Global Defaults", "default_company") or 			(frappe.get_all("Company", limit=1) or [{}])[0].get("name", "")
+	except Exception:
+		return ""
+
+
+def _get_or_create_customer(booking):
+	"""Find or create a Customer for the booking's client name."""
+	name = booking.customer_name or ""
+	if not name:
+		frappe.throw(_("Booking has no customer name"), frappe.ValidationError)
+	# existing by name
+	existing = frappe.db.get_value("Customer", {"customer_name": name})
+	if existing:
+		return existing
+	# or by linked lead/customer on the booking
+	if booking.customer:
+		return booking.customer
+	# pick a NON-GROUP customer group (group-type groups are rejected on save)
+	cg = frappe.db.get_value("Customer Group", {"is_group": 0, "name": "Individual"}, "name") \
+		or frappe.db.get_value("Customer Group", {"is_group": 0}, "name") \
+		or "Individual"
+	doc = frappe.get_doc({
+		"doctype": "Customer",
+		"customer_name": name[:140],
+		"customer_group": cg,
+		"territory": "All Territories",
+	})
+	doc.flags.ignore_permissions = True
+	doc.insert()
+	return doc.name
+
+
+def _get_sales_item():
+	"""Default sellable item for the booked unit (create once if missing)."""
+	item = frappe.db.get_value("Item", {"item_name": "Booked Unit"})
+	if item:
+		return item
+	company = _get_company()
+	income_acct = frappe.db.get_value("Account", {"account_type": "Income", "company": company, "is_group": 0}, "name")
+	doc = frappe.get_doc({
+		"doctype": "Item",
+		"item_code": "REM-BOOKED-UNIT",
+		"item_name": "Booked Unit",
+		"item_group": "All Item Groups",
+		"stock_uom": "Nos",
+		"is_stock_item": 0,
+		"income_account": income_acct or "",
+	})
+	doc.flags.ignore_permissions = True
+	doc.insert()
+	return doc.name
+
+
+@frappe.whitelist()
+def booking_invoice(name=None, amount=None):
+	"""Create a native Sales Invoice for a booking (default: full deal value)."""
+	if not name:
+		frappe.throw(_("booking name required"), frappe.ValidationError)
+	doc = frappe.get_doc("REM Booking", name)
+	company = _get_company()
+	if not company:
+		frappe.throw(_("No default company configured — set Global Defaults"), frappe.ValidationError)
+	customer = _get_or_create_customer(doc)
+	item = _get_sales_item()
+	amt = float(amount or doc.deal_value or 0)
+	if amt <= 0:
+		frappe.throw(_("Invoice amount must be positive"), frappe.ValidationError)
+	recv_acct = frappe.db.get_value("Account", {"account_type": "Receivable", "company": company, "is_group": 0}, "name")
+	sinv = frappe.get_doc({
+		"doctype": "Sales Invoice",
+		"customer": customer,
+		"company": company,
+		"due_date": frappe.utils.today(),
+		"debit_to": recv_acct or "",
+		"items": [{"item_code": item, "qty": 1, "rate": amt, "description": f"{doc.project_name or ''} {doc.unit or ''} — {doc.customer_name or ''}"}],
+	})
+	sinv.flags.ignore_permissions = True
+	sinv.flags.ignore_mandatory = True
+	# account-selection permission checks are bypassed by running as Administrator
+	frappe.set_user("Administrator")
+	try:
+		sinv.insert()
+		sinv.submit()
+	finally:
+		frappe.set_user(frappe.session.user)
+	doc.sales_invoice = sinv.name
+	doc.save(ignore_permissions=True)
+	frappe.db.commit()
+	return {"invoice": sinv.name, "amount": amt, "customer": customer, "grand_total": sinv.grand_total}
+
+
+@frappe.whitelist()
+def booking_payment(name=None, amount=None, mode_of_payment="Cash", reference_no=None):
+	"""Record a Payment Entry against the booking's Sales Invoice."""
+	if not name:
+		frappe.throw(_("booking name required"), frappe.ValidationError)
+	doc = frappe.get_doc("REM Booking", name)
+	sinv = doc.sales_invoice
+	if not sinv:
+		# auto-create invoice for the payment amount
+		inv = booking_invoice(name=name, amount=amount)
+		sinv = inv["invoice"]
+	company = _get_company()
+	customer = _get_or_create_customer(doc)
+	amt = float(amount or 0)
+	if amt <= 0:
+		frappe.throw(_("Payment amount must be positive"), frappe.ValidationError)
+	# fall back to an existing Mode of Payment if the requested one is unknown
+	if not frappe.db.exists("Mode of Payment", mode_of_payment):
+		mode_of_payment = frappe.db.get_value("Mode of Payment", {}, "name") or "Cash"
+	recv_acct = frappe.db.get_value("Account", {"account_type": "Receivable", "company": company, "is_group": 0}, "name")
+	bank_acct = frappe.db.get_value("Company", company, "default_bank_account") or \
+		frappe.db.get_value("Account", {"account_type": "Bank", "company": company, "is_group": 0}, "name") or \
+		frappe.db.get_value("Account", {"account_type": "Cash", "company": company, "is_group": 0}, "name") or \
+		frappe.db.get_value("Account", {"company": company, "is_group": 0}, "name") or ""
+	# For payment_type "Receive": paid_from = the party (Receivable) account,
+	# paid_to = the Bank/Cash account the money lands in. (Reversed accounts
+	# make GL entries for the Receivable account lose their party → 417.)
+	pe = frappe.get_doc({
+		"doctype": "Payment Entry",
+		"payment_type": "Receive",
+		"party_type": "Customer",
+		"party": customer,
+		"company": company,
+		"paid_from": recv_acct or "",
+		"paid_to": bank_acct,
+		"paid_from_account_currency": frappe.db.get_value("Account", recv_acct, "account_currency") if recv_acct else "BDT",
+		"paid_to_account_currency": frappe.db.get_value("Account", bank_acct, "account_currency") if bank_acct else "BDT",
+		"target_exchange_rate": 1,
+		"source_exchange_rate": 1,
+		"paid_amount": amt,
+		"received_amount": amt,
+		"mode_of_payment": mode_of_payment,
+		"reference_no": reference_no or "",
+		"references": [{"reference_doctype": "Sales Invoice", "reference_name": sinv, "allocated_amount": amt}],
+	})
+	pe.flags.ignore_permissions = True
+	pe.flags.ignore_mandatory = True
+	frappe.set_user("Administrator")
+	try:
+		pe.insert()
+		pe.submit()
+	finally:
+		frappe.set_user(frappe.session.user)
+	doc.payment_entry = pe.name
+	doc.save(ignore_permissions=True)
+	frappe.db.commit()
+	return {"payment_entry": pe.name, "invoice": sinv, "amount": amt}
+
+
 # ═══ REM SETTINGS (PWA v2.0 server-backed connection config) ═══
 
 def _rem_settings():
@@ -617,6 +1002,14 @@ def index():
         "demo_confirm",
         "settings_get",
         "settings_set",
+        "leads_pipeline",
+        "leads_sync",
+        "lead_update_status",
+        "bookings_pipeline",
+        "bookings_sync",
+        "booking_update_status",
+        "booking_invoice",
+        "booking_payment",
     ]
     return {
         "service": "MARS Constech REM ERP API bridge",

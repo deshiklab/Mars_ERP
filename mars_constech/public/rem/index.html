@@ -1393,6 +1393,80 @@ function syncTestAll(){
     });
   })(0);
 }
+
+// ═══ LEADS ERP BRIDGE (PWA CRM → ERPNext Lead doctype) ═══
+function leadsPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  showToast('Loading leads from ERPNext…','info');
+  API._req('GET','.leads_pipeline').then(function(r){
+    if(r.status===200 && Array.isArray(r.data.leads)){
+      var n=0;
+      r.data.leads.forEach(function(ep){
+        var existing=mockLeads.find(function(l){return String(l.id)===String(ep.id)||(l.email&&ep.email&&String(l.email).toLowerCase()===String(ep.email).toLowerCase());});
+        if(existing){ Object.assign(existing,ep); n++; }
+        else { mockLeads.push(ep); n++; }
+      });
+      DB.save('leads',mockLeads);
+      showToast('Synced '+n+' leads from ERPNext','success');
+      renderModule();
+    } else {
+      showToast((r.data&&r.data.error)||'Lead pull failed (HTTP '+r.status+')','error');
+    }
+  });
+}
+function leadsPushToERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  showToast('Pushing leads to ERPNext…','info');
+  var payload=mockLeads.map(function(l){ return {id:l.id,name:l.name,email:l.email,phone:l.phone,territory:l.territory,property:l.property,status:l.status,type:l.type,source:l.source,value:l.value||''}; });
+  API._req('POST','.leads_sync',{leads:payload}).then(function(r){
+    if(r.status===200){ showToast('Pushed to ERPNext: '+r.data.created+' created, '+r.data.updated+' updated','success'); }
+    else showToast((r.data&&r.data.error)||'Lead push failed','error');
+  });
+}
+
+// ═══ BOOKINGS ERP BRIDGE (PWA Bookings → REM Booking doctype) ═══
+function bookingsPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  showToast('Loading bookings from ERPNext…','info');
+  API._req('GET','.bookings_pipeline').then(function(r){
+    if(r.status===200 && Array.isArray(r.data.bookings)){
+      var n=0;
+      r.data.bookings.forEach(function(ep){
+        var existing=mockBookings.find(function(b){return String(b.id)===String(ep.id);});
+        if(existing){ Object.assign(existing,ep); n++; }
+        else { mockBookings.push(ep); n++; }
+      });
+      DB.save('bookings',mockBookings);
+      // merge schedules into the mock schedule collection so the detail view works
+      var scheds=DB.init('booking_schedules',[]);
+      r.data.bookings.forEach(function(ep){
+        if(ep.installments&&ep.installments.length){
+          var s=scheds.find(function(s){return String(s.bookingId)===String(ep.id);});
+          if(s){ s.installments=ep.installments; s.total=ep.total_paid+ep.total_due; }
+          else scheds.push({id:scheds.length+1,bookingId:ep.id,terms:ep.terms||'',total:(ep.total_paid||0)+(ep.total_due||0),down:parseMoneyStr(ep.advance)||0,installments:ep.installments});
+        }
+      });
+      DB.save('booking_schedules',scheds);
+      showToast('Synced '+n+' bookings from ERPNext','success');
+      renderModule();
+    } else {
+      showToast((r.data&&r.data.error)||'Booking pull failed (HTTP '+r.status+')','error');
+    }
+  });
+}
+function bookingsPushToERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  showToast('Pushing bookings to ERPNext…','info');
+  var payload=mockBookings.map(function(b){
+    var s=DB.init('booking_schedules',[]).find(function(x){return String(x.bookingId)===String(b.id);});
+    return {id:b.id,client:b.client,property:b.property,unit:b.unit,type:b.type,price:b.price||'',advance:b.advance||'',status:b.status||'Pending Review',terms:b.terms||'',schedStart:b.schedStart||'',installments:(s&&s.installments)||[]};
+  });
+  API._req('POST','.bookings_sync',{bookings:payload}).then(function(r){
+    if(r.status===200){ showToast('Pushed to ERPNext: '+r.data.created+' created, '+r.data.updated+' updated','success'); }
+    else showToast((r.data&&r.data.error)||'Booking push failed','error');
+  });
+}
+
 window.mockLeads = DB.init('leads', [
   {id:1,name:'Tariqul Islam',territory:'Dhaka North',phone:'+880 1711 000000',email:'tariqul@example.com',property:'Muktodhara - 5 Katha',status:'Negotiation',priority:'High',type:'Local',source:'Bikroy.com',value:'৳1.5 Cr',lastContact:'2h ago',owner:'Hasanul Banna',nextFollowUp:'Today, 3:00 PM',paymentStatus:'Up to Date',facingDir:'South',floorPref:'Any',flatType:'Land',sizeSqFt:'1800 sqft',paymentPlan:'Construction Link',brokerId:null,
    installments:[{date:'Oct 01, 2024',amount:'৳5,00,000',status:'Paid'},{date:'Nov 01, 2024',amount:'৳5,00,000',status:'Due'}],
@@ -3942,6 +4016,7 @@ function renderCRM(el){
       ${bc>0?'<span style="font-size:9px;color:#2F80ED;font-weight:600;padding:0 4px">'+bc+' selected</span><button class="action-btn secondary" onclick="bulkActionStatus(\'Negotiation\')" style="padding:2px 6px;font-size:8px">Advance</button><button class="action-btn secondary" onclick="bulkActionAssign()" style="padding:2px 6px;font-size:8px">Assign</button><button class="action-btn secondary" onclick="bulkActionPriority(\'High\')" style="padding:2px 6px;font-size:8px">🔥 Priority</button><button class="action-btn secondary" onclick="bulkActionFollowUp()" style="padding:2px 6px;font-size:8px" title="Set follow-up date">📅 F/U</button><button class="action-btn secondary" onclick="bulkExportLeads()" style="padding:2px 6px;font-size:8px" title="Export selected leads as CSV">📥 Export</button><button class="action-btn secondary" onclick="bulkSetStatusLeads()" style="padding:2px 6px;font-size:8px" title="Set stage for selected leads">🔁 Set Status</button><button class="action-btn secondary" onclick="bulkActionDelete()" style="padding:2px 6px;font-size:8px;color:#e53935">Delete</button><button class="action-btn" onclick="_bulkSel={};renderModule()" style="padding:2px 6px;font-size:8px">Clear</button>':''}
       <button class="action-btn secondary" onclick="importData(mockLeads,'Leads','leads',IMPORT_FIELDS.leads)" style="padding:3px 7px;font-size:9px" title="Import CSV" data-perm="CRM & Leads:Import">📥</button>
       <button class="action-btn primary" onclick="crudLead()" style="padding:3px 8px;font-size:10px" data-perm="CRM & Leads:Create">+ Add Lead</button>
+      <button class="action-btn secondary" onclick="leadsPullFromERP()" style="padding:3px 8px;font-size:10px" title="Load live leads from ERPNext (Lead doctype)">🔄 Sync from ERP</button>
       `:crmSubView==='complaints'?`
       <input id="cmpSearch" placeholder="Search client/project..." oninput="_PG['complaints']={page:1,perPage:_pgPerPage};renderModule()" style="padding:4px 8px;font-size:10px;border:1px solid #e0e0e0;border-radius:4px;flex:0 0 180px"/>
       <select id="cmpFStatus" onchange="_PG['complaints']={page:1,perPage:_pgPerPage};renderModule()" style="padding:4px 6px;font-size:9px;border:1px solid #e0e0e0;border-radius:4px"><option value="">All Status</option><option value="Open">Open</option><option value="In Progress">In Progress</option><option value="Resolved">Resolved</option><option value="Escalated">Escalated</option></select>
@@ -7275,7 +7350,7 @@ function renderBookings(el){
     return '<th'+(c.k==='price'||c.k==='advance'?' class="num"':'')+'>'+c.l+'</th>';
   }).join('');
   el.innerHTML=`<div class="fade-in"><div class="page-title">Bookings</div><div class="page-subtitle">${mockBookings.length} bookings \u00b7 ${mockBookings.filter(b=>b.status==='Confirmed').length} confirmed \u00b7 ${mockInvoices.filter(function(i){return mockBookings.some(function(b){return b.client===i.client})}).length} invoiced</div>
-    <div class="toolbar" style="margin-bottom:6px"><input id="bkgSearch" placeholder="Search client/property/ID..." oninput="renderModule()" style="padding:4px 8px;border:1px solid #e0e0e0;border-radius:4px;font-size:10px;outline:none;width:160px"/><select id="bkgStatus" onchange="renderModule()" style="padding:4px 6px;font-size:9px;border:1px solid #e0e0e0;border-radius:4px"><option value="">All Status</option>${_fopts(['Pending Review','Confirmed','Cancelled','Completed'],bcnt,bs)}</select><div class="spacer"></div>${bulkBar('bookings')}<button class="action-btn secondary" onclick="saveView('bookings')" style="padding:3px 8px;font-size:10px" title="Save current filters as a view">💾 Save View</button><button class="action-btn primary" onclick="crudBooking()" data-perm="Bookings:Create">+ New Booking</button></div>
+    <div class="toolbar" style="margin-bottom:6px"><input id="bkgSearch" placeholder="Search client/property/ID..." oninput="renderModule()" style="padding:4px 8px;border:1px solid #e0e0e0;border-radius:4px;font-size:10px;outline:none;width:160px"/><select id="bkgStatus" onchange="renderModule()" style="padding:4px 6px;font-size:9px;border:1px solid #e0e0e0;border-radius:4px"><option value="">All Status</option>${_fopts(['Pending Review','Confirmed','Cancelled','Completed'],bcnt,bs)}</select><div class="spacer"></div>${bulkBar('bookings')}<button class="action-btn secondary" onclick="saveView('bookings')" style="padding:3px 8px;font-size:10px" title="Save current filters as a view">💾 Save View</button><button class="action-btn secondary" onclick="bookingsPullFromERP()" style="padding:3px 8px;font-size:10px" title="Load live bookings from ERPNext (REM Booking)">🔄 Sync from ERP</button><button class="action-btn primary" onclick="crudBooking()" data-perm="Bookings:Create">+ New Booking</button></div>
     ${renderFltChips('bookings',{search:bq,status:bs},{search:'Search',status:'Status'},mockBookings.length,filtered.length)}
     ${renderViewChips('bookings')}
     <div class="card"><div class="card-body" style="padding:0"><div class="table-wrap"><table data-mod="bookings"><thead><tr>${COLHEAD}</tr></thead><tbody>${pB.items.length?pB.items.map(function(b,bi){
