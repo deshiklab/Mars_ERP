@@ -5,20 +5,20 @@ import frappe
 
 STAGES = [
 	"Lead",
-	"Survey",
+	"Due Diligence",
 	"Negotiation",
 	"Agreement",
 	"Registration",
-	"Handover",
+	"Possession",
 ]
 
 STAGE_COLORS = {
 	"Lead": "blue",
-	"Survey": "cyan",
+	"Due Diligence": "cyan",
 	"Negotiation": "orange",
 	"Agreement": "purple",
 	"Registration": "yellow",
-	"Handover": "green",
+	"Possession": "green",
 }
 
 
@@ -29,9 +29,11 @@ def get_pipeline():
 		"Land Acquisition",
 		fields=[
 			"name", "land_acquisition_title", "current_stage", "status",
-			"land_location", "area_katha", "land_owner", "asking_price",
-			"negotiated_price", "deal_value", "feasibility_score",
-			"legal_status", "acquisition_date", "project",
+			"land_location", "mouza", "dag", "area_katha", "area_bigha",
+			"land_owner", "asking_price", "negotiated_price", "deal_value",
+			"feasibility_score", "risk_rating", "legal_status",
+			"litigation_check", "acquisition_date", "target_project",
+			"priority", "next_action",
 		],
 		order_by="modified desc",
 		limit_page_length=200,

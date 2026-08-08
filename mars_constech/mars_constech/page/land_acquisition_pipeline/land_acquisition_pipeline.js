@@ -16,11 +16,11 @@ frappe.pages["land-acquisition-pipeline"].on_page_load = function (wrapper) {
 	// stage color map (mirrors V10)
 	const COLORS = {
 		Lead: "#3b82f6",
-		Survey: "#06b6d4",
+		"Due Diligence": "#06b6d4",
 		Negotiation: "#f97316",
 		Agreement: "#8b5cf6",
 		Registration: "#eab308",
-		Handover: "#22c55e",
+		Possession: "#22c55e",
 	};
 
 	function load_pipeline() {
@@ -79,17 +79,23 @@ frappe.pages["land-acquisition-pipeline"].on_page_load = function (wrapper) {
 	}
 
 	function card(r) {
+		const riskColor = { Low: "#dcfce7", Medium: "#fef3c7", High: "#fee2e2" }[r.risk_rating] || "#f1f5f9";
+		const riskText = { Low: "#166534", Medium: "#92400e", High: "#991b1b" }[r.risk_rating] || "#475569";
 		return `
 			<div class="kanban-card" data-name="${r.name}" style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:10px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.05);" onclick="frappe.set_route('Form', 'Land Acquisition', '${r.name}')">
-				<div style="font-weight:600;font-size:13px;color:#0f172a;">${r.land_acquisition_title || r.name}</div>
-				<div style="font-size:12px;color:#64748b;margin-top:4px;">${r.land_location || ""} ${r.area_katha ? "· " + r.area_katha + " katha" : ""}</div>
+				<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
+					<div style="font-weight:600;font-size:13px;color:#0f172a;flex:1;">${r.land_acquisition_title || r.name}</div>
+					${r.risk_rating ? `<span style="background:${riskColor};color:${riskText};font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;white-space:nowrap;">${r.risk_rating}</span>` : ""}
+				</div>
+				<div style="font-size:12px;color:#64748b;margin-top:4px;">${r.land_location || ""}${r.mouza ? " · " + r.mouza : ""} ${r.area_katha ? "· " + r.area_katha + " katha" : ""}${r.area_bigha ? " (" + r.area_bigha + " bigha)" : ""}</div>
 				<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
 					<div>
-						<div style="font-size:12px;color:#475569;">${fmtCr(r.deal_value || r.negotiated_price)}</div>
+						<div style="font-size:12px;color:#475569;">${fmtCr(r.deal_value || r.negotiated_price || r.asking_price)}</div>
 						<div style="font-size:11px;color:#94a3b8;">Score: ${r.feasibility_score || 0}%</div>
 					</div>
 					<div style="display:flex;gap:6px;align-items:center;">
 						${r.legal_status === "Cleared" ? `<span class="badge badge-success" style="font-size:10px;">Legal ✓</span>` : ""}
+						${r.litigation_check === "Clear" ? `<span class="badge badge-info" style="font-size:10px;">Title ✓</span>` : ""}
 						${data.stages.indexOf(r.current_stage) < data.stages.length - 1 ? `<button class="btn btn-xs btn-light js-advance" data-name="${r.name}" data-stage="${r.current_stage}" title="Move to next stage" style="padding:2px 8px;font-size:12px;">→</button>` : ""}
 					</div>
 				</div>

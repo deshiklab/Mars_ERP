@@ -2,7 +2,7 @@
  "actions": [],
  "allow_rename": 1,
  "autoname": "format:LA-{#####}",
- "creation": "2026-08-08 19:10:00.000000",
+ "creation": "2026-08-09 01:00:00.000000",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -11,22 +11,47 @@
   "status",
   "column_break_0",
   "acquisition_date",
-  "project",
+  "target_project",
+  "priority",
+  "next_action",
   "section_break_land",
   "land_location",
+  "mouza",
+  "dag",
+  "khatian_cs",
+  "khatian_sa",
+  "khatian_rs",
   "area_katha",
+  "area_bigha",
+  "coordinates",
   "land_owner",
   "seller_contact",
   "column_break_land",
+  "land_use",
+  "road_access",
+  "soil_condition",
+  "flood_risk",
+  "litigation_check",
+  "risk_rating",
+  "landmarks",
+  "section_break_owners",
+  "owners",
+  "section_break_finance",
   "asking_price",
   "negotiated_price",
   "deal_value",
-  "section_break_scorecard",
-  "feasibility_score",
-  "scorecard",
+  "budget",
+  "commission_pct",
+  "commission_amount",
+  "estimated_roi",
+  "section_break_documents",
+  "documents",
   "section_break_legal",
   "legal_status",
   "legal_checklist",
+  "section_break_scorecard",
+  "feasibility_score",
+  "scorecard",
   "section_break_audit",
   "stage_log",
   "remarks"
@@ -36,16 +61,16 @@
    "fieldname": "land_acquisition_title",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Land Acquisition Title",
+   "label": "Acquisition Title",
    "reqd": 1
   },
   {
+   "default": "Lead",
    "fieldname": "current_stage",
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Current Stage",
-   "options": "Lead\nSurvey\nNegotiation\nAgreement\nRegistration\nHandover",
-   "reqd": 1
+   "options": "Lead\nDue Diligence\nNegotiation\nAgreement\nRegistration\nPossession"
   },
   {
    "default": "Open",
@@ -62,29 +87,80 @@
   {
    "fieldname": "acquisition_date",
    "fieldtype": "Date",
-   "label": "Acquisition Date"
+   "label": "Acquisition / Registration Date"
   },
   {
-   "fieldname": "project",
+   "fieldname": "target_project",
    "fieldtype": "Link",
-   "label": "Project",
+   "label": "Target Project",
    "options": "Project"
+  },
+  {
+   "default": "Medium",
+   "fieldname": "priority",
+   "fieldtype": "Select",
+   "label": "Priority",
+   "options": "High\nMedium\nLow"
+  },
+  {
+   "fieldname": "next_action",
+   "fieldtype": "Data",
+   "label": "Next Action",
+   "description": "What happens next (e.g. \"Site visit Nov 5\", \"Soil test scheduled\")"
   },
   {
    "fieldname": "section_break_land",
    "fieldtype": "Section Break",
-   "label": "Land Details"
+   "label": "Land & Location"
   },
   {
    "fieldname": "land_location",
    "fieldtype": "Data",
-   "label": "Land Location",
-   "in_list_view": 1
+   "in_list_view": 1,
+   "label": "Location"
+  },
+  {
+   "fieldname": "mouza",
+   "fieldtype": "Data",
+   "label": "Mouza"
+  },
+  {
+   "fieldname": "dag",
+   "fieldtype": "Data",
+   "label": "Dag No."
+  },
+  {
+   "fieldname": "khatian_cs",
+   "fieldtype": "Data",
+   "label": "CS Khatian No."
+  },
+  {
+   "fieldname": "khatian_sa",
+   "fieldtype": "Data",
+   "label": "SA Khatian No."
+  },
+  {
+   "fieldname": "khatian_rs",
+   "fieldtype": "Data",
+   "label": "RS Khatian No."
   },
   {
    "fieldname": "area_katha",
    "fieldtype": "Float",
-   "label": "Area (Katha)"
+   "label": "Area (Katha)",
+   "precision": "2"
+  },
+  {
+   "fieldname": "area_bigha",
+   "fieldtype": "Float",
+   "label": "Area (Bigha)",
+   "precision": "2"
+  },
+  {
+   "fieldname": "coordinates",
+   "fieldtype": "Data",
+   "label": "Coordinates",
+   "description": "e.g. 23.8213° N, 90.4127° E"
   },
   {
    "fieldname": "land_owner",
@@ -101,6 +177,66 @@
    "fieldtype": "Column Break"
   },
   {
+   "fieldname": "land_use",
+   "fieldtype": "Data",
+   "label": "Land Use",
+   "description": "e.g. Residential (RAJUK), Agricultural → Residential"
+  },
+  {
+   "fieldname": "road_access",
+   "fieldtype": "Data",
+   "label": "Road Access",
+   "description": "e.g. 120ft RAJUK Road"
+  },
+  {
+   "fieldname": "soil_condition",
+   "fieldtype": "Data",
+   "label": "Soil Condition",
+   "description": "e.g. Alluvial — good bearing"
+  },
+  {
+   "default": "Low",
+   "fieldname": "flood_risk",
+   "fieldtype": "Select",
+   "label": "Flood Risk",
+   "options": "Low\nMedium\nHigh"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "litigation_check",
+   "fieldtype": "Select",
+   "label": "Litigation Check",
+   "options": "Clear\nPending\nIssues Found"
+  },
+  {
+   "default": "Low",
+   "fieldname": "risk_rating",
+   "fieldtype": "Select",
+   "label": "Overall Risk",
+   "options": "Low\nMedium\nHigh"
+  },
+  {
+   "fieldname": "landmarks",
+   "fieldtype": "Small Text",
+   "label": "Landmarks / Notes"
+  },
+  {
+   "fieldname": "section_break_owners",
+   "fieldtype": "Section Break",
+   "label": "Owners"
+  },
+  {
+   "fieldname": "owners",
+   "fieldtype": "Table",
+   "label": "Owners",
+   "options": "Land Acquisition Owner"
+  },
+  {
+   "fieldname": "section_break_finance",
+   "fieldtype": "Section Break",
+   "label": "Finance & Deal"
+  },
+  {
    "fieldname": "asking_price",
    "fieldtype": "Currency",
    "label": "Asking Price"
@@ -114,6 +250,57 @@
    "fieldname": "deal_value",
    "fieldtype": "Currency",
    "label": "Deal Value"
+  },
+  {
+   "fieldname": "budget",
+   "fieldtype": "Currency",
+   "label": "Budget"
+  },
+  {
+   "default": "0",
+   "fieldname": "commission_pct",
+   "fieldtype": "Percent",
+   "label": "Commission (%)"
+  },
+  {
+   "fieldname": "commission_amount",
+   "fieldtype": "Currency",
+   "label": "Commission Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "estimated_roi",
+   "fieldtype": "Percent",
+   "label": "Estimated ROI (%)"
+  },
+  {
+   "fieldname": "section_break_documents",
+   "fieldtype": "Section Break",
+   "label": "Document Registry"
+  },
+  {
+   "fieldname": "documents",
+   "fieldtype": "Table",
+   "label": "Documents",
+   "options": "Land Acquisition Document"
+  },
+  {
+   "fieldname": "section_break_legal",
+   "fieldtype": "Section Break",
+   "label": "Legal Vetting"
+  },
+  {
+   "default": "Not Started",
+   "fieldname": "legal_status",
+   "fieldtype": "Select",
+   "label": "Legal Status",
+   "options": "Not Started\nIn Progress\nCleared\nIssues Found"
+  },
+  {
+   "fieldname": "legal_checklist",
+   "fieldtype": "Table",
+   "label": "Legal Checklist",
+   "options": "Land Acquisition Legal Check"
   },
   {
    "fieldname": "section_break_scorecard",
@@ -133,23 +320,6 @@
    "options": "Land Acquisition Scorecard Item"
   },
   {
-   "fieldname": "section_break_legal",
-   "fieldtype": "Section Break",
-   "label": "Legal Vetting"
-  },
-  {
-   "fieldname": "legal_status",
-   "fieldtype": "Select",
-   "label": "Legal Status",
-   "options": "Not Started\nIn Progress\nCleared\nIssues Found"
-  },
-  {
-   "fieldname": "legal_checklist",
-   "fieldtype": "Table",
-   "label": "Legal Checklist",
-   "options": "Land Acquisition Legal Check"
-  },
-  {
    "fieldname": "section_break_audit",
    "fieldtype": "Section Break",
    "label": "Stage Audit Trail"
@@ -158,8 +328,7 @@
    "fieldname": "stage_log",
    "fieldtype": "Table",
    "label": "Stage Log",
-   "options": "Land Acquisition Stage Log",
-   "read_only": 1
+   "options": "Land Acquisition Stage Log"
   },
   {
    "fieldname": "remarks",
@@ -169,11 +338,10 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-08 19:10:00.000000",
+ "modified": "2026-08-09 01:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mars Constech",
  "name": "Land Acquisition",
- "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {

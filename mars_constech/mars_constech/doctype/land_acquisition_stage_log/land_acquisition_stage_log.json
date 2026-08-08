@@ -17,7 +17,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Stage",
-   "options": "Lead\nSurvey\nNegotiation\nAgreement\nRegistration\nHandover"
+   "options": "Lead\nDue Diligence\nNegotiation\nAgreement\nRegistration\nPossession"
   },
   {
    "fieldname": "changed_on",
