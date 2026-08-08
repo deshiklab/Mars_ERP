@@ -57,6 +57,38 @@ def get_context(context):
 		order_by="posting_date desc",
 		limit_page_length=50,
 	)
+	invoice_names = [i.name for i in context.invoices]
+
+	# payments for this customer (with method/reference)
+	context.payments = frappe.get_all(
+		"Payment Entry",
+		filters={"party": customer},
+		fields=[
+			"name", "posting_date", "paid_amount", "reference_no",
+			"remarks", "mode_of_payment",
+		],
+		order_by="posting_date desc",
+		limit_page_length=50,
+	)
+
+	# payment allocation per invoice (method + ref joined for display)
+	context.invoice_payments = {}
+	if invoice_names:
+		alloc = frappe.db.sql(
+			"""
+			SELECT pr.reference_name, pe.posting_date, pe.paid_amount,
+			       pe.mode_of_payment, pe.reference_no
+			FROM `tabPayment Entry Reference` pr
+			JOIN `tabPayment Entry` pe ON pe.name = pr.parent
+			WHERE pr.reference_doctype = 'Sales Invoice'
+			  AND pr.reference_name IN %s
+			ORDER BY pe.posting_date
+			""",
+			(tuple(invoice_names),),
+			as_dict=True,
+		)
+		for a in alloc:
+			context.invoice_payments.setdefault(a.reference_name, []).append(a)
 
 	# totals
 	context.totals = {
@@ -66,9 +98,42 @@ def get_context(context):
 		"due": sum(b.total_due or 0 for b in context.bookings),
 		"invoices": len(context.invoices),
 		"invoice_outstanding": sum(i.outstanding_amount or 0 for i in context.invoices),
+		"payments": len(context.payments),
+		"payments_total": sum(p.paid_amount or 0 for p in context.payments),
+	}
+
+	# payment-alert banner: any booking with due > 0
+	context.alert = None
+	overdue = [b for b in context.bookings if (b.total_due or 0) > 0]
+	if overdue:
+		biggest = max(overdue, key=lambda b: b.total_due or 0)
+		context.alert = {
+			"type": "due",
+			"title": _("Payment due"),
+			"message": _("{0} has ৳{1} outstanding. Please contact our accounts team to arrange payment.").format(
+				biggest.property or biggest.name,
+				_round_cr(biggest.total_due),
+			),
+		}
+
+	# support contact (safe lookups with fallbacks)
+	context.support = {
+		"phone": _safe_single_value("Support Settings", "support_phone")
+		or _safe_single_value("Support Settings", "phone")
+		or "+880 1711-000000",
+		"email": _safe_single_value("Support Settings", "support_email")
+		or "accounts@marsconstech.com",
 	}
 
 	return context
+
+
+def _safe_single_value(doctype, field):
+	"""get_single_value that returns None instead of raising on missing fields."""
+	try:
+		return frappe.db.get_single_value(doctype, field)
+	except Exception:
+		return None
 
 
 def _get_portal_customer():
@@ -83,3 +148,14 @@ def _get_portal_customer():
 	if perms:
 		return perms[0].for_value
 	return None
+
+
+def _round_cr(v):
+	"""Format taka to a compact ৳Cr/৳Lac string."""
+	if not v:
+		return "৳0"
+	if v >= 10000000:
+		return f"৳{v / 10000000:.1f} Cr"
+	if v >= 100000:
+		return f"৳{v / 100000:.1f} Lac"
+	return f"৳{v:,.0f}"
