@@ -94,6 +94,7 @@ frappe.pages["land-acquisition-pipeline"].on_page_load = function (wrapper) {
 						<div style="font-size:11px;color:#94a3b8;">Score: ${r.feasibility_score || 0}%</div>
 					</div>
 					<div style="display:flex;gap:6px;align-items:center;">
+						${r.current_stage === "Due Diligence" ? `<span class="badge badge-light" style="font-size:10px;" title="Legal checklist vetted">⚖ ${r.legal_checklist_progress || 0}%</span>` : ""}
 						${r.legal_status === "Cleared" ? `<span class="badge badge-success" style="font-size:10px;">Legal ✓</span>` : ""}
 						${r.litigation_check === "Clear" ? `<span class="badge badge-info" style="font-size:10px;">Title ✓</span>` : ""}
 						${data.stages.indexOf(r.current_stage) < data.stages.length - 1 ? `<button class="btn btn-xs btn-light js-advance" data-name="${r.name}" data-stage="${r.current_stage}" title="Move to next stage" style="padding:2px 8px;font-size:12px;">→</button>` : ""}

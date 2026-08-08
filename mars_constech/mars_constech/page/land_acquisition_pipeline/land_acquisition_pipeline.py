@@ -33,7 +33,7 @@ def get_pipeline():
 			"land_owner", "asking_price", "negotiated_price", "deal_value",
 			"feasibility_score", "risk_rating", "legal_status",
 			"litigation_check", "acquisition_date", "target_project",
-			"priority", "next_action",
+			"priority", "next_action", "legal_checklist_progress",
 		],
 		order_by="modified desc",
 		limit_page_length=200,

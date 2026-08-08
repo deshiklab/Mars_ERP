@@ -48,6 +48,7 @@
   "documents",
   "section_break_legal",
   "legal_status",
+  "legal_checklist_progress",
   "legal_checklist",
   "section_break_scorecard",
   "feasibility_score",
@@ -295,6 +296,12 @@
    "fieldtype": "Select",
    "label": "Legal Status",
    "options": "Not Started\nIn Progress\nCleared\nIssues Found"
+  },
+  {
+   "fieldname": "legal_checklist_progress",
+   "fieldtype": "Percent",
+   "label": "Legal Checklist Progress",
+   "read_only": 1
   },
   {
    "fieldname": "legal_checklist",

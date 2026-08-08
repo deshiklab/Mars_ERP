@@ -16,6 +16,26 @@ STAGES = [
 	"Possession",
 ]
 
+# Standard legal/land checklist the legal team must collect and vet during
+# Due Diligence (Bangladesh land practice). Auto-loaded when a record enters
+# the Due Diligence stage. Each item: (check_item, required, required_document)
+STANDARD_LEGAL_CHECKLIST = [
+	("CS Khatian", 1, "Certified copy of CS khatian showing the record of right"),
+	("SA Khatian", 1, "Certified copy of SA khatian (1950s settlement record)"),
+	("RS Khatian", 1, "Certified copy of RS khatian (latest survey record)"),
+	("Original Sale Deed", 1, "Original deed / dakil of the current owner (registered)"),
+	("Mutation Certificate", 1, "Mutation in the name of the seller (land office)"),
+	("Land Development Tax Receipt", 1, "Up-to-date land development tax payment receipt"),
+	("Holding / Property Tax Receipt", 1, "Current holding tax receipt (city corporation/union)"),
+	("Non-Encumbrance Certificate", 1, "Certificate of non-encumbrance from the sub-registry"),
+	("Court Case Search", 1, "Certificate from the civil court that no suit/litigation is pending"),
+	("Survey Map (Mouza Map)", 1, "Latest mouza/survey map showing the dag and plot"),
+	("Seller NID & Photo", 1, "Copy of the seller's NID and recent photograph"),
+	("Board Resolution / POA", 0, "Board resolution or power of attorney (if seller is an entity)"),
+	("NOC from Relevant Authority", 0, "NOC (RAJUK / city corporation / utility) if required"),
+	("Possession Proof", 1, "Evidence of khas possession (possession letter / local verification)"),
+]
+
 
 class LandAcquisition(Document):
 	def validate(self):
@@ -23,6 +43,8 @@ class LandAcquisition(Document):
 		self.update_feasibility_score()
 		self.update_risk_rating()
 		self.compute_commission()
+		self.load_standard_checklist_on_due_diligence()
+		self.update_legal_checklist_progress()
 		self.log_stage_transition()
 
 	# ------------------------------------------------------------------
@@ -79,16 +101,31 @@ class LandAcquisition(Document):
 				)
 
 		elif stage == "Negotiation":
-			# title must be investigated before money talks
-			if self.litigation_check != "Clear":
+			# The legal team must have collected AND vetted every required
+			# document on the checklist before money is discussed.
+			if not self.legal_checklist:
 				frappe.throw(
-					_("Litigation check must be 'Clear' before Negotiation. "
-					  "Resolve title issues first."),
+					_("The legal checklist is empty. Load the standard checklist and "
+					  "have the legal team vet the documents before Negotiation."),
 					title=_("Negotiation Prerequisites"),
 				)
-			if not self.khatian_cs and not self.khatian_sa and not self.khatian_rs:
+			unverified = [
+				row.check_item
+				for row in self.legal_checklist
+				if row.is_required and row.status not in ("Verified", "Not Applicable")
+			]
+			if unverified:
 				frappe.throw(
-					_("Record at least one khatian number (CS/SA/RS) before Negotiation."),
+					_("These required documents are not yet vetted by the legal team: {0}. "
+					  "Each must be 'Verified' (or 'Not Applicable') before Negotiation.").format(
+						", ".join(unverified[:5])
+					),
+					title=_("Negotiation Prerequisites"),
+				)
+			if self.legal_status != "Cleared":
+				frappe.throw(
+					_("Legal Status must be 'Cleared' before Negotiation. "
+					  "The legal team must complete and approve the vetting."),
 					title=_("Negotiation Prerequisites"),
 				)
 
@@ -126,6 +163,51 @@ class LandAcquisition(Document):
 					_("Set the Acquisition / Registration Date before Possession."),
 					title=_("Possession Prerequisites"),
 				)
+
+	# ------------------------------------------------------------------
+	# Legal checklist: standard template + progress
+	# ------------------------------------------------------------------
+	def load_standard_checklist_on_due_diligence(self):
+		"""Auto-load the standard legal checklist when the record enters (or is
+		already in) the Due Diligence stage and the checklist is empty."""
+		if self.current_stage != "Due Diligence":
+			return
+		if self.legal_checklist:
+			return
+		self.load_standard_checklist()
+
+	def load_standard_checklist(self):
+		"""Append the standard legal/land checklist rows."""
+		for item, required, doc_desc in STANDARD_LEGAL_CHECKLIST:
+			self.append(
+				"legal_checklist",
+				{
+					"check_item": item,
+					"is_required": required,
+					"required_document": doc_desc,
+					"status": "Pending",
+				},
+			)
+
+	@frappe.whitelist()
+	def load_checklist_from_form(self):
+		"""Form action: load the standard legal checklist (idempotent)."""
+		if not self.legal_checklist:
+			self.load_standard_checklist()
+			self.save(ignore_permissions=True)
+			return {"ok": True, "count": len(self.legal_checklist)}
+		return {"ok": True, "count": len(self.legal_checklist), "already_loaded": True}
+
+	def update_legal_checklist_progress(self):
+		"""Percent of required items vetted (Verified or Not Applicable)."""
+		required = [row for row in self.legal_checklist if row.is_required]
+		if not required:
+			self.legal_checklist_progress = 0
+			return
+		vetted = [
+			row for row in required if row.status in ("Verified", "Not Applicable")
+		]
+		self.legal_checklist_progress = round(len(vetted) / len(required) * 100, 0)
 
 	# ------------------------------------------------------------------
 	# Feasibility score: weighted scorecard with practical criteria
