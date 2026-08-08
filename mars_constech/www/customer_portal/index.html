@@ -1,0 +1,120 @@
+{% extends "templates/web.html" %}
+
+{% block title %}{{ _("My Dashboard") }}{% endblock %}
+
+{% block page_content %}
+<style>
+	.mars-portal { max-width: 1100px; margin: 0 auto; padding: 20px 12px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+	.mars-portal h2 { margin: 0 0 4px; font-size: 24px; color: #1f2937; }
+	.mars-portal .sub { color: #6b7280; font-size: 14px; margin-bottom: 24px; }
+	.mars-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 28px; }
+	.mars-stat { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+	.mars-stat .label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
+	.mars-stat .value { font-size: 22px; font-weight: 700; color: #1f2937; margin-top: 4px; }
+	.mars-stat .value.green { color: #059669; }
+	.mars-stat .value.red { color: #dc2626; }
+	.mars-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px 20px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+	.mars-card h3 { margin: 0 0 14px; font-size: 16px; color: #1f2937; }
+	table.mars-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+	table.mars-table th { text-align: left; color: #6b7280; font-weight: 600; padding: 8px 10px; border-bottom: 2px solid #e5e7eb; }
+	table.mars-table td { padding: 10px; border-bottom: 1px solid #f3f4f6; color: #374151; }
+	.badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+	.badge.green { background: #d1fae5; color: #065f46; }
+	.badge.amber { background: #fef3c7; color: #92400e; }
+	.badge.red { background: #fee2e2; color: #991b1b; }
+	.badge.gray { background: #f3f4f6; color: #4b5563; }
+	.badge.blue { background: #dbeafe; color: #1e40af; }
+	.empty { color: #9ca3af; font-size: 13px; padding: 14px 0; }
+	@media (max-width: 640px) { .mars-stat .value { font-size: 18px; } table.mars-table { font-size: 12px; } }
+</style>
+
+<div class="mars-portal">
+	<h2>{{ _("Welcome, {0}").format(customer) }}</h2>
+	<div class="sub">{{ _("Your property dashboard — bookings, installments and invoices.") }}</div>
+
+	<div class="mars-stats">
+		<div class="mars-stat"><div class="label">{{ _("Bookings") }}</div><div class="value">{{ totals.bookings }}</div></div>
+		<div class="mars-stat"><div class="label">{{ _("Booked Value") }}</div><div class="value">৳{{ "%.1f"|format(totals.booked_value / 10000000) }} Cr</div></div>
+		<div class="mars-stat"><div class="label">{{ _("Total Paid") }}</div><div class="value green">৳{{ "%.1f"|format(totals.paid / 10000000) }} Cr</div></div>
+		<div class="mars-stat"><div class="label">{{ _("Total Due") }}</div><div class="value {{ 'red' if totals.due else 'green' }}">৳{{ "%.2f"|format(totals.due / 100000) }} Lac</div></div>
+	</div>
+
+	<div class="mars-card">
+		<h3>{{ _("My Bookings") }} ({{ bookings|length }})</h3>
+		{% if bookings %}
+		<table class="mars-table">
+			<thead><tr><th>{{ _("ID") }}</th><th>{{ _("Property") }}</th><th>{{ _("Type") }}</th><th>{{ _("Booked Value") }}</th><th>{{ _("Paid") }}</th><th>{{ _("Due") }}</th><th>{{ _("Status") }}</th></tr></thead>
+			<tbody>
+			{% for b in bookings %}
+				<tr>
+					<td><strong>{{ b.name }}</strong></td>
+					<td>{{ b.property }} {{ b.unit or "" }}</td>
+					<td>{{ b.type }}</td>
+					<td>৳{{ "%.1f"|format((b.total_price or 0) / 10000000) }} Cr</td>
+					<td class="text-success">৳{{ "%.1f"|format((b.total_paid or 0) / 10000000) }} Cr</td>
+					<td>৳{{ "%.2f"|format((b.total_due or 0) / 100000) }} Lac</td>
+					<td>
+						{% if b.status == "Confirmed" %}<span class="badge green">{{ b.status }}</span>
+						{% elif b.status == "Pending Review" %}<span class="badge amber">{{ b.status }}</span>
+						{% elif b.status == "Cancelled" %}<span class="badge red">{{ b.status }}</span>
+						{% else %}<span class="badge gray">{{ b.status }}</span>{% endif %}
+					</td>
+				</tr>
+			{% endfor %}
+			</tbody>
+		</table>
+		{% else %}<div class="empty">{{ _("No bookings yet.") }}</div>{% endif %}
+	</div>
+
+	<div class="mars-card">
+		<h3>{{ _("Upcoming Installments") }}</h3>
+		{% set upcoming = installments | selectattr("status", "ne", "Paid") | list %}
+		{% if upcoming %}
+		<table class="mars-table">
+			<thead><tr><th>{{ _("Booking") }}</th><th>{{ _("No") }}</th><th>{{ _("Due Date") }}</th><th>{{ _("Amount") }}</th><th>{{ _("Paid") }}</th><th>{{ _("Status") }}</th></tr></thead>
+			<tbody>
+			{% for i in upcoming[:15] %}
+				<tr>
+					<td>{{ i.parent }}</td>
+					<td>{{ i.installment_no }}</td>
+					<td>{{ i.due_date }}</td>
+					<td>৳{{ "%.2f"|format((i.amount or 0) / 100000) }} Lac</td>
+					<td>৳{{ "%.2f"|format((i.paid_amount or 0) / 100000) }} Lac</td>
+					<td>
+						{% if i.status == "Due" or i.status == "Overdue" %}<span class="badge red">{{ i.status }}</span>
+						{% elif i.status == "Paid" %}<span class="badge green">{{ i.status }}</span>
+						{% else %}<span class="badge blue">{{ i.status }}</span>{% endif %}
+					</td>
+				</tr>
+			{% endfor %}
+			</tbody>
+		</table>
+		{% else %}<div class="empty">{{ _("All installments paid — well done!") }}</div>{% endif %}
+	</div>
+
+	<div class="mars-card">
+		<h3>{{ _("My Invoices") }} ({{ invoices|length }})</h3>
+		{% if invoices %}
+		<table class="mars-table">
+			<thead><tr><th>{{ _("Invoice") }}</th><th>{{ _("Date") }}</th><th>{{ _("Amount") }}</th><th>{{ _("Outstanding") }}</th><th>{{ _("Status") }}</th></tr></thead>
+			<tbody>
+			{% for inv in invoices %}
+				<tr>
+					<td><strong>{{ inv.name }}</strong></td>
+					<td>{{ inv.posting_date }}</td>
+					<td>৳{{ "%.1f"|format((inv.grand_total or 0) / 10000000) }} Cr</td>
+					<td>৳{{ "%.2f"|format((inv.outstanding_amount or 0) / 100000) }} Lac</td>
+					<td>
+						{% if inv.status == "Paid" %}<span class="badge green">{{ inv.status }}</span>
+						{% elif inv.status == "Overdue" %}<span class="badge red">{{ inv.status }}</span>
+						{% elif inv.status == "Draft" %}<span class="badge gray">{{ inv.status }}</span>
+						{% else %}<span class="badge blue">{{ inv.status }}</span>{% endif %}
+					</td>
+				</tr>
+			{% endfor %}
+			</tbody>
+		</table>
+		{% else %}<div class="empty">{{ _("No invoices yet.") }}</div>{% endif %}
+	</div>
+</div>
+{% endblock %}
