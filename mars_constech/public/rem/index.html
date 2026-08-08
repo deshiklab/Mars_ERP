@@ -1111,19 +1111,27 @@ const DB = {
 };
 
 // ═══ SERVER SYNC — Phase 3 (Flask backend) ═══
+// Default API base: when the PWA is served over http(s) (normal Frappe hosting)
+// derive from the page origin so any host/port works; when opened as a local
+// file (file:// origin) fall back to the known-good dev server.
+function apiBaseUrl(){
+  var o=(location.origin||'');
+  if(o.indexOf('http://')===0||o.indexOf('https://')===0)return o+'/api/method/mars_constech.mars_constech.api';
+  return 'http://localhost:8000/api/method/mars_constech.mars_constech.api';
+}
 const API = {
-  url: localStorage.getItem('rem_api_url') || (location.origin + '/api/method/mars_constech.mars_constech.api'),
+  url: localStorage.getItem('rem_api_url') || apiBaseUrl(),
   token: localStorage.getItem('rem_api_token') || '',
   connected: false, lastSync: localStorage.getItem('rem_last_sync') || null,
   _queue: {}, _timer: null,
   _base(){ return (this.url||'').replace(/\/+$/,''); },
   _h(){ const h={'Content-Type':'application/json'}; if(this.token)h['Authorization']='Bearer '+this.token; return h; },
   async _req(method, path, body, raw){
-    const canonical = location.origin + '/api/method/mars_constech.mars_constech.api';
-    // Self-heal: if the stored URL is stale/wrong-origin, use the same-origin
-    // canonical bridge and retry once. Triggers on BOTH network exceptions AND
+    const canonical = apiBaseUrl();
+    // Self-heal: if the stored URL is stale/wrong-origin, use the canonical
+    // bridge and retry once. Triggers on BOTH network exceptions AND
     // HTTP error statuses (404/417/500 — a wrong path returns 417, not a throw).
-    const healNeeded = () => API.url.indexOf('mars_constech.mars_constech.api')<0 || API.url.indexOf(location.origin)!==0;
+    const healNeeded = () => API.url.indexOf('mars_constech.mars_constech.api')<0 || API.url.indexOf(canonical.split('/api/')[0])!==0;
     const heal = () => { API.url=canonical; localStorage.setItem('rem_api_url',API.url); };
     try{
       const res = await fetch(this._base()+path, {method, headers:this._h(), body:body?JSON.stringify(body):undefined});
@@ -1219,11 +1227,11 @@ setTimeout(function(){
   if(!API.token || !API._base())return;
   API._req('GET','.bootstrap').then(function(r){
     if(r.status===200){ API.connected=true; API.lastSync=(r.data.meta||{}).server_time||null; localStorage.setItem('rem_last_sync',API.lastSync||''); }
-    else if(API.url.indexOf('mars_constech.mars_constech.api')<0 || API.url.indexOf(location.origin)!==0){
+    else if(API.url.indexOf('mars_constech.mars_constech.api')<0 || API.url.indexOf(apiBaseUrl().split('/api/')[0])!==0){
       // Stale/wrong stored rem_api_url (wrong path like 'mars_constech.api', or
-      // an origin that no longer matches this page) — heal back to the
-      // same-origin bridge URL and retry once.
-      API.url=location.origin+'/api/method/mars_constech.mars_constech.api';
+      // an origin that no longer matches this page / file:// opening) — heal
+      // back to the canonical bridge URL and retry once.
+      API.url=apiBaseUrl();
       localStorage.setItem('rem_api_url',API.url);
       API._req('GET','.bootstrap').then(function(r2){
         if(r2.status===200){ API.connected=true; API.lastSync=(r2.data.meta||{}).server_time||null; localStorage.setItem('rem_last_sync',API.lastSync||''); }
@@ -1273,7 +1281,7 @@ function syncSaveCfg(){
 }
 function syncResetUrl(){
   localStorage.removeItem('rem_api_url');
-  API.url=location.origin+'/api/method/mars_constech.mars_constech.api';
+  API.url=apiBaseUrl();
   localStorage.setItem('rem_api_url',API.url);
   showToast('URL reset to '+API.url,'success');
   renderModule();
