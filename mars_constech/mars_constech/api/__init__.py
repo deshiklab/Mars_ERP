@@ -891,6 +891,163 @@ def booking_payment(name=None, amount=None, mode_of_payment="Cash", reference_no
 	return {"payment_entry": pe.name, "invoice": sinv, "amount": amt}
 
 
+
+# ═══ PROJECTS & TASKS BRIDGE (PWA Projects/Tasks → ERPNext Project/Task) ═══
+
+PROJECT_STAGES = ["Planning", "In Progress", "Near Completion", "Completed", "On Hold"]
+
+
+def _project_to_pwa(pj):
+	"""Map a native Project to the PWA project contract."""
+	return {
+		"id": pj.custom_rem_ref or ("P-" + str(pj.name)),
+		"name": pj.project_name or "",
+		"type": pj.custom_rem_type or "land",
+		"location": "",
+		"status": _pj_stage(pj.status) or "Planning",
+		"progress": pj.custom_rem_progress or 0,
+		"budget": _fmt_bdt(pj.custom_rem_budget or 0),
+		"manager": "",
+		"plots": pj.custom_rem_plots or 0,
+		"start": str(pj.expected_start_date or "")[:7],
+		"end": str(pj.expected_end_date or "")[:7],
+		"phase": pj.custom_rem_phase or "",
+		"desc": pj.notes or "",
+		"milestones": [],
+		"la_ref": pj.custom_rem_la_ref or "",
+	}
+
+
+def _pj_stage(status):
+	"""Map ERPNext Project.status to REM stage names."""
+	m = {"Open": "In Progress", "In Progress": "In Progress", "Completed": "Completed", "Cancelled": "On Hold"}
+	return m.get(status or "", "")
+
+
+@frappe.whitelist()
+def projects_pipeline():
+	"""Pull all Projects in the PWA contract."""
+	rows = frappe.get_all(
+		"Project",
+		fields=["name", "project_name", "custom_rem_ref", "custom_rem_type", "custom_rem_progress",
+				"custom_rem_plots", "custom_rem_phase", "custom_rem_budget", "custom_rem_la_ref",
+				"status", "expected_start_date", "expected_end_date", "notes"],
+		order_by="creation desc",
+		limit_page_length=500,
+	)
+	return {"count": len(rows), "projects": [_project_to_pwa(r) for r in rows]}
+
+
+@frappe.whitelist()
+def projects_sync(projects=None):
+	"""Upsert projects pushed from the PWA (dedupe via custom_rem_ref)."""
+	if not projects or not isinstance(projects, list):
+		frappe.throw(_("projects must be a list"), frappe.ValidationError)
+	created = updated = 0
+	for item in projects:
+		if not isinstance(item, dict) or not item.get("name"):
+			continue
+		existing = None
+		if item.get("id"):
+			existing = frappe.db.get_value("Project", {"custom_rem_ref": str(item["id"])})
+		if not existing and item.get("name"):
+			# Project.project_name is unique — dedupe by name too (covers
+			# projects already created via land-acquisition merge)
+			existing = frappe.db.get_value("Project", {"project_name": str(item["name"])})
+		doc = frappe.get_doc("Project", existing) if existing else frappe.new_doc("Project")
+		doc.flags.ignore_permissions = True
+		doc.project_name = str(item.get("name") or "")[:140]
+		doc.custom_rem_ref = str(item.get("id") or "")
+		doc.custom_rem_type = str(item.get("type") or "land")
+		doc.custom_rem_progress = int(item.get("progress") or 0)
+		doc.custom_rem_plots = int(item.get("plots") or 0)
+		doc.custom_rem_phase = str(item.get("phase") or "")
+		doc.custom_rem_la_ref = str(item.get("la_ref") or "")
+		doc.custom_rem_budget = parse_bdt(item.get("budget"))
+		doc.notes = str(item.get("desc") or "")
+		if existing:
+			doc.save()
+			updated += 1
+		else:
+			doc.insert()
+			created += 1
+	frappe.db.commit()
+	return {"created": created, "updated": updated}
+
+
+def _task_to_pwa(t):
+	"""Map a native Task to the PWA task contract."""
+	return {
+		"id": t.custom_rem_ref or t.name,
+		"title": t.subject or "",
+		"status": {"Open": "To Do", "Working": "In Progress", "Completed": "Done", "Cancelled": "Blocked", "Overdue": "In Progress"}.get(t.status or "", t.status or "To Do"),
+		"priority": t.custom_rem_priority or t.priority or "Medium",
+		"project": t.project or "",
+		"assignee": t._assign or "",
+		"deadline": str(t.exp_start_date or "")[:10],
+		"desc": t.description or "",
+		"tags": [],
+		"name": t.name,
+	}
+
+
+@frappe.whitelist()
+def tasks_pipeline(project=None):
+	"""Pull tasks (optionally filtered by project)."""
+	filters = {}
+	if project:
+		filters["project"] = project
+	rows = frappe.get_all(
+		"Task",
+		filters=filters,
+		fields=["name", "subject", "status", "priority", "custom_rem_priority", "custom_rem_ref",
+				"project", "_assign", "exp_start_date", "description"],
+		order_by="creation desc",
+		limit_page_length=500,
+	)
+	return {"count": len(rows), "tasks": [_task_to_pwa(r) for r in rows]}
+
+
+@frappe.whitelist()
+def tasks_sync(tasks=None):
+	"""Upsert tasks pushed from the PWA (dedupe via custom_rem_ref)."""
+	if not tasks or not isinstance(tasks, list):
+		frappe.throw(_("tasks must be a list"), frappe.ValidationError)
+	created = updated = 0
+	for item in tasks:
+		if not isinstance(item, dict) or not item.get("title"):
+			continue
+		existing = None
+		if item.get("id") and str(item["id"]).isdigit():
+			existing = frappe.db.get_value("Task", {"custom_rem_ref": str(item["id"])})
+		doc = frappe.get_doc("Task", existing) if existing else frappe.new_doc("Task")
+		doc.flags.ignore_permissions = True
+		doc.subject = str(item.get("title") or "")[:140]
+		doc.custom_rem_ref = str(item.get("id") or "")
+		_ts = {"To Do": "Open", "In Progress": "Working", "Done": "Completed", "Blocked": "Cancelled"}
+		doc.status = _ts.get(str(item.get("status") or "To Do"), str(item.get("status") or "Open"))
+		doc.custom_rem_priority = str(item.get("priority") or "Medium")
+		if item.get("project"):
+			# Task.project is a Link to the Project doc name — accept either the
+			# doc name or the human project_name.
+			_pname = str(item["project"])
+			_pdoc = frappe.db.get_value("Project", {"name": _pname}, "name") or \
+				frappe.db.get_value("Project", {"project_name": _pname}, "name")
+			if _pdoc:
+				doc.project = _pdoc
+		if item.get("deadline"):
+			doc.exp_start_date = str(item["deadline"])[:10]
+		doc.description = str(item.get("desc") or "")
+		if existing:
+			doc.save()
+			updated += 1
+		else:
+			doc.insert()
+			created += 1
+	frappe.db.commit()
+	return {"created": created, "updated": updated}
+
+
 # ═══ REM SETTINGS (PWA v2.0 server-backed connection config) ═══
 
 def _rem_settings():
@@ -1010,6 +1167,10 @@ def index():
         "booking_update_status",
         "booking_invoice",
         "booking_payment",
+        "projects_pipeline",
+        "projects_sync",
+        "tasks_pipeline",
+        "tasks_sync",
     ]
     return {
         "service": "MARS Constech REM ERP API bridge",

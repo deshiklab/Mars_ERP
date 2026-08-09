@@ -1467,6 +1467,51 @@ function bookingsPushToERP(){
   });
 }
 
+// ═══ PROJECTS ERP BRIDGE (PWA Projects/Tasks → ERPNext Project/Task) ═══
+function projectsPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  showToast('Loading projects from ERPNext…','info');
+  API._req('GET','.projects_pipeline').then(function(r){
+    if(r.status===200 && Array.isArray(r.data.projects)){
+      var n=0;
+      r.data.projects.forEach(function(ep){
+        var existing=mockProjects.find(function(p){return String(p.id)===String(ep.id)||(ep.name&&String(p.name).toLowerCase()===String(ep.name).toLowerCase());});
+        if(existing){ Object.assign(existing,ep); n++; }
+        else { mockProjects.push(ep); n++; }
+      });
+      DB.save('projects',mockProjects);
+      showToast('Synced '+n+' projects from ERPNext','success');
+      // also pull tasks
+      API._req('GET','.tasks_pipeline').then(function(tr){
+        if(tr.status===200 && Array.isArray(tr.data.tasks)){
+          var tn=0;
+          tr.data.tasks.forEach(function(et){
+            var existing=mockTasks.find(function(t){return String(t.id)===String(et.id);});
+            if(existing){ Object.assign(existing,et); tn++; }
+            else { mockTasks.push(et); tn++; }
+          });
+          DB.save('tasks',mockTasks);
+          showToast('+ '+tn+' tasks from ERPNext','info');
+        }
+        renderModule();
+      });
+    } else {
+      showToast((r.data&&r.data.error)||'Project pull failed (HTTP '+r.status+')','error');
+    }
+  });
+}
+function projectsPushToERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  showToast('Pushing projects to ERPNext…','info');
+  var payload=mockProjects.map(function(p){
+    return {id:p.id,name:p.name,type:p.type||'land',status:p.status||'Planning',progress:p.progress||0,budget:p.budget||'',plots:p.plots||0,phase:p.phase||'',la_ref:p.la_ref||'',desc:p.desc||''};
+  });
+  API._req('POST','.projects_sync',{projects:payload}).then(function(r){
+    if(r.status===200){ showToast('Pushed to ERPNext: '+r.data.created+' created, '+r.data.updated+' updated','success'); }
+    else showToast((r.data&&r.data.error)||'Project push failed','error');
+  });
+}
+
 window.mockLeads = DB.init('leads', [
   {id:1,name:'Tariqul Islam',territory:'Dhaka North',phone:'+880 1711 000000',email:'tariqul@example.com',property:'Muktodhara - 5 Katha',status:'Negotiation',priority:'High',type:'Local',source:'Bikroy.com',value:'৳1.5 Cr',lastContact:'2h ago',owner:'Hasanul Banna',nextFollowUp:'Today, 3:00 PM',paymentStatus:'Up to Date',facingDir:'South',floorPref:'Any',flatType:'Land',sizeSqFt:'1800 sqft',paymentPlan:'Construction Link',brokerId:null,
    installments:[{date:'Oct 01, 2024',amount:'৳5,00,000',status:'Paid'},{date:'Nov 01, 2024',amount:'৳5,00,000',status:'Due'}],
@@ -7285,7 +7330,7 @@ function renderProjects(el){
       ['Planning',mockProjects.filter(p=>p.status==='Planning').length,'#ff9800'],
       ['Portfolio Value','৳'+totalVal.toFixed(0)+' Cr','#7b1fa2']
     ].map(s=>'<div class="stat-card"><div class="label">'+s[0]+'</div><div class="value" style="color:'+s[2]+'">'+s[1]+'</div></div>').join('')}</div>
-    <div class="toolbar" style="margin-bottom:6px"><div class="tabs">${[['all','All'],['land','Land'],['flat','Flats'],['gantt','📊 Gantt']].map(t=>`<div class="tab ${projectsTab===t[0]?'active':''}" onclick="projectsTab='${t[0]}';renderModule()">${t[1]}</div>`).join('')}</div>${projectsTab!=='gantt'?`<input id="projSearch" placeholder="Search projects..." oninput="renderModule()" style="padding:4px 8px;border:1px solid #e0e0e0;border-radius:4px;font-size:10px;outline:none;width:140px"/><select id="projStatus" onchange="renderModule()" style="padding:4px 6px;font-size:9px;border:1px solid #e0e0e0;border-radius:4px"><option value="">All Status</option><option>Planning</option><option>In Progress</option><option>Near Completion</option></select>`:''}<div class="spacer"></div><button class="action-btn secondary" onclick="importData(mockProjects,'Projects','projects',IMPORT_FIELDS.projects)" style="padding:3px 7px;font-size:9px" title="Import CSV" data-perm="Projects:Import">📥</button><button class="action-btn primary" onclick="crudProject()" data-perm="Projects:Create">+ New Project</button></div>
+    <div class="toolbar" style="margin-bottom:6px"><div class="tabs">${[['all','All'],['land','Land'],['flat','Flats'],['gantt','📊 Gantt']].map(t=>`<div class="tab ${projectsTab===t[0]?'active':''}" onclick="projectsTab='${t[0]}';renderModule()">${t[1]}</div>`).join('')}</div>${projectsTab!=='gantt'?`<input id="projSearch" placeholder="Search projects..." oninput="renderModule()" style="padding:4px 8px;border:1px solid #e0e0e0;border-radius:4px;font-size:10px;outline:none;width:140px"/><select id="projStatus" onchange="renderModule()" style="padding:4px 6px;font-size:9px;border:1px solid #e0e0e0;border-radius:4px"><option value="">All Status</option><option>Planning</option><option>In Progress</option><option>Near Completion</option></select>`:''}<div class="spacer"></div><button class="action-btn secondary" onclick="importData(mockProjects,'Projects','projects',IMPORT_FIELDS.projects)" style="padding:3px 7px;font-size:9px" title="Import CSV" data-perm="Projects:Import">📥</button><button class="action-btn secondary" onclick="projectsPullFromERP()" style="padding:3px 8px;font-size:10px" title="Load live projects + tasks from ERPNext (Project/Task)">🔄 Sync from ERP</button><button class="action-btn primary" onclick="crudProject()" data-perm="Projects:Create">+ New Project</button></div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px">${projectsTab==='gantt'?renderProjectGantt():list.map(p=>`
       <div class="card" style="cursor:pointer" onclick="openProject('${p.id}')"><div class="card-body"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px"><div><div style="font-size:12px;font-weight:600">${p.name}</div><div style="font-size:10px;color:#888">${p.location}</div></div><span class="badge-status ${p.status==='In Progress'?'badge-active':p.status==='Planning'?'badge-pending':'badge-reserved'}" style="background:${statusCol[p.status]||'#888'}15;color:${statusCol[p.status]||'#888'};border:1px solid ${statusCol[p.status]||'#888'}44">${p.status}</span></div>
       ${p.desc?`<div style="font-size:9px;color:#888;margin-bottom:5px;line-height:1.4">${p.desc.substring(0,90)}${p.desc.length>90?'…':''}</div>`:''}
