@@ -5,6 +5,8 @@ import { useAuthStore } from '@/stores/auth'
 import { GROUPS, groupForPath, moduleForPath } from '@/shell/groups'
 import type { ShellGroup, ShellModule } from '@/shell/groups'
 import { i18n, _t } from '@/i18n'
+import GlobalSearch from '@/components/GlobalSearch.vue'
+import SidebarFlyout from '@/components/SidebarFlyout.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -13,7 +15,7 @@ const route = useRoute()
 const activeGroupId = ref('executive')
 const activeModuleId = ref('dashboard')
 
-/* ── text size (root font) + content zoom (mirror fontStep/changeZoom) ── */
+/* ── text size + content zoom ── */
 const zoom = ref(100)
 function fontStep(d: number) {
   const cur = parseFloat(getComputedStyle(document.documentElement).fontSize) || 14
@@ -35,7 +37,7 @@ function toggleFullScreen() {
   else if (document.exitFullscreen) document.exitFullscreen()
 }
 
-/* ── sidebar + top tabs (mirror switchGroup) ── */
+/* ── sidebar + top tabs ── */
 const visibleGroups = computed(() => GROUPS.filter((g) => auth.canAccess(g.module)))
 
 function visibleMods(g: ShellGroup): ShellModule[] {
@@ -55,7 +57,6 @@ function switchModule(m: ShellModule) {
   if (m.path) router.push(m.path)
 }
 
-/* sync active group/module from the current route */
 watch(
   () => route.path,
   (path) => {
@@ -72,6 +73,16 @@ watch(
 const activeGroup = computed(() => GROUPS.find((g) => g.id === activeGroupId.value) ?? GROUPS[0])
 const activeModule = computed(() => activeGroup.value.mods.find((m) => m.id === activeModuleId.value))
 const topTabs = computed(() => visibleMods(activeGroup.value))
+
+/* ── sidebar flyout ── */
+const flyout = ref<{ group: ShellGroup; x: number; y: number } | null>(null)
+
+function showFlyout(g: ShellGroup, e: MouseEvent) {
+  flyout.value = { group: g, x: 76, y: Math.min(e.clientY - 20, window.innerHeight - 260) }
+}
+function hideFlyout() {
+  flyout.value = null
+}
 
 /* ── helpers ── */
 function initials(name: string): string {
@@ -111,6 +122,8 @@ function exportCsv() {
             class="rem-sidebar-item"
             :class="{ active: activeGroupId === g.id }"
             :title="_t(g.label)"
+            @mouseenter="showFlyout(g, $event)"
+            @mouseleave="hideFlyout"
             @click="switchGroup(g)"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 18px; height: 18px" v-html="g.svg"></svg>
@@ -120,11 +133,17 @@ function exportCsv() {
       </div>
     </aside>
 
+    <!-- SIDEBAR FLYOUT (sb-flyout) -->
+    <SidebarFlyout :group="flyout?.group ?? null" :x="flyout?.x ?? 0" :y="flyout?.y ?? 0" @mouseleave="hideFlyout" />
+
     <!-- ═══ MAIN COLUMN ═══ -->
     <div style="display: flex; flex-direction: column; flex: 1; min-width: 0">
       <!-- TOP BAR -->
-      <header class="rem-topbar" style="gap: 8px; padding: 0 10px">
+      <header class="rem-topbar" style="gap: 10px; padding: 0 12px">
         <span class="rem-topbar-title" style="font-size: 11px">🏗️ MARS Constech</span>
+
+        <!-- GLOBAL SEARCH -->
+        <GlobalSearch />
 
         <div class="top-nav" style="display: flex; align-items: center; gap: 2px; flex: 1; overflow-x: auto">
           <div
@@ -176,7 +195,7 @@ function exportCsv() {
         <RouterView />
       </main>
 
-      <!-- ═══ FOOTER: breadcrumb + text-size + zoom + lang + theme + profile ═══ -->
+      <!-- ═══ FOOTER ═══ -->
       <div
         class="app-footer"
         style="height: 28px; min-height: 28px; background: #fff; border-top: 1px solid #e8e8e8; display: flex; align-items: center; padding: 0 12px; font-size: 10px; color: #888; justify-content: space-between; position: sticky; bottom: 0; z-index: 20"
@@ -189,7 +208,6 @@ function exportCsv() {
           <span class="crumb-part" style="cursor: pointer">{{ _t(activeModule?.label ?? '') }}</span>
         </div>
 
-        <!-- Right controls: A − + | − 100% + | ⛶ | EN | 🌙 | MM | Sign Out -->
         <div style="display: flex; align-items: center; gap: 5px">
           <span class="ft-textsize" style="display: flex; align-items: center; gap: 2px; font-weight: 700; color: #555; font-size: 10px">A</span>
           <button class="ft-textsize" title="Decrease text size" style="padding: 1px 5px; border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; cursor: pointer; font-size: 10px; color: #555" @click="fontStep(-1)">−</button>

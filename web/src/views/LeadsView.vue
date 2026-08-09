@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
-import type { TableColumn, TableAction, TableTab } from '@/components/DataTable.vue'
+import KanbanBoard from '@/components/KanbanBoard.vue'
+import StatsRow from '@/components/StatsRow.vue'
+import type { TableAction, TableColumn, TableTab } from '@/components/DataTable.vue'
+import type { KanbanCard, KanbanColumn } from '@/components/KanbanBoard.vue'
 import type { Lead } from '@/api/types'
+import { _t } from '@/i18n'
 
 const data = useDataStore()
+const route = useRoute()
 const statusFilter = ref('')
+const viewMode = ref<'table' | 'kanban'>(route.query.view === 'kanban' ? 'kanban' : 'table')
 const showAddDrawer = ref(false)
 const newLead = ref({ name: '', email: '', phone: '', source: 'Website', priority: 'Medium' })
 
@@ -36,6 +43,17 @@ function priorityColor(p: string): string {
 
 const esc = (s: string) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
 
+/* ── stats row ── */
+const leadStats = computed(() => [
+  { label: _t('Total Leads'), value: String(data.leads.length), color: '#2f80ed' },
+  { label: _t('New Inquiry'), value: String(data.leads.filter((l) => l.status === 'New Inquiry').length), color: '#1565c0' },
+  { label: _t('Site Visit'), value: String(data.leads.filter((l) => l.status === 'Site Visit').length), color: '#e65100' },
+  { label: _t('Negotiation'), value: String(data.leads.filter((l) => l.status === 'Negotiation').length), color: '#ff8f00' },
+  { label: _t('Booking'), value: String(data.leads.filter((l) => l.status === 'Booking').length), color: '#2e7d32' },
+  { label: _t('Lost'), value: String(data.leads.filter((l) => l.status === 'Lost').length), color: '#c62828' }
+])
+
+/* ── table ── */
 const columns = computed<TableColumn<Lead>[]>(() => [
   {
     key: 'name',
@@ -99,15 +117,43 @@ function onTabChange(tab: string) {
 
 const actions = computed<TableAction[]>(() => [
   { label: 'View Details', icon: '👁', onClick: () => {} },
-  { label: 'Mark Site Visit', icon: '📍', onClick: (r) => setStatus(r as unknown as Lead, 'Site Visit') },
-  { label: 'Mark Negotiation', icon: '🤝', onClick: (r) => setStatus(r as unknown as Lead, 'Negotiation') },
-  { label: 'Mark Booking', icon: '✅', onClick: (r) => setStatus(r as unknown as Lead, 'Booking') },
-  { label: 'Mark Lost', icon: '❌', onClick: (r) => setStatus(r as unknown as Lead, 'Lost') },
+  { label: 'Mark Site Visit', icon: '📍', onClick: (r) => setStatus((r as unknown as Lead).id, 'Site Visit') },
+  { label: 'Mark Negotiation', icon: '🤝', onClick: (r) => setStatus((r as unknown as Lead).id, 'Negotiation') },
+  { label: 'Mark Booking', icon: '✅', onClick: (r) => setStatus((r as unknown as Lead).id, 'Booking') },
+  { label: 'Mark Lost', icon: '❌', onClick: (r) => setStatus((r as unknown as Lead).id, 'Lost') },
   { label: 'Delete', icon: '🗑', onClick: (r) => console.log('delete', (r as unknown as Lead).id) }
 ])
 
-async function setStatus(l: Lead, status: string) {
-  await data.updateLeadStatus(l.id, status)
+/* ── kanban ── */
+const kanbanCols: KanbanColumn[] = [
+  { id: 'New Inquiry', label: 'New Inquiry', bg: '#e3f2fd', fg: '#1565c0', next: 'Contacted' },
+  { id: 'Contacted', label: 'Contacted', bg: '#f0f4ff', fg: '#2f80ed', next: 'Site Visit' },
+  { id: 'Site Visit', label: 'Site Visit', bg: '#fff3e0', fg: '#e65100', next: 'Negotiation' },
+  { id: 'Negotiation', label: 'Negotiation', bg: '#fff8e1', fg: '#ff8f00', next: 'Booking' },
+  { id: 'Booking', label: 'Booking', bg: '#e8f5e9', fg: '#2e7d32' },
+  { id: 'Lost', label: 'Lost', bg: '#ffebee', fg: '#c62828' }
+]
+
+const kanbanCards = computed<KanbanCard[]>(() =>
+  data.leads.map((l) => ({
+    id: l.id,
+    title: l.name,
+    subtitle: l.email || l.phone,
+    meta: `${l.source} · ${l.follow_up ?? ''}`,
+    status: l.status,
+    pills: [
+      { text: String(l.score ?? ''), color: l.score >= 50 ? '#2e7d32' : l.score >= 25 ? '#e65100' : '#888' },
+      { text: l.priority, color: priorityColor(l.priority) }
+    ]
+  }))
+)
+
+async function kanbanMove(cardId: string, status: string) {
+  await setStatus(cardId, status)
+}
+
+async function setStatus(id: string, status: string) {
+  await data.updateLeadStatus(id, status)
 }
 
 function openAddDrawer() {
@@ -128,25 +174,54 @@ async function saveLead() {
 <template>
   <div class="fade-in">
     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px">
-      <span class="page-title">CRM & Leads</span>
+      <span class="page-title">{{ _t('CRM & Leads') }}</span>
       <span class="page-subtitle">{{ data.leads.length }} leads · server-synced</span>
-      <div style="margin-left: auto">
+      <div style="margin-left: auto; display: flex; gap: 6px">
+        <div style="display: flex; border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden">
+          <button
+            class="action-btn"
+            :style="{ border: 'none', borderRadius: 0, background: viewMode === 'table' ? '#f0f4ff' : '#fff', color: '#2f80ed' }"
+            @click="viewMode = 'table'"
+          >☰ Table</button>
+          <button
+            class="action-btn"
+            :style="{ border: 'none', borderRadius: 0, borderLeft: '1px solid #e0e0e0', background: viewMode === 'kanban' ? '#f0f4ff' : '#fff', color: '#2f80ed' }"
+            @click="viewMode = 'kanban'"
+          >▤ Kanban</button>
+        </div>
         <button class="action-btn primary" @click="openAddDrawer">+ Add Lead</button>
       </div>
     </div>
 
+    <!-- STATS ROW -->
+    <StatsRow :stats="leadStats" />
+
     <p v-if="data.error" style="font-size: 11px; color: #c62828; margin: 6px 0">{{ data.error }}</p>
     <p v-if="data.leadsLoading" style="font-size: 11px; color: #888; padding: 16px">Loading leads…</p>
 
-    <DataTable
-      v-else
-      :columns="columns"
-      :rows="tabRows"
-      :tabs="tabs"
-      :actions="actions"
-      search-placeholder="Search leads, source, status…"
-      @tab-change="onTabChange"
-    />
+    <template v-else>
+      <!-- TABLE VIEW -->
+      <DataTable
+        v-if="viewMode === 'table'"
+        :columns="columns"
+        :rows="tabRows"
+        :tabs="tabs"
+        :actions="actions"
+        search-placeholder="Search leads, source, status…"
+        @tab-change="onTabChange"
+      />
+
+      <!-- KANBAN VIEW -->
+      <div v-else class="card" style="padding: 8px">
+        <KanbanBoard
+          :columns="kanbanCols"
+          :cards="kanbanCards"
+          @move="kanbanMove"
+          @edit="openAddDrawer"
+          @delete="(c) => console.log('delete', c.id)"
+        />
+      </div>
+    </template>
 
     <!-- Add-lead drawer -->
     <div v-if="showAddDrawer" class="drawer-overlay active">
