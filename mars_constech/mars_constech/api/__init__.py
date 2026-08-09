@@ -1675,6 +1675,307 @@ def settings_set(settings=None):
 
 
 
+
+# ═══ SWEEP BRIDGES (Fixed Assets / Ticketing / QC / Approvals / BOQ) ═══
+@frappe.whitelist()
+def fixed_assets_pipeline():
+    """Fixed assets from native Asset doctype (PWA contract)."""
+    rows = frappe.get_all(
+        "Asset",
+        fields=["name", "item_name", "asset_name", "asset_category", "location",
+                "purchase_date", "gross_purchase_amount", "status", "custom_rem_ref",
+                "custom_rem_type", "custom_rem_site", "opening_accumulated_depreciation"],
+        order_by="creation desc",
+        limit_page_length=500,
+    )
+    out = []
+    for a in rows:
+        out.append({
+            "id": a.custom_rem_ref or a.name,
+            "code": a.custom_rem_ref or a.name,
+            "name": a.asset_name or a.item_name or "",
+            "category": a.asset_category or a.custom_rem_type or "",
+            "purchaseDate": str(a.purchase_date or "")[:10],
+            "cost": a.gross_purchase_amount or 0,
+            "accumDep": a.opening_accumulated_depreciation or 0,
+            "location": a.location or a.custom_rem_site or "",
+            "status": _asset_pwa_status(a.status),
+        })
+    return {"count": len(out), "assets": out}
+
+
+def _asset_pwa_status(erp_status):
+    m = {"Submitted": "In Use", "Partially Depreciated": "In Use",
+         "Fully Depreciated": "In Use", "Scrapped": "Disposed",
+         "Sold": "Disposed", "In Maintenance": "Under Repair", "Draft": "In Use"}
+    return m.get(erp_status or "", erp_status or "In Use")
+
+
+@frappe.whitelist()
+def fixed_assets_sync(assets=None):
+    """Upsert fixed assets (dedupe via custom_rem_ref)."""
+    if not assets or not isinstance(assets, list):
+        frappe.throw(_("assets must be a list"), frappe.ValidationError)
+    created = updated = 0
+    for a in assets:
+        ref = str(a.get("id") or a.get("code") or "")
+        name = frappe.db.get_value("Asset", {"custom_rem_ref": ref}, "name")
+        doc = frappe.get_doc("Asset", name) if name else frappe.new_doc("Asset")
+        if not name:
+            doc.custom_rem_ref = ref
+            doc.item_name = (a.get("name") or "Asset")[:140]
+            doc.asset_name = (a.get("name") or "Asset")[:140]
+            doc.is_existing_asset = 1
+            doc.company = _get_company()
+            doc.calculate_depreciation = 0
+            doc.gross_purchase_amount = a.get("cost") or 0
+            doc.purchase_date = a.get("purchaseDate") or frappe.utils.today()
+            doc.available_for_use_date = doc.purchase_date
+        if a.get("category"):
+            doc.asset_category = _resolve_asset_category(a.get("category"))
+        if a.get("location"):
+            doc.location = _resolve_asset_location(a.get("location"))
+        if a.get("status") and name:
+            doc.status = {"In Use": "Submitted", "Disposed": "Scrapped",
+                          "Under Repair": "In Maintenance"}.get(a.get("status"), doc.status)
+        doc.flags.ignore_mandatory = True
+        doc.save(ignore_permissions=True)
+        if name:
+            updated += 1
+        else:
+            created += 1
+    frappe.db.commit()
+    return {"created": created, "updated": updated}
+
+
+def _resolve_asset_category(name):
+    c = frappe.db.get_value("Asset Category", {"asset_category_name": name}, "name")
+    if c:
+        return c
+    d = frappe.new_doc("Asset Category")
+    d.asset_category_name = str(name)[:140]
+    d.flags.ignore_mandatory = True
+    d.save(ignore_permissions=True)
+    return d.name
+
+
+def _resolve_asset_location(name):
+    l = frappe.db.get_value("Location", {"location_name": name}, "name")
+    if l:
+        return l
+    d = frappe.new_doc("Location")
+    d.location_name = str(name)[:140]
+    d.flags.ignore_mandatory = True
+    d.save(ignore_permissions=True)
+    return d.name
+
+
+@frappe.whitelist()
+def tickets_pipeline():
+    """Tickets from native Issue doctype (PWA ticketing contract)."""
+    rows = frappe.get_all(
+        "Issue",
+        fields=["name", "subject", "customer_name", "status", "priority", "issue_type",
+                "description", "opening_date", "resolution_details", "project"],
+        order_by="creation desc",
+        limit_page_length=500,
+    )
+    out = []
+    for t in rows:
+        out.append({
+            "id": t.name,
+            "subject": t.subject or "",
+            "customer": t.customer_name or "",
+            "status": t.status or "Open",
+            "priority": t.priority or "Medium",
+            "type": t.issue_type or "",
+            "desc": (t.description or "")[:300],
+            "date": str(t.opening_date or "")[:10],
+            "resolution": t.resolution_details or "",
+            "project": t.project or "",
+        })
+    return {"count": len(out), "tickets": out}
+
+
+@frappe.whitelist()
+def tickets_sync(tickets=None):
+    """Upsert tickets (dedupe: subject + customer)."""
+    if not tickets or not isinstance(tickets, list):
+        frappe.throw(_("tickets must be a list"), frappe.ValidationError)
+    created = updated = 0
+    for t in tickets:
+        subj = t.get("subject") or ""
+        cust = t.get("customer") or ""
+        name = frappe.db.get_value("Issue", {"subject": subj, "customer_name": cust}, "name") if subj else None
+        doc = frappe.get_doc("Issue", name) if name else frappe.new_doc("Issue")
+        if not name:
+            doc.subject = subj[:140]
+            doc.description = t.get("desc") or ""
+            doc.customer_name = cust
+            doc.opening_date = t.get("date") or frappe.utils.today()
+        if t.get("status"):
+            doc.status = t.get("status")
+        if t.get("priority"):
+            doc.priority = t.get("priority")
+        if t.get("type"):
+            doc.issue_type = t.get("type")
+        if t.get("resolution"):
+            doc.resolution_details = t.get("resolution")
+        doc.flags.ignore_mandatory = True
+        doc.save(ignore_permissions=True)
+        if name:
+            updated += 1
+        else:
+            created += 1
+    frappe.db.commit()
+    return {"created": created, "updated": updated}
+
+
+@frappe.whitelist()
+def qc_pipeline():
+    """Quality inspections from native Quality Inspection doctype."""
+    rows = frappe.get_all(
+        "Quality Inspection",
+        fields=["name", "inspection_type", "reference_type", "reference_name", "item_name",
+                "status", "inspected_by", "verified_by", "remarks", "report_date"],
+        order_by="creation desc",
+        limit_page_length=500,
+    )
+    out = [{
+        "id": r.name,
+        "type": r.inspection_type or "",
+        "reference": (r.reference_type or "") + (" " + r.reference_name if r.reference_name else ""),
+        "item": r.item_name or "",
+        "status": r.status or "Pending",
+        "inspectedBy": r.inspected_by or "",
+        "verifiedBy": r.verified_by or "",
+        "remarks": r.remarks or "",
+        "date": str(r.report_date or "")[:10],
+    } for r in rows]
+    return {"count": len(out), "qc": out}
+
+
+@frappe.whitelist()
+def approvals_pipeline():
+    """Financial approvals from REM Approval doctype."""
+    rows = frappe.get_all(
+        "REM Approval",
+        fields=["name", "approval_type", "reference", "title", "requested_by", "department",
+                "amount", "approval_date", "priority", "status", "level", "notes"],
+        order_by="creation desc",
+        limit_page_length=500,
+    )
+    out = [{
+        "id": r.name,
+        "type": r.approval_type or "",
+        "ref": r.reference or "",
+        "title": r.title or "",
+        "requestedBy": r.requested_by or "",
+        "dept": r.department or "",
+        "amount": r.amount or 0,
+        "date": str(r.approval_date or "")[:10],
+        "priority": r.priority or "Medium",
+        "status": r.status or "Pending",
+        "level": r.level or "Manager",
+        "notes": r.notes or "",
+    } for r in rows]
+    return {"count": len(out), "approvals": out}
+
+
+@frappe.whitelist()
+def approvals_sync(approvals=None):
+    """Upsert approvals (dedupe: type + reference + title)."""
+    if not approvals or not isinstance(approvals, list):
+        frappe.throw(_("approvals must be a list"), frappe.ValidationError)
+    created = updated = 0
+    for a in approvals:
+        ref = a.get("ref") or ""
+        title = a.get("title") or ""
+        atype = a.get("type") or ""
+        name = frappe.db.get_value("REM Approval", {"reference": ref, "title": title}, "name") if ref else None
+        doc = frappe.get_doc("REM Approval", name) if name else frappe.new_doc("REM Approval")
+        doc.approval_type = atype
+        doc.reference = ref
+        doc.title = title[:140]
+        if a.get("requestedBy"):
+            doc.requested_by = a.get("requestedBy")
+        if a.get("dept"):
+            doc.department = a.get("dept")
+        if a.get("amount") is not None:
+            doc.amount = a.get("amount")
+        doc.approval_date = a.get("date") or frappe.utils.today()
+        if a.get("priority"):
+            doc.priority = a.get("priority")
+        if a.get("status"):
+            doc.status = a.get("status")
+        if a.get("level"):
+            doc.level = a.get("level")
+        if a.get("notes"):
+            doc.notes = a.get("notes")
+        doc.save(ignore_permissions=True)
+        if name:
+            updated += 1
+        else:
+            created += 1
+    frappe.db.commit()
+    return {"created": created, "updated": updated}
+
+
+@frappe.whitelist()
+def boq_pipeline():
+    """BOQ lines from REM BOQ doctype."""
+    rows = frappe.get_all(
+        "REM BOQ",
+        fields=["name", "item", "category", "project", "qty", "unit", "rate", "status", "updated"],
+        order_by="creation asc",
+        limit_page_length=500,
+    )
+    out = [{
+        "id": r.name,
+        "item": r.item or "",
+        "category": r.category or "",
+        "project": r.project or "",
+        "qty": r.qty or 0,
+        "unit": r.unit or "",
+        "rate": r.rate or 0,
+        "status": r.status or "Draft",
+        "updated": str(r.updated or "")[:10],
+    } for r in rows]
+    return {"count": len(out), "boq": out}
+
+
+@frappe.whitelist()
+def boq_sync(boq=None):
+    """Upsert BOQ lines (dedupe: item + project + category)."""
+    if not boq or not isinstance(boq, list):
+        frappe.throw(_("boq must be a list"), frappe.ValidationError)
+    created = updated = 0
+    for b in boq:
+        item = b.get("item") or ""
+        project = b.get("project") or ""
+        cat = b.get("category") or ""
+        name = frappe.db.get_value("REM BOQ", {"item": item, "project": project}, "name") if item else None
+        doc = frappe.get_doc("REM BOQ", name) if name else frappe.new_doc("REM BOQ")
+        doc.item = item[:140]
+        doc.category = cat
+        doc.project = project
+        if b.get("qty") is not None:
+            doc.qty = b.get("qty")
+        if b.get("unit"):
+            doc.unit = b.get("unit")
+        if b.get("rate") is not None:
+            doc.rate = b.get("rate")
+        if b.get("status"):
+            doc.status = b.get("status")
+        doc.updated = b.get("updated") or frappe.utils.today()
+        doc.save(ignore_permissions=True)
+        if name:
+            updated += 1
+        else:
+            created += 1
+    frappe.db.commit()
+    return {"created": created, "updated": updated}
+
 # ═══ STOCK & PROCUREMENT BRIDGE (Milestone C) ═══
 @frappe.whitelist()
 def inventory_pipeline():
@@ -2372,6 +2673,15 @@ def index():
         "po_pipeline",
         "po_sync",
         "receipts_pipeline",
+        "fixed_assets_pipeline",
+        "fixed_assets_sync",
+        "tickets_pipeline",
+        "tickets_sync",
+        "qc_pipeline",
+        "approvals_pipeline",
+        "approvals_sync",
+        "boq_pipeline",
+        "boq_sync",
         "download_invoice",
         "demo_confirm",
         "settings_get",

@@ -1163,6 +1163,16 @@ const API_EPS = [
   {n:'po_pipeline', m:'GET', grp:'construction', d:'Purchase Orders'},
   {n:'po_sync', m:'POST', grp:'construction', d:'Upsert purchase orders', b:'{"pos":[]}'},
   {n:'receipts_pipeline', m:'GET', grp:'construction', d:'Goods receipts (Stock Entries)'},
+  // — Sweep: Fixed Assets / Ticketing / QC / Approvals / BOQ —
+  {n:'fixed_assets_pipeline', m:'GET', grp:'construction', d:'Fixed assets (native Asset)'},
+  {n:'fixed_assets_sync', m:'POST', grp:'construction', d:'Upsert fixed assets', b:'{"assets":[]}'},
+  {n:'tickets_pipeline', m:'GET', grp:'crm', d:'Tickets (native Issue)'},
+  {n:'tickets_sync', m:'POST', grp:'crm', d:'Upsert tickets', b:'{"tickets":[]}'},
+  {n:'qc_pipeline', m:'GET', grp:'construction', d:'Quality inspections (native)'},
+  {n:'approvals_pipeline', m:'GET', grp:'plots', d:'Financial approvals (REM Approval)'},
+  {n:'approvals_sync', m:'POST', grp:'plots', d:'Upsert approvals', b:'{"approvals":[]}'},
+  {n:'boq_pipeline', m:'GET', grp:'construction', d:'BOQ lines (REM BOQ)'},
+  {n:'boq_sync', m:'POST', grp:'construction', d:'Upsert BOQ lines', b:'{"boq":[]}'},
   // — Projects & Tasks —
   {n:'projects_pipeline', m:'GET', grp:'projects', d:'Projects'},
   {n:'projects_sync', m:'POST', grp:'projects', d:'Upsert projects', b:'{"projects":[]}'},
@@ -7945,6 +7955,33 @@ function renderCustTickets(){
     return '<tr><td style="font-family:monospace;font-size:9px;color:#888">'+t.id+'</td><td style="font-weight:500;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+t.subject+'">'+t.subject+'</td><td>'+t.customerName+'</td><td style="font-size:9px">'+t.category+'</td><td><span class="badge-status" style="background:'+(t.priority==='High'?'#ffebee':t.priority==='Medium'?'#fff3e0':'#f5f5f5')+';color:'+(t.priority==='High'?'#c62828':t.priority==='Medium'?'#e65100':'#888')+'">'+t.priority+'</span></td><td style="font-size:9px;color:#888">'+t.date+'</td><td style="font-size:9px">'+t.assignedTo+'</td><td><span class="badge-status" style="background:'+(t.status==='Open'?'#ffebee':t.status==='In Progress'?'#fff8e1':'#e8f5e9')+';color:'+(t.status==='Open'?'#c62828':t.status==='In Progress'?'#ff8f00':'#2e7d32')+'">'+t.status+'</span></td><td style="white-space:nowrap"><span style="color:#2F80ED;cursor:pointer;font-size:10px" onclick="event.stopPropagation();crudTicket(mockSupportTickets.find(function(x){return x.id===\x27'+t.id+'\x27}))">✎</span> <span style="color:#e53935;cursor:pointer;font-size:10px" onclick="event.stopPropagation();if(confirm(\x27Delete?\x27)){var idx=mockSupportTickets.findIndex(function(x){return x.id===\x27'+t.id+'\x27});if(idx>=0)mockSupportTickets.splice(idx,1);DB.save(\x27supportTickets\x27);renderModule();showToast(\x27Deleted\x27,\x27info\x27)}" data-perm="Customer Portal:Delete">✕</span></td></tr>';
   }).join('')+'</tbody></table>'+_pgHtml('tkt',pT.total,pT.page,pT.totalPages,pT.perPage)+'</div></div></div>';
 }
+function ticketsPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  API.call('tickets_pipeline').then(function(r){
+    if(r.ok && Array.isArray(r.data.tickets)){
+      var n=0;
+      r.data.tickets.forEach(function(t){
+        // map server contract → PWA mockSupportTickets shape
+        var mapped={
+          id:t.id,
+          subject:t.subject,
+          customerName:t.customer||'',
+          category:t.type||'General',
+          priority:t.priority||'Medium',
+          status:t.status||'Open',
+          date:t.date||'',
+          desc:t.desc||''
+        };
+        var ex=mockSupportTickets.find(function(x){return String(x.id)===String(t.id)||(x.subject===t.subject&&x.customerName===t.customer);});
+        if(ex){ Object.assign(ex,mapped); } else { mockSupportTickets.push(mapped); }
+        n++;
+      });
+      DB.save('tickets');
+      showToast('Synced '+n+' tickets from ERPNext','success');
+      renderModule();
+    } else showToast((r.data&&r.data.error)||'Tickets pull failed','error');
+  });
+}
 function renderTicketing(el){
   var q=(document.getElementById('tkSearch')||{}).value||'';
   var ps=(document.getElementById('tkPriority')||{}).value||'';
@@ -8109,6 +8146,22 @@ function crudTicket(item){
   );
 }
 // ═══ FINANCIAL APPROVALS MODULE (Accounts & Finance) ═══
+function approvalsPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  API.call('approvals_pipeline').then(function(r){
+    if(r.ok && Array.isArray(r.data.approvals)){
+      var n=0;
+      r.data.approvals.forEach(function(a){
+        var ex=mockApprovals.find(function(x){return String(x.id)===String(a.id)||(x.ref===a.ref&&x.title===a.title);});
+        if(ex){ Object.assign(ex,a); } else { mockApprovals.push(a); }
+        n++;
+      });
+      DB.save('approvals');
+      showToast('Synced '+n+' approvals from ERPNext','success');
+      renderModule();
+    } else showToast((r.data&&r.data.error)||'Approvals pull failed','error');
+  });
+}
 function renderApprovals(el){
   var q=(document.getElementById('apSearch')||{}).value||'';
   var ps=(document.getElementById('apStatus')||{}).value||'';
@@ -8507,6 +8560,22 @@ function crudAfterSale(item){
   );
 }/** BOQ & Cost Control Module **/
 
+function boqPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  API.call('boq_pipeline').then(function(r){
+    if(r.ok && Array.isArray(r.data.boq)){
+      var n=0;
+      r.data.boq.forEach(function(b){
+        var ex=mockBOQ.find(function(x){return String(x.id)===String(b.id)||(x.item===b.item&&x.project===b.project);});
+        if(ex){ Object.assign(ex,b); } else { mockBOQ.push(b); }
+        n++;
+      });
+      DB.save('boq');
+      showToast('Synced '+n+' BOQ lines from ERPNext','success');
+      renderModule();
+    } else showToast((r.data&&r.data.error)||'BOQ pull failed','error');
+  });
+}
 function renderBOQ(el){
   if(typeof boqTab==='undefined') boqTab='dashboard';
   var bt=boqTab;
@@ -10192,6 +10261,22 @@ window.mockFixedAssets = DB.init('fixed_assets', [
 ]);
 function _faNBV(a){return Math.max(0,(a.cost||0)-(a.accumDep||0));}
 function _faAnnualDep(a){return (a.usefulLife>0)?Math.round(((a.cost||0)-(a.salvage||0))/a.usefulLife):0;}
+function fixedAssetsPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  API.call('fixed_assets_pipeline').then(function(r){
+    if(r.ok && Array.isArray(r.data.assets)){
+      var n=0;
+      r.data.assets.forEach(function(a){
+        var ex=mockFixedAssets.find(function(x){return String(x.id)===String(a.id)||String(x.code)===String(a.code);});
+        if(ex){ Object.assign(ex,a); } else { mockFixedAssets.push(a); }
+        n++;
+      });
+      DB.save('fixed_assets');
+      showToast('Synced '+n+' fixed assets from ERPNext','success');
+      renderModule();
+    } else showToast((r.data&&r.data.error)||'Fixed assets pull failed','error');
+  });
+}
 function renderFixedAssets(el){
   var rows=mockFixedAssets;
   var cost=rows.reduce(function(s,a){return s+(a.cost||0);},0);
