@@ -1483,8 +1483,14 @@ function gateVersionPing(){
       if(!sv)return;
       var cur=String((window.API&&API.PWA_VERSION)||'0');
       if(String(sv).trim()!==cur.trim()){
+        // Stale copy detected. If a service worker controls this page, tell it
+        // to update; then reload once so the new SW + fresh index.html load.
         var e=document.getElementById('lg_ver');
-        if(e)e.textContent='⚠️ New PWA v'+sv+' available — close & reopen this tab to update';
+        if(e)e.textContent='⚠️ Updating to v'+sv+'…';
+        if('serviceWorker' in navigator&&navigator.serviceWorker.controller){
+          navigator.serviceWorker.controller.postMessage({type:'SKIP_WAITING'});
+        }
+        setTimeout(function(){ location.reload(); }, 700);
       }
     }).catch(function(){});
   }catch(e){}
@@ -19544,7 +19550,7 @@ function installPWA(){
 }
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){
-    navigator.serviceWorker.register('./sw.js').then(function(r){
+    navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(function(r){
       console.log('SW registered:',r.scope);
     }).catch(function(e){ console.log('SW registration failed:',e.message); });
   });
