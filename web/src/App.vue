@@ -4,6 +4,7 @@ import { RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { GROUPS, groupForPath, moduleForPath } from '@/shell/groups'
 import type { ShellGroup, ShellModule } from '@/shell/groups'
+import { i18n, _t } from '@/i18n'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -11,6 +12,28 @@ const route = useRoute()
 
 const activeGroupId = ref('executive')
 const activeModuleId = ref('dashboard')
+
+/* ── text size (root font) + content zoom (mirror fontStep/changeZoom) ── */
+const zoom = ref(100)
+function fontStep(d: number) {
+  const cur = parseFloat(getComputedStyle(document.documentElement).fontSize) || 14
+  const px = Math.round(cur + d)
+  document.documentElement.style.fontSize = `${Math.min(24, Math.max(11, px))}px`
+}
+function changeZoom(d: number) {
+  zoom.value = Math.min(150, Math.max(60, zoom.value + d))
+  const main = document.querySelector('.rem-content') as HTMLElement | null
+  if (main) main.style.zoom = zoom.value === 100 ? '' : `${zoom.value}%`
+}
+function resetZoom() {
+  zoom.value = 100
+  const main = document.querySelector('.rem-content') as HTMLElement | null
+  if (main) main.style.zoom = ''
+}
+function toggleFullScreen() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen()
+  else if (document.exitFullscreen) document.exitFullscreen()
+}
 
 /* ── sidebar + top tabs (mirror switchGroup) ── */
 const visibleGroups = computed(() => GROUPS.filter((g) => auth.canAccess(g.module)))
@@ -32,8 +55,7 @@ function switchModule(m: ShellModule) {
   if (m.path) router.push(m.path)
 }
 
-/* sync active group/module whenever the route changes (sidebar, tabs,
-   quick cards, breadcrumb, or direct navigation) */
+/* sync active group/module from the current route */
 watch(
   () => route.path,
   (path) => {
@@ -54,14 +76,6 @@ const topTabs = computed(() => visibleMods(activeGroup.value))
 /* ── helpers ── */
 function initials(name: string): string {
   return name.split(/[\s@._-]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'U'
-}
-
-function toggleFullscreen() {
-  if (document.fullscreenElement) {
-    document.exitFullscreen()
-  } else {
-    document.documentElement.requestFullscreen()
-  }
 }
 
 async function signOut() {
@@ -96,12 +110,12 @@ function exportCsv() {
           <button
             class="rem-sidebar-item"
             :class="{ active: activeGroupId === g.id }"
-            :title="g.label"
+            :title="_t(g.label)"
             @click="switchGroup(g)"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 18px; height: 18px" v-html="g.svg"></svg>
           </button>
-          <div class="rem-sidebar-label">{{ g.label.split(' & ')[0] }}</div>
+          <div class="rem-sidebar-label">{{ _t(g.label.split(' & ')[0]) }}</div>
         </template>
       </div>
     </aside>
@@ -120,7 +134,7 @@ function exportCsv() {
             :class="{ active: activeModuleId === m.id }"
             @click="switchModule(m)"
           >
-            {{ m.label }}
+            {{ _t(m.label) }}
           </div>
         </div>
 
@@ -150,7 +164,7 @@ function exportCsv() {
               <path d="M23 4v6h-6" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
             </svg>
           </button>
-          <button class="rem-icon-btn" title="Fullscreen" @click="toggleFullscreen">⛶</button>
+          <button class="rem-icon-btn" title="Fullscreen" @click="toggleFullScreen">⛶</button>
           <div class="rem-user-chip" style="margin-left: 4px" title="User Profile" @click="router.push('/login')">
             <span class="chip-avatar">{{ initials(auth.fullName || auth.user) }}</span>
           </div>
@@ -162,28 +176,46 @@ function exportCsv() {
         <RouterView />
       </main>
 
-      <!-- FOOTER: breadcrumb -->
+      <!-- ═══ FOOTER: breadcrumb + text-size + zoom + lang + theme + profile ═══ -->
       <div
         class="app-footer"
-        style="height: 28px; min-height: 28px; background: #fff; border-top: 1px solid #e8e8e8; display: flex; align-items: center; padding: 0 12px; font-size: 10px; color: #888; justify-content: space-between"
+        style="height: 28px; min-height: 28px; background: #fff; border-top: 1px solid #e8e8e8; display: flex; align-items: center; padding: 0 12px; font-size: 10px; color: #888; justify-content: space-between; position: sticky; bottom: 0; z-index: 20"
       >
         <div class="breadcrumb" style="display: flex; align-items: center; gap: 4px">
           <span class="crumb-part" style="cursor: pointer; color: #2f80ed; font-weight: 600" @click="router.push('/')">REM ERP</span>
           <span class="crumb-sep">›</span>
-          <span class="crumb-part" style="cursor: pointer" @click="switchGroup(activeGroup)">{{ activeGroup.label }}</span>
+          <span class="crumb-part" style="cursor: pointer" @click="switchGroup(activeGroup)">{{ _t(activeGroup.label) }}</span>
           <span class="crumb-sep">›</span>
-          <span class="crumb-part" style="cursor: pointer">{{ activeModule?.label ?? '' }}</span>
+          <span class="crumb-part" style="cursor: pointer">{{ _t(activeModule?.label ?? '') }}</span>
         </div>
-        <div style="display: flex; align-items: center; gap: 6px">
-          <span style="cursor: pointer" title="Toggle Theme">🌙</span>
+
+        <!-- Right controls: A − + | − 100% + | ⛶ | EN | 🌙 | MM | Sign Out -->
+        <div style="display: flex; align-items: center; gap: 5px">
+          <span class="ft-textsize" style="display: flex; align-items: center; gap: 2px; font-weight: 700; color: #555; font-size: 10px">A</span>
+          <button class="ft-textsize" title="Decrease text size" style="padding: 1px 5px; border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; cursor: pointer; font-size: 10px; color: #555" @click="fontStep(-1)">−</button>
+          <button class="ft-textsize" title="Increase text size" style="padding: 2px 6px; border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; cursor: pointer; font-size: 11px; color: #555" @click="fontStep(1)">+</button>
+          <span class="ft-textsize" style="color: #e0e0e0">|</span>
+          <button title="Decrease zoom" style="padding: 1px 5px; border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; cursor: pointer; font-size: 10px; color: #555" @click="changeZoom(-10)">−</button>
+          <span id="zoomLabel" title="Reset zoom" style="cursor: pointer; font-weight: 600; min-width: 36px; text-align: center; font-size: 11px" @click="resetZoom">{{ zoom }}%</span>
+          <button title="Increase zoom" style="padding: 2px 6px; border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; cursor: pointer; font-size: 11px; color: #555" @click="changeZoom(10)">+</button>
           <span style="color: #e0e0e0">|</span>
+          <button title="Fullscreen" style="padding: 2px 6px; border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; cursor: pointer; font-size: 10px; color: #555" @click="toggleFullScreen">⛶</button>
+          <span class="ft-extra" style="color: #e0e0e0">|</span>
+          <span
+            id="footerLangBtn"
+            title="বাংলা / English"
+            style="cursor: pointer; font-size: 9px; font-weight: 700; color: #555; padding: 1px 5px; border: 1px solid #d0d8e8; border-radius: 4px"
+            @click="i18n.toggle()"
+          >{{ i18n.lang === 'bn' ? 'বাং' : 'EN' }}</span>
+          <span class="ft-extra" title="Toggle Theme" style="cursor: pointer; font-size: 12px; padding: 1px 4px; border-radius: 3px">🌙</span>
+          <span class="ft-extra" style="color: #e0e0e0">|</span>
           <span
             id="footerRoleBtn"
             style="cursor: pointer; font-size: 10px; font-weight: 600; color: #2f80ed; padding: 1px 6px; border: 1px solid #d0d8e8; border-radius: 4px"
             title="User Profile"
             @click="router.push('/login')"
           >{{ initials(auth.fullName || auth.user) }}</span>
-          <button class="action-btn" style="padding: 1px 8px; font-size: 9px" @click="signOut">⎋ Sign Out</button>
+          <button class="action-btn" style="padding: 1px 8px; font-size: 9px" @click="signOut">{{ _t('Sign Out') }}</button>
         </div>
       </div>
     </div>
