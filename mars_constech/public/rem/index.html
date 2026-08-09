@@ -938,6 +938,23 @@
   <div style="margin-top:8px;padding-top:6px;border-top:1px solid #f0f0f0;font-size:8px;color:#ccc;display:flex;justify-content:space-between"><span><kbd style="background:#f5f5f5;border:1px solid #e0e0e0;border-radius:2px;padding:0 3px;font-size:8px">Alt+N</kbd> Open · <kbd style="background:#f5f5f5;border:1px solid #e0e0e0;border-radius:2px;padding:0 3px;font-size:8px">Esc</kbd> Close</span><span>'+_qaItems.length+' items</span></div>
 </div></div>
 
+<div id="loginGate" style="display:none;position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#0d1b2a 0%,#1b263b 60%,#2f80ed 160%);display:flex;align-items:center;justify-content:center;font-family:Segoe UI,system-ui,sans-serif">
+  <div style="background:#fff;border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.35);width:380px;max-width:92vw;padding:34px 32px;text-align:center">
+    <div style="font-size:40px;margin-bottom:6px">🏗️</div>
+    <div style="font-size:19px;font-weight:700;color:#0d1b2a">MARS Constech</div>
+    <div style="font-size:11px;color:#888;margin:3px 0 20px">REM ERP — Secure Sign In</div>
+    <div class="form-group" style="text-align:left"><label class="form-label">Email</label>
+      <input class="form-input" id="lg_email" type="email" placeholder="you@mars.com" autocomplete="username" style="padding:10px 12px"></div>
+    <div class="form-group" style="text-align:left"><label class="form-label">Password</label>
+      <input class="form-input" id="lg_pass" type="password" placeholder="••••••••" autocomplete="current-password" style="padding:10px 12px"></div>
+    <div id="lg_err" style="font-size:10px;color:#e53935;min-height:14px;margin:2px 0 8px"></div>
+    <button class="action-btn primary" onclick="loginGateSignIn()" id="lg_btn" style="width:100%;padding:11px;font-size:13px">🔐 Sign In</button>
+    <div style="font-size:10px;color:#999;margin-top:16px">New customer?
+      <a href="javascript:void(0)" onclick="loginGateSignup()" style="color:#2f80ed;font-weight:600">Create an account</a>
+    </div>
+    <div style="font-size:9px;color:#bbb;margin-top:10px">2FA protected · sessions expire in 8h</div>
+  </div>
+</div>
 <div class="app-shell">
   <!-- SIDEBAR: 8 Groups with separators -->
   <div id="sidebar">
@@ -1415,10 +1432,142 @@ const API = {
   }
 };
 
+
+// ═══ LOGIN GATE ═══
+function _pwaRoleFor(roles){
+  var r=roles||[];
+  if(r.indexOf('Administrator')>=0||r.indexOf('MARS Manager')>=0)return 'Super Admin';
+  if(r.indexOf('MARS Agent')>=0)return 'Sales Agent';
+  if(r.indexOf('MARS Customer')>=0||r.indexOf('Customer')>=0)return 'Customer';
+  return 'Super Admin';
+}
+function loginGateVisible(){ return document.getElementById('loginGate').style.display!=='none'; }
+function showLoginGate(){
+  document.getElementById('loginGate').style.display='flex';
+}
+function hideLoginGate(){
+  document.getElementById('loginGate').style.display='none';
+}
+function loginGateError(msg){
+  var e=document.getElementById('lg_err'); if(e)e.textContent=msg||'';
+  var b=document.getElementById('lg_btn'); if(b)b.disabled=false;
+}
+function loginGateSignIn(){
+  var em=(document.getElementById('lg_email')||{}).value||'';
+  var pw=(document.getElementById('lg_pass')||{}).value||'';
+  if(!em||!pw){loginGateError('Enter your email and password');return;}
+  var btn=document.getElementById('lg_btn'); if(btn)btn.disabled=true;
+  API.url=apiBaseUrl();
+  API.login(em,pw).then(function(r){
+    if(r.status===200&&r.ok&&r.data&&r.data.token){
+      _onPwaLogin(r.data);
+    }else if(r.status===200&&r.data&&r.data.two_factor_required){
+      // 2FA step 2 via the existing modal
+      var tmpId=r.data.tmp_id||'';
+      var method=(r.data.verification&&r.data.verification.method)||'OTP App';
+      var body='<div style="text-align:center;padding:8px 4px">'+
+        '<div style="font-size:30px;margin-bottom:6px">🔐</div>'+
+        '<div style="font-size:13px;font-weight:600;color:#222;margin-bottom:4px">Two-factor authentication</div>'+
+        '<div style="font-size:10px;color:#888;margin-bottom:14px">Enter the 6-digit code from your '+esc(method)+' authenticator app.</div>'+
+        '<input id="f_otp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" '+
+        'style="width:150px;padding:9px 10px;font-size:18px;letter-spacing:6px;text-align:center;border:1px solid #e0e0e0;border-radius:8px;outline:none" placeholder="••••••">'+
+        '<div id="otpErr" style="font-size:10px;color:#e53935;margin-top:8px;min-height:12px"></div>'+
+        '</div>';
+      openModal('Verify 2FA Code',body,'<button class="drawer-btn secondary" onclick="closeDrawer()">Cancel</button>'+
+        '<button class="drawer-btn primary" onclick="submitOtp()" id="otpSubmitBtn">Verify</button>');
+      setTimeout(function(){var i=document.getElementById('f_otp');if(i){i.focus();}},120);
+      window._otpCtx={em:em,pw:pw,tmpId:tmpId,fromGate:true};
+    }else{
+      loginGateError((r.data&&r.data.error)||'Login failed');
+    }
+  });
+}
+function loginGateSignup(){
+  openModal('Create Account',[
+    '<div class="form-group"><label class="form-label">Full name</label><input class="form-input" id="su_name" placeholder="Your name"></div>',
+    '<div class="form-group"><label class="form-label">Email</label><input class="form-input" id="su_email" type="email" placeholder="you@example.com"></div>',
+    '<div class="form-group"><label class="form-label">Phone (optional)</label><input class="form-input" id="su_phone" placeholder="+880 1XXX-XXXXXX"></div>',
+    '<div class="form-group"><label class="form-label">Password</label><input class="form-input" id="su_pass" type="password" placeholder="Min 8 characters"></div>',
+    '<div style="font-size:9px;color:#999;margin-top:4px">Accounts are created with Customer access and 2FA.</div>'
+  ].join(''),function(){
+    var name=(document.getElementById('su_name')||{}).value||'';
+    var email=(document.getElementById('su_email')||{}).value||'';
+    var phone=(document.getElementById('su_phone')||{}).value||'';
+    var pass=(document.getElementById('su_pass')||{}).value||'';
+    if(!name||!email||!pass){showToast('Name, email and password are required','error');return;}
+    if(pass.length<8){showToast('Password must be at least 8 characters','error');return;}
+    var btn=document.getElementById('drawerSaveBtn'); if(btn)btn.disabled=true;
+    API.url=apiBaseUrl();
+    API.call('signup',{method:'POST',body:{name:name,email:email,password:pass,phone:phone}}).then(function(r){
+      if(r.ok&&r.data&&r.data.ok){
+        closeDrawer();
+        showToast('Account created — signing you in…','success');
+        // auto sign-in with the new credentials
+        document.getElementById('lg_email').value=email;
+        document.getElementById('lg_pass').value=pass;
+        loginGateSignIn();
+      }else{
+        if(btn)btn.disabled=false;
+        showToast((r.data&&(r.data.error||r.data.message))||'Signup failed','error');
+      }
+    });
+  });
+}
+function _onPwaLogin(d){
+  API.token=d.token; API.connected=true;
+  localStorage.setItem('rem_api_token',d.token);
+  localStorage.setItem('rem_api_url',API.url);
+  if(d.user)localStorage.setItem('rem_api_user',d.user);
+  if(d.roles)localStorage.setItem('rem_api_roles',JSON.stringify(d.roles));
+  var role=_pwaRoleFor(d.roles);
+  currentRole=role;
+  localStorage.setItem('rem_role',role);
+  if(typeof setRole==='function')setRole(role);
+  else if(typeof _applyRole==='function')_applyRole(role);
+  if(d.session_expiry){
+    API._sessionExpiry=API._expiryToMs(d.session_expiry);
+    API._sessionStartedAt=Date.now();
+    localStorage.setItem('rem_session_started',String(API._sessionStartedAt));
+  }
+  hideLoginGate();
+  showToast('Welcome, '+(d.full_name||d.user||'')+' ('+role+')','success');
+  renderModule();
+}
+// extend submitOtp to also serve the login gate flow
+var _submitOtpOrig=submitOtp;
+submitOtp=function(){
+  var ctx=window._otpCtx||{};
+  var code=(document.getElementById('f_otp')||{}).value||'';
+  var err=document.getElementById('otpErr');
+  if(!/^\d{6}$/.test(code.trim())){ if(err)err.textContent='Enter the 6-digit code'; return; }
+  API.login(ctx.em,ctx.pw,code.trim(),ctx.tmpId).then(function(r2){
+    if(r2.ok&&r2.data&&r2.data.token){
+      closeDrawer();
+      if(ctx.fromGate){ _onPwaLogin(r2.data); }
+      else {
+        localStorage.setItem('rem_api_user',r2.data.user||ctx.em);
+        showToast('Connected to server (2FA verified)','success');
+        API.pushAll().then(function(pr){
+          if(pr.status===200)showToast('Pushed '+pr.data.rows+' rows to server','success');
+          renderModule();
+        });
+      }
+    }else{
+      var btn=document.getElementById('otpSubmitBtn'); if(btn)btn.disabled=false;
+      if(err)err.textContent=(r2.data&&r2.data.error)||'Verification failed — try again';
+      var i=document.getElementById('f_otp'); if(i){i.value='';i.focus();}
+    }
+  });
+};
+
 // Auto-connect on boot when a token is stored: verify via bootstrap, heal a
 // stale stored URL (call() does that), check version + session expiry.
 setTimeout(function(){
-  if(!API.token||!API._base())return;
+  if(!API.token||!API._base()){
+    // No stored session → show the login gate
+    setTimeout(function(){ showLoginGate(); }, 400);
+    return;
+  }
   API.call('bootstrap').then(function(r){
     if(r.ok){
       API.connected=true;
@@ -1443,9 +1592,9 @@ setTimeout(function(){
       // token around; user reconnects via Settings → Server Sync
       API.token=''; API.connected=false;
       localStorage.removeItem('rem_api_token'); localStorage.removeItem('rem_session_started');
-      var st=(r.status===401)?'Session no longer valid — reconnect (Settings → Server Sync)'
-                              :'Server unreachable — reconnect when available';
-      setTimeout(function(){ showToast(st,'info'); },2500);
+      var st=(r.status===401)?'Session no longer valid — please sign in again'
+                              :'Server unreachable — sign in when available';
+      setTimeout(function(){ showToast(st,'info'); showLoginGate(); },2500);
     }
   });
 }, 900);
@@ -13449,7 +13598,8 @@ var _rolePerms = {};
 var ROLE_MODULES = {
   'Sales Agent': ['dashboard','customers','crm','proposals','contacts','sales_marketing','bookings','customer_portal','dues_recovery','handover','ticketing','properties_units','tasks','calendar','announcements','whatsapp','chat'],
   'Site Engineer': ['dashboard','projects','plots','properties_units','contractors','variation_orders','equipment','labor','designs','compliance','qc','boq','stock','knowledge_base','tasks','calendar','chat'],
-  'Finance': ['dashboard','finance','party_ledger','fixed_assets','payment_heatmap','approvals','investment_loans','boq','bookings','dues_recovery','stock','customers','tasks','calendar','announcements','chat']
+  'Finance': ['dashboard','finance','party_ledger','fixed_assets','payment_heatmap','approvals','investment_loans','boq','bookings','dues_recovery','stock','customers','tasks','calendar','announcements','chat'],
+  'Customer': ['dashboard','customer_portal','bookings','dues_recovery','ticketing','handover','announcements']
 };
 // label ↔ module id maps (Permissions-matrix labels vs module ids)
 var _permLabelToMod = {}, _permModToLabel = {};

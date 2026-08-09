@@ -82,6 +82,7 @@ def login(usr=None, pwd=None, email=None, password=None):
 		"token": token,
 		"full_name": frappe.utils.get_fullname(user),
 		"user": user,
+		"roles": frappe.get_roles(user),
 		"session_expiry": _session_expiry_hint(),
 	}
 
@@ -295,6 +296,50 @@ def download_invoice(invoice_name):
 	download_pdf("Sales Invoice", invoice_name, "MARS Sales Invoice")
 	return None
 
+
+@frappe.whitelist(allow_guest=True)
+@rate_limit(limit=5, seconds=300, ip_based=True)
+def signup(name=None, email=None, password=None, phone=None, company=None):
+	"""Guest self-registration: creates a MARS Customer user + linked Customer.
+	Rate-limited (5 per 5 min per IP) to slow abuse."""
+	import re
+	if not name or not email or not password:
+		frappe.throw(_("Name, email and password are required"))
+	if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+		frappe.throw(_("Enter a valid email address"))
+	if len(password) < 8:
+		frappe.throw(_("Password must be at least 8 characters"))
+	if frappe.db.exists("User", email):
+		frappe.throw(_("An account with this email already exists"))
+	if frappe.db.exists("User", {"name": email}):
+		frappe.throw(_("An account with this email already exists"))
+
+	from frappe.model.naming import get_default_naming_series
+	cust = frappe.new_doc("Customer")
+	cust.customer_name = name
+	if phone:
+		cust.mobile_no = phone
+	if company:
+		cust.customer_group = company
+	cust.flags.ignore_permissions = True
+	cust.insert(ignore_permissions=True)
+	frappe.db.commit()
+
+	user = frappe.new_doc("User")
+	user.email = email
+	user.first_name = name.split()[0] if name.split() else name
+	user.last_name = " ".join(name.split()[1:]) or None
+	user.full_name = name
+	user.new_password = password
+	user.send_welcome_email = False
+	user.append_roles("MARS Customer", "Customer")
+	if phone:
+		user.mobile_no = phone
+	user.flags.ignore_permissions = True
+	user.insert(ignore_permissions=True)
+	user.add_roles("MARS Customer", "Customer")
+	frappe.db.commit()
+	return {"ok": True, "message": _("Account created — you can now sign in"), "user": email}
 
 @frappe.whitelist()
 def pay_invoice(invoice_name, gateway="bkash"):
