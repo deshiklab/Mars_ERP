@@ -5,6 +5,7 @@ import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
 import KanbanBoard from '@/components/KanbanBoard.vue'
 import StatsRow from '@/components/StatsRow.vue'
+import LeadDetailDrawer from '@/components/LeadDetailDrawer.vue'
 import type { TableAction, TableColumn, TableTab } from '@/components/DataTable.vue'
 import type { KanbanCard, KanbanColumn } from '@/components/KanbanBoard.vue'
 import type { Lead } from '@/api/types'
@@ -15,6 +16,7 @@ const route = useRoute()
 const statusFilter = ref('')
 const viewMode = ref<'table' | 'kanban'>(route.query.view === 'kanban' ? 'kanban' : 'table')
 const showAddDrawer = ref(false)
+const detailLead = ref<Lead | null>(null)
 const newLead = ref({ name: '', email: '', phone: '', source: 'Website', priority: 'Medium' })
 
 onMounted(() => {
@@ -116,7 +118,7 @@ function onTabChange(tab: string) {
 }
 
 const actions = computed<TableAction[]>(() => [
-  { label: 'View Details', icon: '👁', onClick: () => {} },
+  { label: 'View Details', icon: '👁', onClick: (r) => (detailLead.value = r as unknown as Lead) },
   { label: 'Mark Site Visit', icon: '📍', onClick: (r) => setStatus((r as unknown as Lead).id, 'Site Visit') },
   { label: 'Mark Negotiation', icon: '🤝', onClick: (r) => setStatus((r as unknown as Lead).id, 'Negotiation') },
   { label: 'Mark Booking', icon: '✅', onClick: (r) => setStatus((r as unknown as Lead).id, 'Booking') },
@@ -222,6 +224,9 @@ async function saveLead() {
         />
       </div>
     </template>
+
+    <!-- Lead detail drawer -->
+    <LeadDetailDrawer :lead="detailLead" @close="detailLead = null" @status="(st: string) => detailLead && setStatus(detailLead.id, st)" />
 
     <!-- Add-lead drawer -->
     <div v-if="showAddDrawer" class="drawer-overlay active">

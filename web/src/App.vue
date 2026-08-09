@@ -6,6 +6,7 @@ import { GROUPS, groupForPath, moduleForPath } from '@/shell/groups'
 import type { ShellGroup, ShellModule } from '@/shell/groups'
 import { i18n, _t } from '@/i18n'
 import GlobalSearch from '@/components/GlobalSearch.vue'
+import QuickAdd from '@/components/QuickAdd.vue'
 import SidebarFlyout from '@/components/SidebarFlyout.vue'
 
 const auth = useAuthStore()
@@ -159,7 +160,7 @@ function exportCsv() {
 
         <div class="top-actions" style="display: flex; align-items: center; gap: 2px; position: relative">
           <button class="rem-icon-btn" title="Keyboard Shortcuts">⌨</button>
-          <button class="rem-icon-btn" title="Quick Add" style="font-weight: 700; font-size: 16px; color: #2f80ed">+</button>
+          <QuickAdd />
           <button class="rem-icon-btn" title="Print Report">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 15px; height: 15px">
               <path d="M6 9V2h12v7" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><path d="M6 14h12v8H6z" />
