@@ -1,67 +1,99 @@
 <script setup lang="ts">
-import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import { RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { onMounted } from 'vue'
 
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
-
-onMounted(() => {
-  // a 401 mid-session should drop us back to the login gate
-  // (wired in main.ts via api.setOnUnauthorized)
-})
 
 async function signOut() {
   await auth.signOut()
   router.push('/login')
 }
 
-const nav = [
-  { to: '/', label: 'Dashboard', icon: '📊', module: 'dashboard' },
-  { to: '/leads', label: 'CRM & Leads', icon: '🎯', module: 'crm' }
+function initials(name: string): string {
+  return name.split(/[\s@._-]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'U'
+}
+
+function toggleFullscreen() {
+  if (document.fullscreenElement) {
+    document.exitFullscreen()
+  } else {
+    document.documentElement.requestFullscreen()
+  }
+}
+
+/** Groups mirroring the HTML PWA sidebar (id, label, icon, module id per view). */
+const groups = [
+  { id: 'executive', label: 'Executive', icon: '📊', module: 'dashboard', path: '/' },
+  { id: 'sales_crm', label: 'Sales & CRM', icon: '🎯', module: 'crm', path: '/leads' },
+  { id: 'land_projects', label: 'Projects', icon: '🏗️', module: 'dashboard' },
+  { id: 'construction', label: 'Engineering & Construction', icon: '🔧', module: 'dashboard' },
+  { id: 'finance_admin', label: 'Accounts & Finance', icon: '💰', module: 'dashboard' },
+  { id: 'hr_admin', label: 'Admin & Operations', icon: '💼', module: 'dashboard' },
+  { id: 'collaboration', label: 'Collaboration', icon: '🤝', module: 'dashboard' }
 ]
+
+function visibleGroups() {
+  return groups.filter((g) => auth.canAccess(g.module))
+}
+
+function isActive(g: { path?: string; module: string }): boolean {
+  if (g.path) return route.path === g.path
+  return false
+}
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-950 text-slate-100">
-    <header class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
-      <RouterLink to="/" class="flex items-center gap-3">
-        <span class="text-2xl">🏗️</span>
-        <div>
-          <h1 class="text-lg font-bold leading-tight">MARS Constech</h1>
-          <p class="text-xs text-slate-400">REM ERP — Vue 3 PWA</p>
-        </div>
-      </RouterLink>
-      <div class="flex items-center gap-4 text-sm">
-        <nav v-if="auth.authenticated" class="flex items-center gap-1">
-          <RouterLink
-            v-for="n in nav.filter((x) => auth.canAccess(x.module))"
-            :key="n.to"
-            :to="n.to"
-            class="rounded-lg px-3 py-1.5 text-xs"
-            :class="route.path === n.to ? 'bg-slate-800 text-white' : 'text-slate-300 hover:text-white'"
-          >
-            {{ n.icon }} {{ n.label }}
-          </RouterLink>
-        </nav>
-        <div v-if="auth.authenticated" class="flex items-center gap-3 border-l border-slate-800 pl-4">
-          <div class="text-right">
-            <p class="text-xs font-semibold text-slate-200">{{ auth.fullName || auth.user }}</p>
-            <p class="text-[10px] text-slate-500">{{ auth.pwaRole }}</p>
-          </div>
-          <button
-            class="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800"
-            @click="signOut"
-          >
-            ⎋ Sign Out
-          </button>
-        </div>
+  <div class="app-shell">
+    <!-- SIDEBAR: 72px, mirrors the HTML PWA -->
+    <aside class="rem-sidebar">
+      <div class="rem-sidebar-logo" @click="router.push('/')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" />
+          <rect x="14" y="3" width="7" height="7" />
+          <rect x="3" y="14" width="7" height="7" />
+          <rect x="14" y="14" width="7" height="7" />
+        </svg>
+        <div class="rem-sidebar-brand">REM ERP</div>
       </div>
-    </header>
+      <div class="rem-sidebar-scroll">
+        <template v-for="(g, i) in visibleGroups()" :key="g.id">
+          <div v-if="i > 0" class="rem-sidebar-sep"></div>
+          <button
+            class="rem-sidebar-item"
+            :class="{ active: isActive(g) }"
+            :title="g.label"
+            @click="g.path ? router.push(g.path) : undefined"
+          >
+            {{ g.icon }}
+          </button>
+          <div class="rem-sidebar-label">{{ g.label.split(' & ')[0] }}</div>
+        </template>
+      </div>
+    </aside>
 
-    <main class="mx-auto max-w-6xl px-6 py-10">
-      <RouterView />
-    </main>
+    <!-- MAIN COLUMN -->
+    <div style="display: flex; flex-direction: column; flex: 1; min-width: 0">
+      <!-- TOP BAR -->
+      <header class="rem-topbar">
+        <span class="rem-topbar-title">🏗️ MARS Constech</span>
+        <div style="font-size: 10px; color: #888">{{ route.meta.title ?? '' }}</div>
+        <div class="rem-topbar-actions">
+          <button class="rem-icon-btn" title="Notifications">🔕</button>
+          <button class="rem-icon-btn" title="Fullscreen" @click="toggleFullscreen">⛶</button>
+          <div class="rem-user-chip" title="User Profile" @click="router.push('/login')">
+            <span class="chip-avatar">{{ initials(auth.fullName || auth.user) }}</span>
+            <span>{{ auth.fullName || auth.user }}</span>
+          </div>
+          <button class="action-btn" @click="signOut">⎋ Sign Out</button>
+        </div>
+      </header>
+
+      <!-- CONTENT -->
+      <main class="rem-content">
+        <RouterView />
+      </main>
+    </div>
   </div>
 </template>

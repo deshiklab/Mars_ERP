@@ -45,54 +45,82 @@ function cancelOtp() {
 </script>
 
 <template>
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-[#0d1b2a] via-[#1b263b] to-[#2f80ed] p-4">
-    <div class="w-full max-w-sm rounded-2xl bg-white p-8 text-center shadow-2xl">
-      <div class="mb-1 text-4xl">🏗️</div>
-      <h1 class="text-lg font-bold text-slate-900">MARS Constech</h1>
-      <p class="mb-6 mt-1 text-xs text-slate-400">REM ERP — Secure Sign In</p>
+  <!-- Mirrors the HTML PWA gate: dark blue gradient, white rounded card -->
+  <div
+    style="
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: linear-gradient(135deg, #0d1b2a 0%, #1b263b 60%, #2f80ed 160%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Inter', Arial, sans-serif;
+    "
+  >
+    <div
+      style="
+        background: #fff;
+        border-radius: 18px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+        width: 380px;
+        max-width: 92vw;
+        padding: 34px 32px;
+        text-align: center;
+      "
+    >
+      <div style="font-size: 40px; margin-bottom: 6px">🏗️</div>
+      <div style="font-size: 19px; font-weight: 700; color: #0d1b2a">MARS Constech</div>
+      <div style="font-size: 11px; color: #888; margin: 3px 0 20px">REM ERP — Secure Sign In</div>
 
       <!-- Password stage -->
-      <form v-if="!showOtp" class="space-y-4" @submit.prevent="onSignIn">
-        <div class="text-left">
-          <label class="mb-1 block text-xs font-medium text-slate-600">Email</label>
-          <input
-            v-model="email"
-            type="email"
-            autocomplete="username"
-            placeholder="you@mars.com"
-            class="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#2f80ed] focus:ring-2 focus:ring-[#2f80ed]/20"
-          />
+      <form v-if="!showOtp" @submit.prevent="onSignIn">
+        <div class="form-group" style="text-align: left">
+          <label class="form-label">Email</label>
+          <input v-model="email" type="email" class="form-input" placeholder="you@mars.com" autocomplete="username" style="padding: 10px 12px" />
         </div>
-        <div class="text-left">
-          <label class="mb-1 block text-xs font-medium text-slate-600">Password</label>
-          <input
-            v-model="password"
-            type="password"
-            autocomplete="current-password"
-            placeholder="••••••••"
-            class="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#2f80ed] focus:ring-2 focus:ring-[#2f80ed]/20"
-          />
+        <div class="form-group" style="text-align: left">
+          <label class="form-label">Password</label>
+          <input v-model="password" type="password" class="form-input" placeholder="••••••••" autocomplete="current-password" style="padding: 10px 12px" />
         </div>
 
-        <p v-if="auth.error" class="text-xs text-rose-600">{{ auth.error }}</p>
-        <p class="text-left text-[10px] text-slate-400">Server: {{ $route.query.api ?? '/api/method/mars_constech.mars_constech.api' }}</p>
+        <p v-if="auth.error" style="font-size: 10px; color: #e53935; min-height: 14px; margin: 2px 0 8px">{{ auth.error }}</p>
+        <p v-else style="font-size: 10px; color: #999; min-height: 14px; margin: 2px 0 8px; text-align: left">
+          Server: /api/method/mars_constech.mars_constech.api
+        </p>
 
         <button
           type="submit"
           :disabled="auth.busy"
-          class="w-full rounded-lg bg-[#2f80ed] py-2.5 text-sm font-semibold text-white transition hover:bg-[#1e6fd0] disabled:opacity-60"
+          style="
+            width: 100%;
+            padding: 11px;
+            font-size: 13px;
+            background: #2f80ed;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+          "
         >
           {{ auth.busy ? '⏳ Signing in…' : '🔐 Sign In' }}
         </button>
+
+        <div style="font-size: 10px; color: #999; margin-top: 16px">
+          New customer?
+          <a href="javascript:void(0)" style="color: #2f80ed; font-weight: 600">Create an account</a>
+        </div>
+        <div style="font-size: 9px; color: #bbb; margin-top: 10px">2FA protected · sessions expire in 8h</div>
       </form>
 
       <!-- OTP stage -->
-      <div v-else class="space-y-4">
-        <div class="text-3xl">🔐</div>
-        <h2 class="text-sm font-semibold text-slate-800">Two-factor authentication</h2>
-        <p class="text-xs text-slate-400">
+      <div v-else>
+        <div style="font-size: 30px; margin-bottom: 6px">🔐</div>
+        <div style="font-size: 13px; font-weight: 600; color: #222; margin-bottom: 4px">Two-factor authentication</div>
+        <div style="font-size: 10px; color: #888; margin-bottom: 14px">
           Enter the 6-digit code from your authenticator app.
-        </p>
+        </div>
         <input
           v-model="otp"
           type="text"
@@ -100,22 +128,30 @@ function cancelOtp() {
           autocomplete="one-time-code"
           maxlength="6"
           placeholder="••••••"
-          class="mx-auto block w-40 rounded-lg border border-slate-200 px-3 py-2.5 text-center text-lg tracking-[0.4em] outline-none focus:border-[#2f80ed] focus:ring-2 focus:ring-[#2f80ed]/20"
+          style="
+            width: 150px;
+            padding: 9px 10px;
+            font-size: 18px;
+            letter-spacing: 6px;
+            text-align: center;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            outline: none;
+          "
         />
-        <p v-if="otpError" class="text-xs text-rose-600">{{ otpError }}</p>
-        <p v-else-if="auth.error" class="text-xs text-rose-600">{{ auth.error }}</p>
-        <p class="text-[10px] text-slate-400">Codes refresh every 30s — if it fails, enter the new one.</p>
+        <p v-if="otpError" style="font-size: 10px; color: #e53935; margin-top: 8px">{{ otpError }}</p>
+        <p v-else-if="auth.error" style="font-size: 10px; color: #e53935; margin-top: 8px">{{ auth.error }}</p>
+        <p style="font-size: 9px; color: #999; margin-top: 4px">Codes refresh every 30s — if it fails, enter the new one.</p>
 
         <button
           :disabled="auth.busy"
-          class="w-full rounded-lg bg-[#2f80ed] py-2.5 text-sm font-semibold text-white transition hover:bg-[#1e6fd0] disabled:opacity-60"
+          class="action-btn primary"
+          style="width: 100%; padding: 11px; font-size: 13px; margin-top: 14px"
           @click="onVerify"
         >
           {{ auth.busy ? '⏳ Verifying…' : 'Verify' }}
         </button>
-        <button class="w-full text-xs text-slate-400 hover:text-slate-600" @click="cancelOtp">
-          Cancel
-        </button>
+        <button class="action-btn" style="width: 100%; margin-top: 6px" @click="cancelOtp">Cancel</button>
       </div>
     </div>
   </div>
