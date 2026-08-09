@@ -4348,22 +4348,22 @@ function switchCustTab(id,tab){
 // ═══ CUSTOMER HELPER FUNCTIONS ═══
 function addCustChatHistory(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;var type=document.getElementById('custChType').value;var text=document.getElementById('custChText').value;if(!text.trim())return;if(!e.chatHistory)e.chatHistory=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+', '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});e.chatHistory.unshift({type:type,contact:e.type==='company'?e.companyName:e.name,date:ds,summary:text.trim()});DB.save('entities');document.getElementById('custChText').value='';switchCustTab(id,'chathistory');showToast('Contact logged!');}
 function addCustNoteQuick(id){var text=document.getElementById('custNoteText');if(!text||!text.value.trim())return;var e=mockEntities.find(function(x){return x.id===id});if(!e)return;if(!e.notesList)e.notesList=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+', '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});e.notesList.unshift({user:'You',date:ds,text:text.value.trim()});DB.save('entities');text.value='';switchCustTab(id,'notes');showToast('Note saved!');}
-function addCustInvoice(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;var num=prompt('Invoice number:');if(!num)return;var amt=prompt('Amount (৳):');if(!amt)return;if(!e.invoices)e.invoices=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});e.invoices.push({number:num,date:ds,property:e.properties&&e.properties[0]?e.properties[0]:'—',amount:amt,status:'Pending'});DB.save('entities');switchCustTab(id,'invoices');showToast('Invoice added!');}
-function addCustInstallment(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;var amt=prompt('Payment amount (৳):');if(!amt)return;var method=prompt('Method (Cash/Bank/Cheque/Online):')||'Cash';if(!e.installments)e.installments=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});e.installments.push({amount:amt,date:ds,method:method,status:'Paid'});DB.save('entities');switchCustTab(id,'installments');showToast('Payment recorded!');}
-function addCustQuotation(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;var title=prompt('Quotation title:');if(!title||!title.trim())return;var amt=prompt('Amount (৳):');if(!amt)return;if(!e.quotations)e.quotations=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});e.quotations.push({title:title.trim(),date:ds,property:e.properties&&e.properties[0]?e.properties[0]:'—',amount:amt,status:'Sent'});DB.save('entities');switchCustTab(id,'quotations');showToast('Quotation added!');}
-function addCustCreditNote(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;var reason=prompt('Reason:');if(!reason)return;var amt=prompt('Amount (৳):');if(!amt)return;if(!e.creditNotes)e.creditNotes=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});e.creditNotes.push({reason:reason,date:ds,amount:amt});DB.save('entities');switchCustTab(id,'creditnotes');showToast('Credit note added!');}
-function addCustEstimate(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;var project=prompt('Project name:');if(!project)return;var item=prompt('Item description:');if(!item)return;var amt=prompt('Estimated amount (৳):');if(!amt)return;if(!e.estimates)e.estimates=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});e.estimates.push({project:project,item:item,date:ds,amount:amt});DB.save('entities');switchCustTab(id,'estimates');showToast('Estimate added!');}
-function addCustExpense(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;var cat=prompt('Category (e.g. Registration, Tax, Legal):');if(!cat)return;var amt=prompt('Amount (৳):');if(!amt)return;var desc=prompt('Description:');if(!desc)return;if(!e.expenses)e.expenses=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});e.expenses.push({category:cat,amount:amt,date:ds,description:desc});DB.save('entities');switchCustTab(id,'expenses');showToast('Expense added!');}
-function addCustContract(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;var title=prompt('Contract title:');if(!title||!title.trim())return;var prop=e.properties&&e.properties[0]?e.properties[0]:'—';if(!e.contracts)e.contracts=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});e.contracts.push({title:title.trim(),date:ds,property:typeof prop==='string'?prop:(prop.name||'—'),status:'Active'});DB.save('entities');switchCustTab(id,'contracts');showToast('Contract registered!');}
-function addCustTask(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;var title=prompt('Task title:');if(!title||!title.trim())return;var assignee=prompt('Assign to:')||'Unassigned';var due=prompt('Due date:')||'No due';if(!e.tasks)e.tasks=[];e.tasks.push({title:title.trim(),assignee:assignee,status:'Pending',due:due,priority:'Medium'});DB.save('entities');switchCustTab(id,'tasks');showToast('Task added!');}
+function addCustInvoice(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;askFields('Add Customer Invoice',[{id:'num',label:'Invoice number:',req:1}, {id:'amt',label:'Amount (৳):',req:1}],function(v){var num=v.num;var amt=v.amt;if(!e.invoices)e.invoices=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});e.invoices.push({number:num,date:ds,property:e.properties&&e.properties[0]?e.properties[0]:'—',amount:amt,status:'Pending'});DB.save('entities');switchCustTab(id,'invoices');showToast('Invoice added!');});}
+function addCustInstallment(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;askFields('Add Installment Payment',[{id:'amt',label:'Payment amount (৳):',req:1}, {id:'method',label:'Method (Cash/Bank/Cheque/Online):',}],function(v){var amt=v.amt;var method=v.method||'Cash';if(!e.installments)e.installments=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});e.installments.push({amount:amt,date:ds,method:method,status:'Paid'});DB.save('entities');switchCustTab(id,'installments');showToast('Payment recorded!');});}
+function addCustQuotation(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;askFields('Add Quotation',[{id:'title',label:'Quotation title:',req:1}, {id:'amt',label:'Amount (৳):',req:1}],function(v){var title=v.title;var amt=v.amt;if(!e.quotations)e.quotations=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});e.quotations.push({title:title.trim(),date:ds,property:e.properties&&e.properties[0]?e.properties[0]:'—',amount:amt,status:'Sent'});DB.save('entities');switchCustTab(id,'quotations');showToast('Quotation added!');});}
+function addCustCreditNote(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;askFields('Add Credit Note',[{id:'reason',label:'Reason:',req:1}, {id:'amt',label:'Amount (৳):',req:1}],function(v){var reason=v.reason;var amt=v.amt;if(!e.creditNotes)e.creditNotes=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});e.creditNotes.push({reason:reason,date:ds,amount:amt});DB.save('entities');switchCustTab(id,'creditnotes');showToast('Credit note added!');});}
+function addCustEstimate(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;askFields('Add Cost Estimate',[{id:'project',label:'Project name:',req:1}, {id:'item',label:'Item description:',req:1}, {id:'amt',label:'Estimated amount (৳):',req:1}],function(v){var project=v.project;var item=v.item;var amt=v.amt;if(!e.estimates)e.estimates=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});e.estimates.push({project:project,item:item,date:ds,amount:amt});DB.save('entities');switchCustTab(id,'estimates');showToast('Estimate added!');});}
+function addCustExpense(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;askFields('Add Expense',[{id:'cat',label:'Category (e.g. Registration, Tax, Legal):',req:1}, {id:'amt',label:'Amount (৳):',req:1}, {id:'desc',label:'Description:',req:1}],function(v){var cat=v.cat;var amt=v.amt;var desc=v.desc;if(!e.expenses)e.expenses=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});e.expenses.push({category:cat,amount:amt,date:ds,description:desc});DB.save('entities');switchCustTab(id,'expenses');showToast('Expense added!');});}
+function addCustContract(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;askFields('Add Contract',[{id:'title',label:'Contract title:',req:1}],function(v){var title=v.title;var prop=e.properties&&e.properties[0]?e.properties[0]:'—';if(!e.contracts)e.contracts=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});e.contracts.push({title:title.trim(),date:ds,property:typeof prop==='string'?prop:(prop.name||'—'),status:'Active'});DB.save('entities');switchCustTab(id,'contracts');showToast('Contract registered!');});}
+function addCustTask(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;askFields('Add Task',[{id:'title',label:'Task title:',req:1}, {id:'assignee',label:'Assign to:',}, {id:'due',label:'Due date:',}],function(v){var title=v.title;var assignee=v.assignee||'Unassigned';var due=v.due||'No due';if(!e.tasks)e.tasks=[];e.tasks.push({title:title.trim(),assignee:assignee,status:'Pending',due:due,priority:'Medium'});DB.save('entities');switchCustTab(id,'tasks');showToast('Task added!');});}
 function toggleCustTask(id,idx){var e=mockEntities.find(function(x){return x.id===id});if(!e||!e.tasks||!e.tasks[idx])return;e.tasks[idx].status=e.tasks[idx].status==='Done'?'Pending':'Done';DB.save('entities');switchCustTab(id,'tasks');}
-function addCustAttachment(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;var name=prompt('File name:');if(!name||!name.trim())return;if(!e.attachments)e.attachments=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});var ext=name.split('.').pop().toUpperCase();var fType=(ext==='PDF'?'PDF':['JPG','JPEG','PNG','GIF'].includes(ext)?'Image':['DOC','DOCX'].includes(ext)?'Doc':'Other');e.attachments.push({name:name.trim(),type:fType,size:Math.floor(Math.random()*500+50)+'KB',uploadedBy:'You',date:ds});DB.save('entities');switchCustTab(id,'attachments');showToast('File uploaded!');}
-function addCustVaultItem(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;var type=prompt('Type (NID/Deed/Passport/Tax/Other):')||'Other';var title=prompt('Title:')||'Document';if(!e.vaultItems)e.vaultItems=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});e.vaultItems.push({type:type,title:title,date:ds});DB.save('entities');switchCustTab(id,'vault');showToast('Vault item added!');}
-function addCustReminder(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;var title=prompt('Reminder title:');if(!title)return;var dt=prompt('Date & time:')||'Tomorrow';var type=prompt('Type:')||'Follow-up';if(!e.reminders)e.reminders=[];e.reminders.push({title:title,dateTime:dt,type:type,status:'Pending'});DB.save('entities');switchCustTab(id,'reminders');showToast('Reminder set!');}
+function addCustAttachment(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;askFields('Add Attachment',[{id:'name',label:'File name:',req:1}],function(v){var name=v.name;if(!e.attachments)e.attachments=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});var ext=name.split('.').pop().toUpperCase();var fType=(ext==='PDF'?'PDF':['JPG','JPEG','PNG','GIF'].includes(ext)?'Image':['DOC','DOCX'].includes(ext)?'Doc':'Other');e.attachments.push({name:name.trim(),type:fType,size:Math.floor(Math.random()*500+50)+'KB',uploadedBy:'You',date:ds});DB.save('entities');switchCustTab(id,'attachments');showToast('File uploaded!');});}
+function addCustVaultItem(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;askFields('Add Vault Item',[{id:'type',label:'Type (NID/Deed/Passport/Tax/Other):',}, {id:'title',label:'Title:',}],function(v){var type=v.type||'Other';var title=v.title||'Document';if(!e.vaultItems)e.vaultItems=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});e.vaultItems.push({type:type,title:title,date:ds});DB.save('entities');switchCustTab(id,'vault');showToast('Vault item added!');});}
+function addCustReminder(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;askFields('Add Reminder',[{id:'title',label:'Reminder title:',req:1}, {id:'dt',label:'Date & time:',}, {id:'type',label:'Type:',}],function(v){var title=v.title;var dt=v.dt||'Tomorrow';var type=v.type||'Follow-up';if(!e.reminders)e.reminders=[];e.reminders.push({title:title,dateTime:dt,type:type,status:'Pending'});DB.save('entities');switchCustTab(id,'reminders');showToast('Reminder set!');});}
 function deleteCustReminder(id,idx){if(!confirm('Remove?'))return;var e=mockEntities.find(function(x){return x.id===id});if(!e||!e.reminders)return;e.reminders.splice(idx,1);DB.save('entities');switchCustTab(id,'reminders');showToast('Reminder removed');}
 function addCustActivity(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;var type=document.getElementById('custActType').value;var text=document.getElementById('custActText').value;if(!text.trim())return;if(!e.logs)e.logs=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+', '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});e.logs.unshift({type:type,user:'You',date:ds,text:text.trim()});DB.save('entities');document.getElementById('custActText').value='';switchCustTab(id,'activities');showToast('Activity logged!');}
 function toggleCustPortal(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;e.portalAccess=!e.portalAccess;if(e.portalAccess)e.portalLastLogin='Just now';DB.save('entities');switchCustTab(id,'portal');showToast(e.portalAccess?'Portal enabled!':'Portal revoked','info');}
-function addCustIssue(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;var title=prompt('Issue title:');if(!title||!title.trim())return;var desc=prompt('Description:')||'—';if(!e.issues)e.issues=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});e.issues.push({title:title.trim(),description:desc,date:ds,status:'Open',priority:'Normal'});DB.save('entities');switchCustTab(id,'issues');showToast('Ticket created!');}
+function addCustIssue(id){var e=mockEntities.find(function(x){return x.id===id});if(!e)return;askFields('Add Issue',[{id:'title',label:'Issue title:',req:1}, {id:'desc',label:'Description:',}],function(v){var title=v.title;var desc=v.desc||'—';if(!e.issues)e.issues=[];var d=new Date();var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});e.issues.push({title:title.trim(),description:desc,date:ds,status:'Open',priority:'Normal'});DB.save('entities');switchCustTab(id,'issues');showToast('Ticket created!');});}
 
 function crudEntity(id){
   var e=id?mockEntities.find(function(x){return x.id===id}):null;
@@ -4673,11 +4673,10 @@ function openComplaint(id){
 
 function resolveComplaint(id){
   var c=mockComplaints.find(function(x){return x.id===id});if(!c)return;
-  var sat=prompt('Rate satisfaction (1-5):');if(!sat)return;
-  var s=parseInt(sat);if(isNaN(s)||s<1||s>5){showToast('Enter 1-5','error');return;}
+  askFields('Resolve Complaint',[{id:'sat',label:'Rate satisfaction (1-5):',req:1}],function(v){var sat=v.sat;var s=parseInt(sat);if(isNaN(s)||s<1||s>5){showToast('Enter 1-5','error');return;}
   c.status='Resolved';c.resolvedDate=new Date().toISOString().slice(0,10);c.satisfaction=s;
   DB.save('complaints');renderModule();closeModal();showToast('Complaint resolved! ✅','success');
-}
+});}
 
 
 // ═══ INVOICES ═══
@@ -14119,13 +14118,21 @@ document.addEventListener('click',function(e){var t=document.getElementById('the
 function settingsAddUser(){openModal('Add User',inputField('Name','su_name')+inputField('Email','su_email')+selectField('Role','su_role','Sales Agent',['Super Admin','System Admin','Sales Agent','Site Engineer','Finance'])+selectField('Dept','su_dept','Sales',['Management','IT','Sales','Construction','Finance','HR']),function(){var n=g('su_name');if(!n)return;var inits=n.split(' ').map(function(w){return w[0]}).join('').slice(0,2).toUpperCase();mockUsers.push({name:n,email:g('su_email'),role:g('su_role'),dept:g('su_dept'),status:'Active',initials:inits});DB.save('users');showToast('User added!','success');renderModule()})}
 function settingsEditUser(u){openModal('Edit User',inputField('Name','eu_name',u.name)+inputField('Email','eu_email',u.email)+selectField('Role','eu_role',u.role,['Super Admin','System Admin','Sales Agent','Site Engineer','Finance'])+selectField('Dept','eu_dept',u.dept,['Management','IT','Sales','Construction','Finance','HR']),function(){u.name=g('eu_name');u.email=g('eu_email');u.role=g('eu_role');u.dept=g('eu_dept');DB.save('users');showToast('User updated!','success');renderModule()})}
 function settingsToggleUser(u){u.status=u.status==='Active'?'Inactive':'Active';DB.save('users');showToast(u.name+' '+u.status,'info');renderModule()}
-function settingsBulkAction(){var idx=prompt('Bulk User Action:\n1. Activate All\n2. Suspend All\n3. Cancel\n\nEnter 1, 2, or 3:');if(idx==='1'){mockUsers.forEach(function(u){u.status='Active'});DB.save('users');showToast('All users activated','success');renderModule()}else if(idx==='2'){mockUsers.forEach(function(u){u.status='Inactive'});DB.save('users');showToast('All users suspended','info');renderModule()}}
+function settingsBulkAction(){
+  var body='<div style="font-size:10px;color:#555;margin-bottom:10px">Choose a bulk action for all users:</div>'+
+    '<select id="af_action" class="form-input" style="padding:8px"><option value="1">Activate All</option><option value="2">Suspend All</option><option value="3">Cancel</option></select>';
+  openModal('Bulk User Action',body,function(){
+    var idx=document.getElementById('af_action').value;
+    if(idx==='1'){mockUsers.forEach(function(u){u.status='Active'});DB.save('users');showToast('All users activated','success');renderModule()}
+    else if(idx==='2'){mockUsers.forEach(function(u){u.status='Inactive'});DB.save('users');showToast('All users suspended','info');renderModule()}
+  });
+}
 function settingsAddAccount(){openModal('Add Account',inputField('Code','ac_code')+inputField('Name','ac_name')+selectField('Type','ac_type','Asset',['Asset','Liability','Income','Expense'])+inputField('Balance','ac_bal'),function(){mockCOA.push({code:g('ac_code')||'NEW',name:g('ac_name')||'New Account',type:g('ac_type'),balance:g('ac_bal')||'৳0'});DB.save('coa');showToast('Account added!','success');renderModule()})}
 function settingsAddBank(){openModal('Add Bank Account',inputField('Bank Name','bk_name')+inputField('Account No','bk_acct')+selectField('Type','bk_type','Current',['Current','SME','Savings','Petty Cash'])+inputField('Balance','bk_bal'),function(){mockBankAccounts.push({name:g('bk_name')||'New Bank',account:g('bk_acct')||'XXXX',branch:'—',type:g('bk_type'),balance:g('bk_bal')||'৳0'});DB.save('bank_accounts');showToast('Bank added!','success');renderModule()})}
 function settingsConfigure(name){openModal('Configure: '+name,'<p style="font-size:12px;color:#888;margin-bottom:10px">Configure '+name+' integration settings.</p><div class="form-group"><label class="form-label">API Key</label><input class="form-input" id="apikey" placeholder="Enter API key..."/></div><div class="form-group"><label class="form-label">Webhook URL</label><input class="form-input" id="webhook" placeholder="https://..."/></div>',function(){showToast(name+' configuration saved!','success');closeDrawer()})}
 function settingsNewRule(){openModal('New Automation Rule',selectField('Trigger','nr_trigger','Lead Created',['Lead Created','Payment Received','Installment Due','Installment Overdue','Booking Converted','Stock Low'])+selectField('Channel','nr_channel','Email + SMS',['Email','SMS','Email + SMS'])+'<div class="form-group"><label class="form-label">Action</label><input class="form-input" id="nr_action" placeholder="e.g. Notify Sales Manager"/></div>',function(){showToast('Rule created!','success');renderModule()})}
 function settingsEditRule(){openModal('Edit Automation Rule',selectField('Status','er_status','Active',['Active','Paused']),function(){showToast('Rule updated!','success');closeDrawer()})}
-function settingsAddList(k){var v=prompt('Add new item to '+k+':');if(v&&v.trim()){if(!mockMasterLists[k])mockMasterLists[k]=[];mockMasterLists[k].push(v.trim());DB.save('master_lists');renderModule()}}
+function settingsAddList(k){askFields('Add Item to '+k,[{id:'v',label:'New item for '+k,req:1}],function(v){if(v.v&&v.v.trim()){if(!mockMasterLists[k])mockMasterLists[k]=[];mockMasterLists[k].push(v.v.trim());DB.save('master_lists');renderModule()}})}
 function settingsRemoveList(k,i){if(!confirm('Remove "'+i+'" from '+k+'?'))return;if(mockMasterLists[k]){mockMasterLists[k]=mockMasterLists[k].filter(function(x){return x!==i});DB.save('master_lists');renderModule()}}
 function clearSearch(){var el=document.getElementById('searchActLog');if(el){el.value=''}renderModule();}
 initTheme();
@@ -14413,22 +14420,18 @@ function addLeadActivity(id){
 }
 function addLeadProposal(id){
   const l=mockLeads.find(x=>x.id===id);if(!l)return;
-  const title=prompt('Proposal title:');if(!title||!title.trim())return;
-  const amt=prompt('Amount (e.g. ৳1,50,00,000):');if(!amt)return;
+  askFields('Add Proposal',[{id:'title',label:'Proposal title:',req:1}, {id:'amt',label:'Amount (e.g. ৳1,50,00,000):',req:1}],function(v){var title=v.title;var amt=v.amt;
   if(!l.proposals)l.proposals=[];
   const d=new Date();const ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   l.proposals.push({title:title.trim(),date:ds,unit:l.property||'—',amount:amt,status:'Sent'});
   DB.save('leads');openLeadPanel(id,'proposals');showToast('Proposal added!');
-}
+});}
 function addLeadTask(id){
   const l=mockLeads.find(x=>x.id===id);if(!l)return;
-  const title=prompt('Task title:');if(!title||!title.trim())return;
-  const assignee=prompt('Assign to (optional):')||'Unassigned';
-  const due=prompt('Due date (e.g. Dec 25):')||'No due date';
-  if(!l.tasks)l.tasks=[];
+  askFields('Add Task',[{id:'title',label:'Task title:',req:1}, {id:'assignee',label:'Assign to (optional):',}, {id:'due',label:'Due date (e.g. Dec 25):',}],function(v){var title=v.title;var assignee=v.assignee||'Unassigned';var due=v.due||'No due date';if(!l.tasks)l.tasks=[];
   l.tasks.push({title:title.trim(),assignee,status:'Pending',due,priority:'Medium'});
   DB.save('leads');openLeadPanel(id,'tasks');showToast('Task added!');
-}
+});}
 function toggleLeadTask(id,idx){
   const l=mockLeads.find(x=>x.id===id);if(!l)return;
   if(!l.tasks||!l.tasks[idx])return;
@@ -14437,22 +14440,19 @@ function toggleLeadTask(id,idx){
 }
 function addLeadAttachment(id){
   const l=mockLeads.find(x=>x.id===id);if(!l)return;
-  const name=prompt('File name (e.g. NID_Scan.pdf):');if(!name||!name.trim())return;
+  askFields('Add Attachment',[{id:'name',label:'File name (e.g. NID_Scan.pdf):',req:1}],function(v){var name=v.name;
   if(!l.attachments)l.attachments=[];
   const d=new Date();const ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   var ext=name.split('.').pop().toUpperCase();var fType=(ext==='PDF'?'PDF':['JPG','JPEG','PNG','GIF'].includes(ext)?'Image':['DOC','DOCX'].includes(ext)?'Doc':'Other');
   l.attachments.push({name:name.trim(),type:fType,size:Math.floor(Math.random()*500+50)+'KB',uploadedBy:'You',date:ds});
   DB.save('leads');openLeadPanel(id,'attachments');showToast('Attachment added!');
-}
+});}
 function addLeadReminder(id){
   const l=mockLeads.find(x=>x.id===id);if(!l)return;
-  const title=prompt('Reminder title:');if(!title||!title.trim())return;
-  const dt=prompt('Date & time (e.g. Dec 30, 3:00 PM):');if(!dt)return;
-  const type=prompt('Type (Call/Meeting/Follow-up):')||'Follow-up';
-  if(!l.reminders)l.reminders=[];
+  askFields('Add Reminder',[{id:'title',label:'Reminder title:',req:1}, {id:'dt',label:'Date & time (e.g. Dec 30, 3:00 PM):',req:1}, {id:'type',label:'Type (Call/Meeting/Follow-up):',}],function(v){var title=v.title;var dt=v.dt;var type=v.type||'Follow-up';if(!l.reminders)l.reminders=[];
   l.reminders.push({title:title.trim(),dateTime:dt,type:type});
   DB.save('leads');openLeadPanel(id,'reminders');showToast('Reminder set!');
-}
+});}
 function deleteLeadReminder(id,idx){
   if(!confirm('Remove this reminder?'))return;
   const l=mockLeads.find(x=>x.id===id);if(!l||!l.reminders)return;
@@ -14471,12 +14471,12 @@ function addLeadNote(id){
   const text=document.getElementById('leadNoteText');
   if(text&&text.value.trim()){addLeadNoteQuick(id);return;}
   const l=mockLeads.find(x=>x.id===id);if(!l)return;
-  const txt=prompt('Enter note text:');if(!txt||!txt.trim())return;
+  askFields('Add Note',[{id:'txt',label:'Enter note text:',req:1}],function(v){var txt=v.txt;
   if(!l.notesList)l.notesList=[];
   const d=new Date();const ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+', '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
   l.notesList.unshift({user:'You',date:ds,text:txt.trim()});DB.save('leads');
   openLeadPanel(id,'notes');showToast('Note saved!');
-}
+});}
 function addLeadChatHistory(id){
   const l=mockLeads.find(x=>x.id===id);if(!l)return;
   const type=document.getElementById('leadChType').value;
@@ -14675,9 +14675,11 @@ function bulkActionStatus(status){
 }
 function bulkActionAssign(){
   var ids=Object.keys(_bulkSel);if(ids.length===0){showToast('Select leads first','error');return}
-  var owner=prompt('Assign to (e.g. Sales Team A, Hasanul Banna):');if(!owner||!owner.trim())return;
-  ids.forEach(function(id){var l=mockLeads.find(function(x){return x.id===parseInt(id)});if(l)l.owner=owner.trim();});
-  DB.save('leads');_bulkSel={};showToast('Assigned '+ids.length+' leads to '+owner,'success');renderModule();
+  askFields('Assign Leads',[{id:'owner',label:'Assign to (e.g. Sales Team A, Hasanul Banna)',req:1}],function(v){
+    var owner=v.owner;
+    ids.forEach(function(id){var l=mockLeads.find(function(x){return x.id===parseInt(id)});if(l)l.owner=owner.trim();});
+    DB.save('leads');_bulkSel={};showToast('Assigned '+ids.length+' leads to '+owner,'success');renderModule();
+  });
 }
 function bulkActionDelete(){
   var ids=Object.keys(_bulkSel);if(ids.length===0){showToast('Select leads first','error');return}
@@ -14687,10 +14689,11 @@ function bulkActionDelete(){
 }
 function bulkActionFollowUp(){
   var ids=Object.keys(_bulkSel);if(ids.length===0){showToast('Select leads first','error');return}
-  var date=prompt('Set follow-up date for '+ids.length+' leads (e.g. Today, 3:00 PM or Dec 25):');
-  if(!date||!date.trim())return;
-  ids.forEach(function(id){var l=mockLeads.find(function(x){return x.id===parseInt(id)});if(l){l.nextFollowUp=date.trim();if(!l.activities)l.activities=[];l.activities.unshift({type:'System',user:'System',date:'Just now',text:'Follow-up set to: '+date});}});
-  DB.save('leads');_bulkSel={};showToast('Follow-up set for '+ids.length+' leads','success');renderModule();
+  askFields('Set Follow-up Date',[{id:'date',label:'Follow-up date for '+ids.length+' leads (e.g. Today, 3:00 PM or Dec 25)',req:1}],function(v){
+    var date=v.date;
+    ids.forEach(function(id){var l=mockLeads.find(function(x){return x.id===parseInt(id)});if(l){l.nextFollowUp=date.trim();if(!l.activities)l.activities=[];l.activities.unshift({type:'System',user:'System',date:'Just now',text:'Follow-up set to: '+date});}});
+    DB.save('leads');_bulkSel={};showToast('Follow-up set for '+ids.length+' leads','success');renderModule();
+  });
 }
 function bulkActionPriority(priority){
   var ids=Object.keys(_bulkSel);if(ids.length===0){showToast('Select leads first','error');return}
@@ -14815,6 +14818,32 @@ function filterLeads(){
 const GROUPS_LOOKUP = {dashboard:'executive',analytics:'executive',reports:'executive',bi_reports:'executive',customers:'sales_crm',crm:'sales_crm',sales_marketing:'sales_crm',contacts:'sales_crm',proposals:'sales_crm',land_mgmt:'land_projects',plots:'land_projects',layout_builder:'land_projects',projects:'land_projects',compliance:'legal_compliance',legal_contracts:'legal_compliance',bookings:'bookings_customer',customer_portal:'bookings_customer',handover:'bookings_customer',dues_recovery:'bookings_customer',ticketing:'bookings_customer',contractors:'construction',boq:'finance_admin',variation_orders:'construction',equipment:'construction',labor:'construction',qc:'legal_compliance',designs:'construction',stock:'hr_admin',finance:'finance_admin',approvals:'finance_admin',payment_reminders:'bookings_customer',hr:'hr_admin',documents:'hr_admin',knowledge_base:'hr_admin',tasks:'collaboration',workspace:'collaboration',calendar:'collaboration',announcements:'collaboration',notifications_page:'collaboration',settings:'system'};
 
 // ═══ CRUD ═══
+function askFields(title, fields, onOk){
+  // Generic multi-field modal form (replaces prompt() chains).
+  // fields: [{id, label, req, ph, type}]
+  var body='';
+  for(var i=0;i<fields.length;i++){
+    var f=fields[i];
+    body+='<div class="form-group"><label class="form-label">'+esc(f.label)+
+      (f.req?' <span style="color:#e53935">*</span>':'')+'</label>'+
+      '<input class="form-input" id="af_'+f.id+'" type="'+(f.type||'text')+'"'+
+      (f.ph?' placeholder="'+esc(f.ph)+'"':'')+'>'+(f.hint?'<div style="font-size:9px;color:#999;margin-top:2px">'+esc(f.hint)+'</div>':'')+'</div>';
+  }
+  openModal(title, body, function(){
+    var vals={}, missing=null;
+    for(var i=0;i<fields.length;i++){
+      var f=fields[i];
+      var el=document.getElementById('af_'+f.id);
+      var v=el?el.value.trim():'';
+      if(f.req&&!v){ missing=f.label; break; }
+      vals[f.id]=v;
+    }
+    if(missing){ showToast(missing+' is required','error'); return; }
+    closeDrawer();
+    onOk(vals);
+  });
+  setTimeout(function(){var el=document.getElementById('af_'+(fields[0]||{}).id); if(el)el.focus();},120);
+}
 function openModal(title,body,onSave){
   var d=document.getElementById('appDrawer');
   document.getElementById('drawerTitle').textContent=title;
