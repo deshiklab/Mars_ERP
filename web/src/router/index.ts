@@ -34,6 +34,18 @@ const router = createRouter({
       component: () => import('../views/DuesView.vue'),
       meta: { module: 'dues', title: 'Dues & Collections' }
     },
+    {
+      path: '/projects',
+      name: 'projects',
+      component: () => import('../views/ProjectsView.vue'),
+      meta: { module: 'projects', title: 'Projects' }
+    },
+    {
+      path: '/hr',
+      name: 'hr',
+      component: () => import('../views/EmployeesView.vue'),
+      meta: { module: 'hr', title: 'HR & Employees' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })

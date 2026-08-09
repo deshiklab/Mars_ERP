@@ -11,9 +11,11 @@ import type {
   Booking,
   BootstrapResponse,
   Due,
+  Employee,
   Lead,
   LoginResponse,
-  PipelineResponse
+  PipelineResponse,
+  Project
 } from './types'
 
 const BASE = '/api/method/mars_constech.mars_constech.api'
@@ -133,6 +135,14 @@ class ApiClient {
     const body: Record<string, unknown> = { id, status }
     if (paid !== undefined) body.paid = paid
     return this.request<{ ok: boolean }>('dues_update', { method: 'POST', body })
+  }
+
+  async employeesPipeline(): Promise<ApiResult<PipelineResponse<Employee>>> {
+    return this.request<PipelineResponse<Employee>>('employees_pipeline')
+  }
+
+  async projectsPipeline(): Promise<ApiResult<PipelineResponse<Project>>> {
+    return this.request<PipelineResponse<Project>>('projects_pipeline')
   }
 
   async sync(collection: string): Promise<ApiResult<{ rows: number }>> {

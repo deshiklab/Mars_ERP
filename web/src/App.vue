@@ -27,10 +27,10 @@ function toggleFullscreen() {
 const groups = [
   { id: 'executive', label: 'Executive', icon: '📊', module: 'dashboard', path: '/' },
   { id: 'sales_crm', label: 'Sales & CRM', icon: '🎯', module: 'crm', path: '/leads' },
-  { id: 'land_projects', label: 'Projects', icon: '🏗️', module: 'dashboard', path: '/bookings' },
+  { id: 'land_projects', label: 'Projects', icon: '🏗️', module: 'projects', path: '/projects' },
   { id: 'construction', label: 'Engineering & Construction', icon: '🔧', module: 'dashboard' },
-  { id: 'finance_admin', label: 'Accounts & Finance', icon: '💰', module: 'dashboard', path: '/dues' },
-  { id: 'hr_admin', label: 'Admin & Operations', icon: '💼', module: 'dashboard' },
+  { id: 'finance_admin', label: 'Accounts & Finance', icon: '💰', module: 'dues', path: '/dues' },
+  { id: 'hr_admin', label: 'Admin & Operations', icon: '💼', module: 'hr', path: '/hr' },
   { id: 'collaboration', label: 'Collaboration', icon: '🤝', module: 'dashboard' }
 ]
 

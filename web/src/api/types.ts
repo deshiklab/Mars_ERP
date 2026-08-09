@@ -93,6 +93,51 @@ export interface Due {
   promises?: string
 }
 
+/** An employee record. */
+export interface Employee {
+  id: string
+  name: string
+  designation: string
+  dept: string
+  phone: string
+  email: string
+  joinDate: string
+  salary: number
+  status: string
+  contract: {
+    type: string
+    start: string
+    end: string
+    noticePeriod: number
+    salaryClause: string
+  }
+  insurance: {
+    provider: string
+    policyNo: string
+    coverage: number
+    expiry: string
+  }
+}
+
+/** A construction project. */
+export interface Project {
+  id: string
+  name: string
+  type: string
+  location: string
+  status: string
+  progress: number
+  budget: string
+  manager: string
+  plots: number
+  start: string
+  end: string
+  phase: string
+  desc?: string
+  la_ref?: string
+  milestones?: unknown[]
+}
+
 export interface PipelineResponse<T> {
   [key: string]: T[] | number | string | undefined
 }

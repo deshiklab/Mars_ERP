@@ -1,9 +1,9 @@
 /**
- * Data store — server snapshot (bootstrap) + CRM leads + bookings + dues.
+ * Data store — server snapshot + CRM + bookings + dues + HR + projects.
  */
 import { defineStore } from 'pinia'
 import { api, apiErrorText } from '@/api/client'
-import type { Booking, Due, Lead } from '@/api/types'
+import type { Booking, Due, Employee, Lead, Project } from '@/api/types'
 
 export interface DashboardStats {
   bookings: number
@@ -22,6 +22,10 @@ interface DataState {
   bookingsLoading: boolean
   dues: Due[]
   duesLoading: boolean
+  employees: Employee[]
+  employeesLoading: boolean
+  projects: Project[]
+  projectsLoading: boolean
   error: string
 }
 
@@ -34,6 +38,10 @@ export const useDataStore = defineStore('data', {
     bookingsLoading: false,
     dues: [],
     duesLoading: false,
+    employees: [],
+    employeesLoading: false,
+    projects: [],
+    projectsLoading: false,
     error: ''
   }),
 
@@ -125,6 +133,32 @@ export const useDataStore = defineStore('data', {
       }
       this.error = apiErrorText(r)
       return false
+    },
+
+    async loadEmployees(): Promise<void> {
+      this.employeesLoading = true
+      this.error = ''
+      const r = await api.employeesPipeline()
+      if (r.ok && r.data) {
+        const arr = r.data['employees']
+        this.employees = Array.isArray(arr) ? (arr as Employee[]) : []
+      } else {
+        this.error = apiErrorText(r)
+      }
+      this.employeesLoading = false
+    },
+
+    async loadProjects(): Promise<void> {
+      this.projectsLoading = true
+      this.error = ''
+      const r = await api.projectsPipeline()
+      if (r.ok && r.data) {
+        const arr = r.data['projects']
+        this.projects = Array.isArray(arr) ? (arr as Project[]) : []
+      } else {
+        this.error = apiErrorText(r)
+      }
+      this.projectsLoading = false
     }
   }
 })
