@@ -604,3 +604,154 @@ html, body {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+/* ═══ DARK MODE (mirrors html.dark var swap in the HTML PWA) ═══ */
+html.dark {
+  --rem-blue: #60a5fa;
+  --rem-blue-soft: rgba(59, 130, 246, 0.12);
+  --rem-border: rgba(255, 255, 255, 0.08);
+  --rem-border-strong: rgba(255, 255, 255, 0.1);
+  --rem-text: #e2e8f0;
+  --rem-text-soft: #cbd5e1;
+  --rem-text-muted: #94a3b8;
+  --rem-bg: #07080d;
+  --rem-white: #0e1420;
+  --rem-green: #34d399;
+  --rem-red: #f87171;
+  --rem-orange: #fb923c;
+}
+
+html.dark body,
+html.dark .rem-content {
+  background: #07080d;
+  color: #e2e8f0;
+}
+
+html.dark .rem-sidebar,
+html.dark .rem-topbar,
+html.dark .app-footer,
+html.dark .card,
+html.dark .stat-card,
+html.dark .quick-card,
+html.dark .drawer-sheet,
+html.dark .rem-table thead th,
+html.dark .tbl-toolbar,
+html.dark .card-header {
+  background: #0e1420;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .rem-sidebar-item:hover,
+html.dark .rem-sidebar-item.active,
+html.dark .top-nav-item.active {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+}
+
+html.dark .rem-sidebar-label,
+html.dark .page-subtitle,
+html.dark .tt-label,
+html.dark .stat-card .label,
+html.dark .stat-card .trend {
+  color: #94a3b8;
+}
+
+html.dark .stat-card .value,
+html.dark .card-header h3,
+html.dark .page-title,
+html.dark .rem-table tbody td,
+html.dark .rem-table tbody td div {
+  color: #e2e8f0;
+}
+
+html.dark .rem-table tbody tr:hover {
+  background: rgba(30, 41, 59, 0.4);
+}
+
+html.dark .rem-table thead th {
+  color: #94a3b8;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .rem-table tbody td {
+  border-bottom-color: rgba(255, 255, 255, 0.05);
+}
+
+html.dark .form-input,
+html.dark .action-btn,
+html.dark .tt-btn,
+html.dark .drawer-btn {
+  background: #0e1420;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+}
+
+html.dark .action-btn.primary,
+html.dark .drawer-btn.primary {
+  background: #3b82f6;
+  color: #fff;
+}
+
+html.dark .kanban-col {
+  background: rgba(12, 16, 24, 0.4);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+html.dark .kanban-card {
+  background: #0e1420;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .kanban-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+html.dark .drawer-overlay {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+html.dark .drawer-header,
+html.dark .drawer-footer {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .drawer-header h3 {
+  color: #e2e8f0;
+}
+
+html.dark .crumb-part,
+html.dark .breadcrumb {
+  color: #94a3b8;
+}
+
+html.dark .ft-textsize,
+html.dark .app-footer span,
+html.dark .app-footer button {
+  color: #94a3b8;
+}
+
+html.dark .rem-user-chip {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #60a5fa;
+}
+
+html.dark .pill {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* dark-mode fixes: search bar + global-search dropdown + primary button */
+html.dark #searchBar,
+html.dark #searchDropdown,
+html.dark #searchBar input,
+html.dark #searchDropdown input {
+  background: #0e1420;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+html.dark #searchBar input::placeholder,
+html.dark #searchDropdown input::placeholder {
+  color: #94a3b8;
+}
+html.dark .action-btn.primary {
+  background: #3b82f6 !important;
+  color: #fff !important;
+}

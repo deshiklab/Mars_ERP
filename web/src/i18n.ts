@@ -97,6 +97,19 @@ export const i18n = reactive({
 })
 
 /** Translate a string (falls back to the original). */
+/** Theme store — dark/light toggle (persisted in localStorage). */
+export const theme = reactive({
+  dark: localStorage.getItem('theme') === 'dark',
+  init() {
+    if (this.dark) document.documentElement.classList.add('dark')
+  },
+  toggle() {
+    this.dark = !this.dark
+    document.documentElement.classList.toggle('dark', this.dark)
+    localStorage.setItem('theme', this.dark ? 'dark' : 'light')
+  }
+})
+
 export function _t(s: string): string {
   return i18n.lang === 'bn' ? BN[s] ?? s : s
 }

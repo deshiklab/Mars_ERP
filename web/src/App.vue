@@ -4,7 +4,9 @@ import { RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { GROUPS, groupForPath, moduleForPath } from '@/shell/groups'
 import type { ShellGroup, ShellModule } from '@/shell/groups'
-import { i18n, _t } from '@/i18n'
+import { i18n, _t, theme } from '@/i18n'
+import NotificationsPanel from '@/components/NotificationsPanel.vue'
+import RecentTray from '@/components/RecentTray.vue'
 import GlobalSearch from '@/components/GlobalSearch.vue'
 import QuickAdd from '@/components/QuickAdd.vue'
 import SidebarFlyout from '@/components/SidebarFlyout.vue'
@@ -13,6 +15,9 @@ const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 
+theme.init()
+const notifOpen = ref(false)
+const recentOpen = ref(false)
 const activeGroupId = ref('executive')
 const activeModuleId = ref('dashboard')
 
@@ -171,13 +176,14 @@ function exportCsv() {
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
             </svg>
           </button>
-          <button class="rem-icon-btn" title="Toggle Dark Mode">🌙</button>
+          <button class="rem-icon-btn" :title="theme.dark ? 'Light Mode' : 'Dark Mode'" @click="theme.toggle()">{{ theme.dark ? '☀️' : '🌙' }}</button>
           <button class="rem-icon-btn" title="Theme Palette">🎨</button>
-          <button class="rem-icon-btn" title="Notifications" style="position: relative">
+          <button class="rem-icon-btn" title="Notifications" style="position: relative" @click="notifOpen = true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 15px; height: 15px">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
           </button>
+          <button class="rem-icon-btn" title="Recent Items" style="position: relative; font-size: 15px; line-height: 1" @click="recentOpen = !recentOpen">🕘</button>
           <button class="rem-icon-btn" title="More" style="font-weight: 700">⋯</button>
           <button class="rem-icon-btn" title="Sync all with server (Shift+click = force full refresh)" style="color: #2f80ed">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width: 15px; height: 15px">
@@ -226,7 +232,7 @@ function exportCsv() {
             style="cursor: pointer; font-size: 9px; font-weight: 700; color: #555; padding: 1px 5px; border: 1px solid #d0d8e8; border-radius: 4px"
             @click="i18n.toggle()"
           >{{ i18n.lang === 'bn' ? 'বাং' : 'EN' }}</span>
-          <span class="ft-extra" title="Toggle Theme" style="cursor: pointer; font-size: 12px; padding: 1px 4px; border-radius: 3px">🌙</span>
+          <span class="ft-extra" :title="theme.dark ? 'Light Mode' : 'Dark Mode'" style="cursor: pointer; font-size: 12px; padding: 1px 4px; border-radius: 3px" @click="theme.toggle()">{{ theme.dark ? '☀️' : '🌙' }}</span>
           <span class="ft-extra" style="color: #e0e0e0">|</span>
           <span
             id="footerRoleBtn"
@@ -238,5 +244,8 @@ function exportCsv() {
         </div>
       </div>
     </div>
+      <!-- Notifications + Recent panels -->
+    <NotificationsPanel :open="notifOpen" @close="notifOpen = false" />
+    <RecentTray :open="recentOpen" @close="recentOpen = false" />
   </div>
 </template>
