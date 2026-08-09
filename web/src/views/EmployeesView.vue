@@ -1,21 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import DataTable from '@/components/DataTable.vue'
+import type { TableAction, TableColumn, TableTab } from '@/components/DataTable.vue'
 import type { Employee } from '@/api/types'
 
 const data = useDataStore()
-const deptFilter = ref('')
+const tab = ref('all')
 const detail = ref<Employee | null>(null)
 
 onMounted(() => {
   data.loadEmployees()
-})
-
-const depts = computed(() => [...new Set(data.employees.map((e) => e.dept).filter(Boolean))])
-
-const filtered = computed(() => {
-  if (!deptFilter.value) return data.employees
-  return data.employees.filter((e) => e.dept === deptFilter.value)
 })
 
 function statusStyle(status: string): { bg: string; fg: string } {
@@ -36,75 +31,99 @@ function monthsBetween(from: string): number {
   if (Number.isNaN(d.getTime())) return 0
   return Math.max(0, Math.floor((Date.now() - d.getTime()) / (30.44 * 24 * 3600 * 1000)))
 }
+
+const esc = (s: string) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+
+const avatar = (name: string) =>
+  `<span style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#2f80ed,#0d1b2a);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">${esc(name.split(' ').slice(0, 2).map((w) => w[0]).join(''))}</span>`
+
+const columns = computed<TableColumn<Employee>[]>(() => [
+  {
+    key: 'name',
+    label: 'Employee',
+    renderHtml: (e) =>
+      `<div style="display:flex;align-items:center;gap:8px">${avatar(e.name)}<span style="font-weight:500;color:#333">${esc(e.name)}</span></div>`
+  },
+  { key: 'designation', label: 'Designation', renderHtml: (e) => `<span style="font-size:10px;color:#555">${esc(e.designation)}</span>` },
+  { key: 'dept', label: 'Dept', renderHtml: (e) => `<span style="font-size:10px;color:#555">${esc(e.dept)}</span>` },
+  {
+    key: 'phone',
+    label: 'Contact',
+    renderHtml: (e) =>
+      `<div style="font-size:10px;color:#555">${esc(e.phone)}</div><div style="font-size:9px;color:#888">${esc(e.email)}</div>`
+  },
+  {
+    key: 'joinDate',
+    label: 'Joined',
+    sortable: true,
+    renderHtml: (e) =>
+      `<div style="font-size:10px;color:#555">${esc(e.joinDate)}</div><div style="font-size:9px;color:#888">${monthsBetween(e.joinDate)}mo tenure</div>`
+  },
+  {
+    key: 'salary',
+    label: 'Salary',
+    sortable: true,
+    renderHtml: (e) => `<span style="font-size:10px;color:#333;font-weight:600">${bdt(e.salary)}</span>`
+  },
+  {
+    key: 'status',
+    label: 'Status',
+    sortable: true,
+    renderHtml: (e) => {
+      const s = statusStyle(e.status)
+      return `<span class="pill" style="background:${s.bg};color:${s.fg}">${esc(e.status)}</span>`
+    }
+  }
+])
+
+const depts = computed(() => [...new Set(data.employees.map((e) => e.dept).filter(Boolean))])
+
+const tabs = computed<TableTab[]>(() => [
+  { id: 'all', label: 'All', count: data.employees.length },
+  { id: 'active', label: 'Active', count: data.employees.filter((e) => e.status === 'active').length },
+  { id: 'onleave', label: 'On Leave', count: data.employees.filter((e) => e.status === 'on leave').length },
+  ...depts.value.slice(0, 4).map((d) => ({ id: d, label: d.split(' - ')[0], count: data.employees.filter((e) => e.dept === d).length }))
+])
+
+const tabRows = computed(() => {
+  if (tab.value === 'all') return data.employees
+  if (tab.value === 'active') return data.employees.filter((e) => e.status === 'active')
+  if (tab.value === 'onleave') return data.employees.filter((e) => e.status === 'on leave')
+  return data.employees.filter((e) => e.dept === tab.value)
+})
+
+function onTabChange(t: string) {
+  tab.value = t
+}
+
+const actions = computed<TableAction[]>(() => [
+  { label: 'View Profile', icon: '👁', onClick: (r) => (detail.value = r as unknown as Employee) },
+  { label: 'View Contract', icon: '📄', onClick: (r) => (detail.value = r as unknown as Employee) },
+  { label: 'Mark On Leave', icon: '🏖', onClick: (r) => (detail.value = r as unknown as Employee) }
+])
 </script>
 
 <template>
   <div class="fade-in">
     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px">
       <span class="page-title">HR & Employees</span>
-      <span class="page-subtitle">{{ data.employees.length }} employees · {{ data.employees.filter((e) => e.status === 'active').length }} active</span>
-      <div style="margin-left: auto">
-        <select
-          v-model="deptFilter"
-          style="padding: 3px 8px; font-size: 10px; border: 1px solid #e0e0e0; border-radius: 6px; outline: none; color: #555; background: #fff"
-        >
-          <option value="">All departments</option>
-          <option v-for="d in depts" :key="d" :value="d">{{ d }}</option>
-        </select>
-      </div>
+      <span class="page-subtitle">
+        {{ data.employees.length }} employees · {{ data.employees.filter((e) => e.status === 'active').length }} active
+      </span>
     </div>
 
     <p v-if="data.error" style="font-size: 11px; color: #c62828; margin: 6px 0">{{ data.error }}</p>
     <p v-if="data.employeesLoading" style="font-size: 11px; color: #888; padding: 16px">Loading employees…</p>
 
-    <div v-else class="card">
-      <div class="table-wrap">
-        <table class="rem-table">
-          <thead>
-            <tr>
-              <th>Employee</th>
-              <th>Designation</th>
-              <th>Dept</th>
-              <th>Contact</th>
-              <th>Joined</th>
-              <th>Salary</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="e in filtered" :key="e.id" style="cursor: pointer" @click="detail = e">
-              <td>
-                <div style="display: flex; align-items: center; gap: 8px">
-                  <span
-                    style="width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, #2f80ed, #0d1b2a); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700"
-                  >{{ e.name.split(' ').slice(0, 2).map((w) => w[0]).join('') }}</span>
-                  <span style="font-weight: 500; color: #333">{{ e.name }}</span>
-                </div>
-              </td>
-              <td style="font-size: 10px; color: #555">{{ e.designation }}</td>
-              <td style="font-size: 10px; color: #555">{{ e.dept }}</td>
-              <td>
-                <div style="font-size: 10px; color: #555">{{ e.phone }}</div>
-                <div style="font-size: 9px; color: #888">{{ e.email }}</div>
-              </td>
-              <td style="font-size: 10px; color: #555">
-                {{ e.joinDate }}
-                <div style="font-size: 9px; color: #888">{{ monthsBetween(e.joinDate) }}mo tenure</div>
-              </td>
-              <td style="font-size: 10px; color: #333; font-weight: 600">{{ bdt(e.salary) }}</td>
-              <td>
-                <span class="pill" :style="{ background: statusStyle(e.status).bg, color: statusStyle(e.status).fg }">
-                  {{ e.status }}
-                </span>
-              </td>
-            </tr>
-            <tr v-if="filtered.length === 0">
-              <td colspan="7" style="text-align: center; color: #888; padding: 20px; font-size: 11px">No employees found</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <DataTable
+      v-else
+      :columns="columns"
+      :rows="tabRows"
+      :tabs="tabs"
+      :actions="actions"
+      search-placeholder="Search employees, departments…"
+      @tab-change="onTabChange"
+    />
 
     <!-- Employee detail drawer -->
     <div v-if="detail" class="drawer-overlay active" @click.self="detail = null">
@@ -126,14 +145,14 @@ function monthsBetween(from: string): number {
           </div>
 
           <h4 style="font-size: 12px; color: #333; margin: 14px 0 8px">Contract</h4>
-          <div style="font-size: 11px; color: #555; line-height: 1.8" v-if="detail.contract">
+          <div v-if="detail.contract" style="font-size: 11px; color: #555; line-height: 1.8">
             <div><span style="color: #888">Type:</span> {{ detail.contract.type }}</div>
             <div><span style="color: #888">Period:</span> {{ detail.contract.start }} → {{ detail.contract.end || '—' }}</div>
             <div><span style="color: #888">Notice period:</span> {{ detail.contract.noticePeriod ?? '—' }} days</div>
           </div>
 
           <h4 style="font-size: 12px; color: #333; margin: 14px 0 8px">Insurance</h4>
-          <div style="font-size: 11px; color: #555; line-height: 1.8" v-if="detail.insurance">
+          <div v-if="detail.insurance" style="font-size: 11px; color: #555; line-height: 1.8">
             <div><span style="color: #888">Provider:</span> {{ detail.insurance.provider }}</div>
             <div><span style="color: #888">Policy:</span> {{ detail.insurance.policyNo }}</div>
             <div><span style="color: #888">Coverage:</span> <b style="color: #2e7d32">{{ bdt(detail.insurance.coverage) }}</b></div>

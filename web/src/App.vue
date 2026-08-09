@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { GROUPS, groupForPath, moduleForPath } from '@/shell/groups'
@@ -32,16 +32,20 @@ function switchModule(m: ShellModule) {
   if (m.path) router.push(m.path)
 }
 
-/* sync active group/module from the current route */
-function syncFromRoute() {
-  const g = groupForPath(route.path)
-  if (g) {
-    activeGroupId.value = g.id
-    const m = moduleForPath(route.path)
-    if (m) activeModuleId.value = m.id
-  }
-}
-syncFromRoute()
+/* sync active group/module whenever the route changes (sidebar, tabs,
+   quick cards, breadcrumb, or direct navigation) */
+watch(
+  () => route.path,
+  (path) => {
+    const g = groupForPath(path)
+    if (g) {
+      activeGroupId.value = g.id
+      const m = moduleForPath(path)
+      if (m) activeModuleId.value = m.id
+    }
+  },
+  { immediate: true }
+)
 
 const activeGroup = computed(() => GROUPS.find((g) => g.id === activeGroupId.value) ?? GROUPS[0])
 const activeModule = computed(() => activeGroup.value.mods.find((m) => m.id === activeModuleId.value))
@@ -77,7 +81,7 @@ function exportCsv() {
 
 <template>
   <div class="app-shell">
-    <!-- ═══ SIDEBAR (mirrors the HTML PWA: SVG icons, separators) ═══ -->
+    <!-- ═══ SIDEBAR ═══ -->
     <aside class="rem-sidebar">
       <div class="rem-sidebar-logo" @click="router.push('/')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -104,7 +108,7 @@ function exportCsv() {
 
     <!-- ═══ MAIN COLUMN ═══ -->
     <div style="display: flex; flex-direction: column; flex: 1; min-width: 0">
-      <!-- TOP BAR: title + top tabs + actions -->
+      <!-- TOP BAR -->
       <header class="rem-topbar" style="gap: 8px; padding: 0 10px">
         <span class="rem-topbar-title" style="font-size: 11px">🏗️ MARS Constech</span>
 
@@ -158,7 +162,7 @@ function exportCsv() {
         <RouterView />
       </main>
 
-      <!-- ═══ FOOTER: breadcrumb strip (REM ERP › Group › Module) ═══ -->
+      <!-- FOOTER: breadcrumb -->
       <div
         class="app-footer"
         style="height: 28px; min-height: 28px; background: #fff; border-top: 1px solid #e8e8e8; display: flex; align-items: center; padding: 0 12px; font-size: 10px; color: #888; justify-content: space-between"

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import DataTable from '@/components/DataTable.vue'
+import type { TableAction, TableColumn, TableTab } from '@/components/DataTable.vue'
 import type { Project } from '@/api/types'
 
 const data = useDataStore()
-const statusFilter = ref('')
+const tab = ref('all')
 const detail = ref<Project | null>(null)
 
 onMounted(() => {
@@ -24,83 +26,95 @@ function statusStyle(status: string): { bg: string; fg: string } {
   return { bg, fg }
 }
 
-const filtered = computed(() => {
-  if (!statusFilter.value) return data.projects
-  return data.projects.filter((p) => p.status === statusFilter.value)
-})
-
 function progressColor(p: number): string {
   if (p >= 70) return '#2e7d32'
   if (p >= 40) return '#2f80ed'
   if (p > 0) return '#ff8f00'
   return '#e0e0e0'
 }
+
+const esc = (s: string) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+
+const columns = computed<TableColumn<Project>[]>(() => [
+  {
+    key: 'name',
+    label: 'Project',
+    renderHtml: (p) =>
+      `<div style="font-weight:500;color:#333">${esc(p.name)}</div><div style="font-size:9px;color:#888">${esc(p.id)}</div>`
+  },
+  { key: 'type', label: 'Type', renderHtml: (p) => `<span style="font-size:10px;color:#555">${esc(p.type)}</span>` },
+  { key: 'location', label: 'Location', renderHtml: (p) => `<span style="font-size:10px;color:#555">${esc(p.location || '—')}</span>` },
+  {
+    key: 'progress',
+    label: 'Progress',
+    sortable: true,
+    renderHtml: (p) =>
+      `<div style="display:flex;align-items:center;gap:6px;min-width:90px">
+        <div style="flex:1;height:4px;background:#e0e0e0;border-radius:2px;overflow:hidden">
+          <div style="height:100%;border-radius:2px;background:${progressColor(p.progress)};width:${Math.min(100, p.progress)}%"></div>
+        </div>
+        <span style="font-size:9px;color:#888;font-weight:600">${p.progress}%</span>
+      </div>`
+  },
+  { key: 'budget', label: 'Budget', renderHtml: (p) => `<span style="font-size:10px;color:#555">${esc(p.budget || '—')}</span>` },
+  { key: 'manager', label: 'Manager', renderHtml: (p) => `<span style="font-size:10px;color:#555">${esc(p.manager || '—')}</span>` },
+  {
+    key: 'status',
+    label: 'Status',
+    sortable: true,
+    renderHtml: (p) => {
+      const s = statusStyle(p.status)
+      return `<span class="pill" style="background:${s.bg};color:${s.fg}">${esc(p.status)}</span>`
+    }
+  }
+])
+
+const tabs = computed<TableTab[]>(() => [
+  { id: 'all', label: 'All', count: data.projects.length },
+  { id: 'progress', label: 'In Progress', count: data.projects.filter((p) => p.status === 'In Progress').length },
+  { id: 'planning', label: 'Planning', count: data.projects.filter((p) => p.status === 'Planning').length },
+  { id: 'completed', label: 'Completed', count: data.projects.filter((p) => p.status === 'Completed').length },
+  { id: 'hold', label: 'On Hold', count: data.projects.filter((p) => p.status === 'On Hold').length }
+])
+
+const tabRows = computed(() => {
+  if (tab.value === 'all') return data.projects
+  const map: Record<string, string> = { progress: 'In Progress', planning: 'Planning', completed: 'Completed', hold: 'On Hold' }
+  const st = map[tab.value]
+  return st ? data.projects.filter((p) => p.status === st) : data.projects
+})
+
+function onTabChange(t: string) {
+  tab.value = t
+}
+
+const actions = computed<TableAction[]>(() => [
+  { label: 'View Details', icon: '👁', onClick: (r) => (detail.value = r as unknown as Project) },
+  { label: 'Open Acquisition', icon: '📋', onClick: (r) => (detail.value = r as unknown as Project) }
+])
 </script>
 
 <template>
   <div class="fade-in">
     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px">
       <span class="page-title">Projects</span>
-      <span class="page-subtitle">{{ data.projects.length }} projects · {{ data.projects.filter((p) => p.status === 'In Progress').length }} in progress</span>
-      <div style="margin-left: auto">
-        <select
-          v-model="statusFilter"
-          style="padding: 3px 8px; font-size: 10px; border: 1px solid #e0e0e0; border-radius: 6px; outline: none; color: #555; background: #fff"
-        >
-          <option value="">All statuses</option>
-          <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
-        </select>
-      </div>
+      <span class="page-subtitle">
+        {{ data.projects.length }} projects · {{ data.projects.filter((p) => p.status === 'In Progress').length }} in progress
+      </span>
     </div>
 
     <p v-if="data.error" style="font-size: 11px; color: #c62828; margin: 6px 0">{{ data.error }}</p>
     <p v-if="data.projectsLoading" style="font-size: 11px; color: #888; padding: 16px">Loading projects…</p>
 
-    <div v-else class="card">
-      <div class="table-wrap">
-        <table class="rem-table">
-          <thead>
-            <tr>
-              <th>Project</th>
-              <th>Type</th>
-              <th>Location</th>
-              <th>Progress</th>
-              <th>Budget</th>
-              <th>Manager</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="p in filtered" :key="p.id" style="cursor: pointer" @click="detail = p">
-              <td>
-                <div style="font-weight: 500; color: #333">{{ p.name }}</div>
-                <div style="font-size: 9px; color: #888">{{ p.id }}</div>
-              </td>
-              <td style="font-size: 10px; color: #555">{{ p.type }}</td>
-              <td style="font-size: 10px; color: #555">{{ p.location || '—' }}</td>
-              <td style="min-width: 90px">
-                <div style="display: flex; align-items: center; gap: 6px">
-                  <div style="flex: 1; height: 4px; background: #e0e0e0; border-radius: 2px; overflow: hidden">
-                    <div style="height: 100%; border-radius: 2px; transition: width 0.3s" :style="{ width: `${Math.min(100, p.progress)}%`, background: progressColor(p.progress) }"></div>
-                  </div>
-                  <span style="font-size: 9px; color: #888; font-weight: 600">{{ p.progress }}%</span>
-                </div>
-              </td>
-              <td style="font-size: 10px; color: #555">{{ p.budget || '—' }}</td>
-              <td style="font-size: 10px; color: #555">{{ p.manager || '—' }}</td>
-              <td>
-                <span class="pill" :style="{ background: statusStyle(p.status).bg, color: statusStyle(p.status).fg }">
-                  {{ p.status }}
-                </span>
-              </td>
-            </tr>
-            <tr v-if="filtered.length === 0">
-              <td colspan="7" style="text-align: center; color: #888; padding: 20px; font-size: 11px">No projects found</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <DataTable
+      v-else
+      :columns="columns"
+      :rows="tabRows"
+      :tabs="tabs"
+      :actions="actions"
+      search-placeholder="Search projects…"
+      @tab-change="onTabChange"
+    />
 
     <!-- Project detail drawer -->
     <div v-if="detail" class="drawer-overlay active" @click.self="detail = null">
