@@ -74,7 +74,7 @@ export const GROUPS: ShellGroup[] = [
     svg: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
     module: 'dashboard',
     mods: [
-      { id: 'contractors', label: 'Contractors' },
+      { id: 'contractors', label: 'Contractors', path: '/contractors' },
       { id: 'variation_orders', label: 'Variation Orders' },
       { id: 'equipment', label: 'Equipment' },
       { id: 'labor', label: 'Labor Mgmt' },
@@ -87,7 +87,7 @@ export const GROUPS: ShellGroup[] = [
     svg: '<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
     module: 'dues',
     mods: [
-      { id: 'finance', label: 'Finance' },
+      { id: 'finance', label: 'Finance', path: '/finance' },
       { id: 'party_ledger', label: 'Party Ledger' },
       { id: 'payment_heatmap', label: 'Payment Heatmap' },
       { id: 'approvals', label: 'Financial Approvals' },
@@ -105,7 +105,7 @@ export const GROUPS: ShellGroup[] = [
       { id: 'hr', label: 'HR', path: '/hr' },
       { id: 'documents', label: 'Documents Vault' },
       { id: 'knowledge_base', label: 'Knowledge Base' },
-      { id: 'stock', label: 'Stock & Procurement' }
+      { id: 'stock', label: 'Stock & Procurement', path: '/stock' }
     ]
   },
   {

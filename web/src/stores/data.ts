@@ -3,7 +3,7 @@
  */
 import { defineStore } from 'pinia'
 import { api, apiErrorText } from '@/api/client'
-import type { Booking, Due, Employee, Lead, Project } from '@/api/types'
+import type { Booking, CoaAccount, Contractor, Due, Employee, Invoice, Lead, Payment, Project, PurchaseOrder, StockItem } from '@/api/types'
 
 export interface DashboardStats {
   bookings: number
@@ -26,6 +26,18 @@ interface DataState {
   employeesLoading: boolean
   projects: Project[]
   projectsLoading: boolean
+  inventory: StockItem[]
+  inventoryLoading: boolean
+  pos: PurchaseOrder[]
+  posLoading: boolean
+  invoices: Invoice[]
+  invoicesLoading: boolean
+  payments: Payment[]
+  paymentsLoading: boolean
+  coa: CoaAccount[]
+  coaLoading: boolean
+  contractors: Contractor[]
+  contractorsLoading: boolean
   error: string
 }
 
@@ -42,6 +54,18 @@ export const useDataStore = defineStore('data', {
     employeesLoading: false,
     projects: [],
     projectsLoading: false,
+    inventory: [],
+    inventoryLoading: false,
+    pos: [],
+    posLoading: false,
+    invoices: [],
+    invoicesLoading: false,
+    payments: [],
+    paymentsLoading: false,
+    coa: [],
+    coaLoading: false,
+    contractors: [],
+    contractorsLoading: false,
     error: ''
   }),
 
@@ -159,6 +183,66 @@ export const useDataStore = defineStore('data', {
         this.error = apiErrorText(r)
       }
       this.projectsLoading = false
+    },
+
+    async loadInventory(): Promise<void> {
+      this.inventoryLoading = true
+      const r = await api.inventoryPipeline()
+      if (r.ok && r.data) {
+        const arr = r.data['inventory']
+        this.inventory = Array.isArray(arr) ? (arr as StockItem[]) : []
+      } else this.error = apiErrorText(r)
+      this.inventoryLoading = false
+    },
+
+    async loadPos(): Promise<void> {
+      this.posLoading = true
+      const r = await api.poPipeline()
+      if (r.ok && r.data) {
+        const arr = r.data['pos']
+        this.pos = Array.isArray(arr) ? (arr as PurchaseOrder[]) : []
+      } else this.error = apiErrorText(r)
+      this.posLoading = false
+    },
+
+    async loadFinance(): Promise<void> {
+      this.coaLoading = true
+      const r = await api.financePipeline()
+      if (r.ok && r.data) {
+        const arr = r.data['coa']
+        this.coa = Array.isArray(arr) ? (arr as CoaAccount[]) : []
+      } else this.error = apiErrorText(r)
+      this.coaLoading = false
+    },
+
+    async loadInvoices(): Promise<void> {
+      this.invoicesLoading = true
+      const r = await api.invoicesPipeline()
+      if (r.ok && r.data) {
+        const arr = r.data['invoices']
+        this.invoices = Array.isArray(arr) ? (arr as Invoice[]) : []
+      } else this.error = apiErrorText(r)
+      this.invoicesLoading = false
+    },
+
+    async loadPayments(): Promise<void> {
+      this.paymentsLoading = true
+      const r = await api.paymentsPipeline()
+      if (r.ok && r.data) {
+        const arr = r.data['payments']
+        this.payments = Array.isArray(arr) ? (arr as Payment[]) : []
+      } else this.error = apiErrorText(r)
+      this.paymentsLoading = false
+    },
+
+    async loadContractors(): Promise<void> {
+      this.contractorsLoading = true
+      const r = await api.contractorsPipeline()
+      if (r.ok && r.data) {
+        const arr = r.data['contractors']
+        this.contractors = Array.isArray(arr) ? (arr as Contractor[]) : []
+      } else this.error = apiErrorText(r)
+      this.contractorsLoading = false
     }
   }
 })

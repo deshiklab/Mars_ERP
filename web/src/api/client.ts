@@ -10,12 +10,18 @@ import type {
   ApiError,
   Booking,
   BootstrapResponse,
+  CoaAccount,
+  Contractor,
   Due,
   Employee,
+  Invoice,
   Lead,
   LoginResponse,
+  Payment,
   PipelineResponse,
-  Project
+  Project,
+  PurchaseOrder,
+  StockItem
 } from './types'
 
 const BASE = '/api/method/mars_constech.mars_constech.api'
@@ -143,6 +149,31 @@ class ApiClient {
 
   async projectsPipeline(): Promise<ApiResult<PipelineResponse<Project>>> {
     return this.request<PipelineResponse<Project>>('projects_pipeline')
+  }
+
+
+  async inventoryPipeline(): Promise<ApiResult<PipelineResponse<StockItem>>> {
+    return this.request<PipelineResponse<StockItem>>('inventory_pipeline')
+  }
+
+  async poPipeline(): Promise<ApiResult<PipelineResponse<PurchaseOrder>>> {
+    return this.request<PipelineResponse<PurchaseOrder>>('po_pipeline')
+  }
+
+  async financePipeline(): Promise<ApiResult<PipelineResponse<CoaAccount>>> {
+    return this.request<PipelineResponse<CoaAccount>>('finance_pipeline')
+  }
+
+  async invoicesPipeline(): Promise<ApiResult<PipelineResponse<Invoice>>> {
+    return this.request<PipelineResponse<Invoice>>('invoices_pipeline')
+  }
+
+  async paymentsPipeline(): Promise<ApiResult<PipelineResponse<Payment>>> {
+    return this.request<PipelineResponse<Payment>>('payments_pipeline')
+  }
+
+  async contractorsPipeline(): Promise<ApiResult<PipelineResponse<Contractor>>> {
+    return this.request<PipelineResponse<Contractor>>('contractors_pipeline')
   }
 
   async sync(collection: string): Promise<ApiResult<{ rows: number }>> {

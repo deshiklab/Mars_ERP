@@ -46,6 +46,24 @@ const router = createRouter({
       component: () => import('../views/EmployeesView.vue'),
       meta: { module: 'hr', title: 'HR & Employees' }
     },
+    {
+      path: '/stock',
+      name: 'stock',
+      component: () => import('../views/StockView.vue'),
+      meta: { module: 'stock', title: 'Stock & Procurement' }
+    },
+    {
+      path: '/finance',
+      name: 'finance',
+      component: () => import('../views/FinanceView.vue'),
+      meta: { module: 'finance', title: 'Finance' }
+    },
+    {
+      path: '/contractors',
+      name: 'contractors',
+      component: () => import('../views/ContractorsView.vue'),
+      meta: { module: 'contractors', title: 'Contractors' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })

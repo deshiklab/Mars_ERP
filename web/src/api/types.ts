@@ -148,3 +148,77 @@ export interface ApiError {
   exception?: string
   exc_type?: string
 }
+
+/** A stock inventory item. */
+export interface StockItem {
+  id: string
+  site: string
+  item: string
+  category: string
+  qty: number
+  unit: string
+  price: number
+  value: number
+  status: string
+  reorder: number
+}
+
+/** A purchase order. */
+export interface PurchaseOrder {
+  id: string
+  date: string
+  vendor: string
+  site: string
+  items: string
+  amount: number
+  fmt: string
+  dueDate: string
+  status: string
+  category: string
+}
+
+/** A sales invoice. */
+export interface Invoice {
+  id: string
+  client: string
+  project: string
+  unit: string
+  amount: number
+  status: string
+  dueDate: string
+  issuedDate: string
+  desc: string
+  items: unknown[]
+}
+
+/** A payment record. */
+export interface Payment {
+  id: string
+  invoiceId: string
+  client: string
+  amount: number
+  date: string
+  method: string
+  reference: string
+  status: string
+  notes: string
+}
+
+/** A chart-of-accounts entry. */
+export interface CoaAccount {
+  code: string
+  name: string
+  type: string
+  balance: string
+}
+
+/** A contractor. */
+export interface Contractor {
+  id: string
+  name: string
+  specialty: string
+  phone: string
+  status: string
+  rating?: number
+  contracts?: number
+}
