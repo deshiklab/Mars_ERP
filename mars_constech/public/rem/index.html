@@ -1149,6 +1149,14 @@ const API_EPS = [
   {n:'booking_payment', m:'POST', grp:'crm', d:'Record Payment Entry', b:'{"name":"BKG-...","amount":5000000}'},
   {n:'dues_pipeline', m:'GET', grp:'crm', d:'Dues & Recovery: unpaid installments + invoice outstanding'},
   {n:'dues_update', m:'POST', grp:'crm', d:'Record follow-up / promise on a booking', b:'{"id":"BKG-00004","last_follow_up":"2026-08-09","notes":"...","promise_amount":5000000}'},
+  // — HR —
+  {n:'employees_pipeline', m:'GET', grp:'crm', d:'Employees (native Employee doctype)'},
+  {n:'employees_sync', m:'POST', grp:'crm', d:'Upsert employees', b:'{"employees":[]}'},
+  {n:'attendance_pipeline', m:'GET', grp:'crm', d:'Attendance (REM Attendance)'},
+  {n:'attendance_sync', m:'POST', grp:'crm', d:'Upsert attendance', b:'{"attendance":[]}'},
+  {n:'leave_pipeline', m:'GET', grp:'crm', d:'Leave requests (REM Leave)'},
+  {n:'leave_sync', m:'POST', grp:'crm', d:'Upsert leave requests', b:'{"leave":[]}'},
+  {n:'shifts_pipeline', m:'GET', grp:'crm', d:'Shifts (REM Shift)'},
   // — Projects & Tasks —
   {n:'projects_pipeline', m:'GET', grp:'projects', d:'Projects'},
   {n:'projects_sync', m:'POST', grp:'projects', d:'Upsert projects', b:'{"projects":[]}'},
@@ -11158,6 +11166,57 @@ function openSupplier(id){
 var hrTab='dashboard';
 function hrEmpName(id){var e=mockEmployees.find(function(x){return x.id===id});return e?e.name:'Unknown';}
 function hrEmpDept(id){var e=mockEmployees.find(function(x){return x.id===id});return e?e.dept:'—';}
+
+// ═══ HR ERP BRIDGE (Milestone B) ═══
+function hrPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  showToast('Loading HR data from ERPNext…','info');
+  var pulls=[];
+  if(hrTab==='employees'||hrTab==='dashboard') pulls.push(['employees_pipeline','employees','mockEmployees']);
+  if(hrTab==='attendance'||hrTab==='dashboard') pulls.push(['attendance_pipeline','attendance','mockHRAttendance']);
+  if(hrTab==='leave'||hrTab==='dashboard') pulls.push(['leave_pipeline','leave','mockLeave']);
+  if(hrTab==='shifts'||hrTab==='dashboard') pulls.push(['shifts_pipeline','shifts',null]);
+  if(!pulls.length) pulls.push(['employees_pipeline','employees','mockEmployees']);
+  var done=0, total=pulls.length, nSynced=0, firstErr=null;
+  pulls.forEach(function(p){
+    API.call(p[0]).then(function(r){
+      done++;
+      if(r.ok && r.data && Array.isArray(r.data[p[1]])){
+        var rows=r.data[p[1]];
+        if(p[2]==='mockEmployees'){
+          rows.forEach(function(ep){
+            var ex=mockEmployees.find(function(x){return String(x.id)===String(ep.id)||(x.email&&ep.email&&String(x.email).toLowerCase()===String(ep.email).toLowerCase());});
+            if(ex){ Object.assign(ex,ep); } else { mockEmployees.push(ep); }
+          });
+          DB.save('employees');
+        } else if(p[2]==='mockHRAttendance'){
+          var added=0;
+          rows.forEach(function(a){
+            var ex=mockHRAttendance.find(function(x){return String(x.employeeId)===String(a.employeeId)&&String(x.date)===String(a.date);});
+            if(ex){ Object.assign(ex,a); } else { mockHRAttendance.push(a); added++; }
+          });
+          DB.save('hr_attendance');
+        } else if(p[2]==='mockLeave'){
+          var addedL=0;
+          rows.forEach(function(l){
+            var ex=mockLeave.find(function(x){return String(x.employeeId)===String(l.employeeId)&&String(x.from)===String(l.from)&&String(x.type)===String(l.type);});
+            if(ex){ Object.assign(ex,l); } else { mockLeave.push(l); addedL++; }
+          });
+          DB.save('leave');
+        }
+        nSynced+=rows.length;
+      } else if(!firstErr){
+        firstErr=(r.data&&r.data.error)||('HTTP '+r.status);
+      }
+      if(done===total){
+        if(firstErr) showToast('Partial sync: '+nSynced+' rows, error: '+firstErr,'error');
+        else showToast('Synced '+nSynced+' HR rows from ERPNext','success');
+        renderModule();
+      }
+    });
+  });
+}
+
 function renderHR(el){
   hrTab=hrTab||'dashboard';
   var total=mockEmployees.length;
@@ -11169,6 +11228,7 @@ function renderHR(el){
     '<div class="toolbar" style="margin-bottom:6px">'+
       '<div class="tabs">'+[['dashboard','📊 Dashboard'],['employees','👥 Employees'],['attendance','📅 Attendance'],['leave','🏖 Leave'],['timesheets','⏱ Timesheets'],['shifts','🕒 Shifts'],['payroll','💰 Payroll'],['recruitment','📢 Recruitment']].map(function(t){return '<div class="tab '+(hrTab===t[0]?'active':'')+'" onclick="hrTab=\''+t[0]+'\';_PG={};renderModule()">'+t[1]+'</div>';}).join('')+'</div>'+
       '<div class="spacer"></div>'+
+      '<button class="action-btn secondary" onclick="hrPullFromERP()" style="padding:3px 8px;font-size:10px;display:'+(hrTab==='employees'||hrTab==='attendance'||hrTab==='leave'||hrTab==='shifts'?'':'none')+'" title="Load real HR data from ERPNext">🔄 Sync from ERP</button>'+
       '<button class="action-btn primary" onclick="crudEmployee()" data-perm="HR:Create" style="padding:3px 8px;font-size:10px;display:'+(hrTab==='employees'?'':'none')+'">+ Add Employee</button>'+
       '<button class="action-btn primary" onclick="crudLeave()" data-perm="HR:Create" style="padding:3px 8px;font-size:10px;display:'+(hrTab==='leave'?'':'none')+'">+ New Request</button>'+
       '<button class="action-btn primary" onclick="crudTimesheet()" data-perm="HR:Create" style="padding:3px 8px;font-size:10px;display:'+(hrTab==='timesheets'?'':'none')+'>+ Add Entry</button>'+

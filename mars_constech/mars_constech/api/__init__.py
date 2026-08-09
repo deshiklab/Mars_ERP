@@ -1673,6 +1673,302 @@ def settings_set(settings=None):
 	return _rem_settings()
 
 
+
+# ═══ HR BRIDGE (Milestone B) ═══
+_HR_STATUS_MAP = {
+    "Active": "active", "Inactive": "inactive", "Left": "left",
+}
+
+
+@frappe.whitelist()
+def employees_pipeline():
+    """Real employees from the native Employee doctype (PWA contract)."""
+    rows = frappe.get_all(
+        "Employee",
+        filters={"status": ["in", ["Active", "Inactive", "Left"]]},
+        fields=["name", "employee_name", "designation", "department", "cell_number",
+                "personal_email", "date_of_joining", "status", "ctc",
+                "custom_rem_ref", "custom_contract_type", "custom_contract_start",
+                "custom_contract_end", "custom_notice_days", "custom_salary_clause",
+                "custom_insurance_provider", "custom_insurance_policy",
+                "custom_insurance_coverage", "custom_insurance_expiry"],
+        order_by="creation desc",
+        limit_page_length=500,
+    )
+    out = []
+    for e in rows:
+        out.append({
+            "id": e.custom_rem_ref or e.name,
+            "name": e.employee_name or "",
+            "designation": e.designation or "",
+            "dept": e.department or "",
+            "phone": e.cell_number or "",
+            "email": e.personal_email or "",
+            "joinDate": str(e.date_of_joining or "")[:10],
+            "salary": e.ctc or 0,
+            "status": _HR_STATUS_MAP.get(e.status, (e.status or "active").lower()),
+            "contract": {
+                "type": e.custom_contract_type or "Permanent",
+                "start": str(e.custom_contract_start or "")[:10],
+                "end": str(e.custom_contract_end or "")[:10],
+                "noticePeriod": e.custom_notice_days or 30,
+                "salaryClause": e.custom_salary_clause or "",
+            },
+            "insurance": {
+                "provider": e.custom_insurance_provider or "",
+                "policyNo": e.custom_insurance_policy or "",
+                "coverage": e.custom_insurance_coverage or 0,
+                "expiry": str(e.custom_insurance_expiry or "")[:10],
+            },
+        })
+    return {"count": len(out), "employees": out}
+
+
+@frappe.whitelist()
+def employees_sync(employees=None):
+    """Upsert employees from the PWA (dedupe via custom_rem_ref or email)."""
+    if not employees or not isinstance(employees, list):
+        frappe.throw(_("employees must be a list"), frappe.ValidationError)
+    created = updated = 0
+    for emp in employees:
+        name = frappe.db.get_value("Employee", {"custom_rem_ref": emp.get("id")}, "name")
+        if not name and emp.get("email"):
+            name = frappe.db.get_value("Employee", {"personal_email": emp.get("email")}, "name")
+        if name:
+            doc = frappe.get_doc("Employee", name)
+            created_flag = False
+        else:
+            doc = frappe.new_doc("Employee")
+            doc.first_name = (emp.get("name") or "").split(" ")[0] or "Employee"
+            if " " in (emp.get("name") or ""):
+                doc.last_name = (emp.get("name") or "").split(" ", 1)[1]
+            doc.status = "Active"
+            doc.company = _get_company()
+            created_flag = True
+        if emp.get("designation"):
+            doc.designation = _resolve_designation(emp.get("designation"))
+        if emp.get("dept"):
+            doc.department = _resolve_department(emp.get("dept"))
+        if emp.get("phone"):
+            doc.cell_number = str(emp.get("phone"))
+        if emp.get("email"):
+            doc.personal_email = str(emp.get("email"))
+        if emp.get("joinDate"):
+            doc.date_of_joining = emp.get("joinDate")
+        if emp.get("salary"):
+            doc.ctc = emp.get("salary")
+        doc.custom_rem_ref = str(emp.get("id") or "")
+        c = emp.get("contract") or {}
+        if c:
+            doc.custom_contract_type = c.get("type") or "Permanent"
+            if c.get("start"):
+                doc.custom_contract_start = c.get("start")
+            if c.get("end"):
+                doc.custom_contract_end = c.get("end")
+            doc.custom_notice_days = c.get("noticePeriod") or 30
+            doc.custom_salary_clause = c.get("salaryClause") or ""
+        ins = emp.get("insurance") or {}
+        if ins:
+            doc.custom_insurance_provider = ins.get("provider") or ""
+            doc.custom_insurance_policy = ins.get("policyNo") or ""
+            doc.custom_insurance_coverage = ins.get("coverage") or 0
+            if ins.get("expiry"):
+                doc.custom_insurance_expiry = ins.get("expiry")
+        doc.flags.ignore_mandatory = True
+        doc.save(ignore_permissions=True)
+        if created_flag:
+            created += 1
+        else:
+            updated += 1
+    frappe.db.commit()
+    return {"created": created, "updated": updated}
+
+
+def _resolve_designation(name):
+    d = frappe.db.get_value("Designation", {"designation_name": name}, "name")
+    if d:
+        return d
+    doc = frappe.new_doc("Designation")
+    doc.designation_name = str(name)[:140]
+    doc.flags.ignore_mandatory = True
+    doc.save(ignore_permissions=True)
+    return doc.name
+
+
+def _resolve_department(name):
+    d = frappe.db.get_value("Department", {"department_name": name}, "name")
+    if d:
+        return d
+    doc = frappe.new_doc("Department")
+    doc.department_name = str(name)[:140]
+    doc.flags.ignore_mandatory = True
+    doc.save(ignore_permissions=True)
+    return doc.name
+
+
+def _emp_id_map():
+    """native Employee name -> PWA id (custom_rem_ref or name)."""
+    m = {}
+    for r in frappe.get_all("Employee", fields=["name", "custom_rem_ref"], limit_page_length=2000):
+        m[r.name] = r.custom_rem_ref or r.name
+    return m
+
+
+@frappe.whitelist()
+def attendance_pipeline():
+    """Real attendance from REM Attendance doctype."""
+    rows = frappe.get_all(
+        "REM Attendance",
+        fields=["name", "employee", "employee_name", "attendance_date", "status",
+                "shift", "in_time", "out_time", "notes"],
+        order_by="attendance_date desc",
+        limit_page_length=1000,
+    )
+    _emap = _emp_id_map()
+    out = [{
+        "id": r.name,
+        "employeeId": _emap.get(r.employee, r.employee),
+        "employeeName": r.employee_name or "",
+        "date": str(r.attendance_date or "")[:10],
+        "status": r.status or "Present",
+        "shift": r.shift or "",
+        "inTime": str(r.in_time or "")[:5],
+        "outTime": str(r.out_time or "")[:5],
+        "notes": r.notes or "",
+    } for r in rows]
+    return {"count": len(out), "attendance": out}
+
+
+def _emp_name_map():
+    """PWA id (custom_rem_ref) -> native Employee name."""
+    m = {}
+    for r in frappe.get_all("Employee", fields=["name", "custom_rem_ref"], limit_page_length=2000):
+        if r.custom_rem_ref:
+            m[str(r.custom_rem_ref)] = r.name
+    return m
+
+
+@frappe.whitelist()
+def attendance_sync(attendance=None):
+    """Upsert attendance rows (dedupe: employee + date)."""
+    if not attendance or not isinstance(attendance, list):
+        frappe.throw(_("attendance must be a list"), frappe.ValidationError)
+    created = updated = 0
+    _nmap = _emp_name_map()
+    for a in attendance:
+        emp = a.get("employeeId") or a.get("employee") or ""
+        if not emp:
+            continue
+        emp = _nmap.get(str(emp), emp)
+        dt = a.get("date") or ""
+        existing = frappe.db.get_value(
+            "REM Attendance", {"employee": emp, "attendance_date": dt}, "name"
+        )
+        doc = frappe.get_doc("REM Attendance", existing) if existing else frappe.new_doc("REM Attendance")
+        doc.employee = emp
+        if a.get("employeeName") and not existing:
+            doc.employee_name = a.get("employeeName")
+        doc.attendance_date = dt
+        doc.status = a.get("status") or "Present"
+        doc.shift = a.get("shift") or ""
+        if a.get("inTime"):
+            doc.in_time = a.get("inTime")
+        if a.get("outTime"):
+            doc.out_time = a.get("outTime")
+        doc.notes = a.get("notes") or ""
+        doc.save(ignore_permissions=True)
+        if existing:
+            updated += 1
+        else:
+            created += 1
+    frappe.db.commit()
+    return {"created": created, "updated": updated}
+
+
+@frappe.whitelist()
+def leave_pipeline():
+    """Real leave requests from REM Leave doctype."""
+    rows = frappe.get_all(
+        "REM Leave",
+        fields=["name", "employee", "employee_name", "leave_type", "from_date",
+                "to_date", "total_days", "status", "reason", "approver", "decided_at"],
+        order_by="creation desc",
+        limit_page_length=500,
+    )
+    _emap = _emp_id_map()
+    out = [{
+        "id": r.name,
+        "employeeId": _emap.get(r.employee, r.employee),
+        "employeeName": r.employee_name or "",
+        "type": r.leave_type or "Annual",
+        "from": str(r.from_date or "")[:10],
+        "to": str(r.to_date or "")[:10],
+        "days": r.total_days or 0,
+        "status": r.status or "Pending",
+        "reason": r.reason or "",
+        "approver": r.approver or "",
+        "decidedAt": str(r.decided_at or "")[:16],
+    } for r in rows]
+    return {"count": len(out), "leave": out}
+
+
+@frappe.whitelist()
+def leave_sync(leave=None):
+    """Upsert leave requests (dedupe: employee + from_date + leave_type)."""
+    if not leave or not isinstance(leave, list):
+        frappe.throw(_("leave must be a list"), frappe.ValidationError)
+    created = updated = 0
+    _nmap = _emp_name_map()
+    for lv in leave:
+        emp = lv.get("employeeId") or lv.get("employee") or ""
+        frm = lv.get("from") or lv.get("from_date") or ""
+        ltype = lv.get("type") or lv.get("leave_type") or "Annual"
+        if not emp or not frm:
+            continue
+        emp = _nmap.get(str(emp), emp)
+        existing = frappe.db.get_value(
+            "REM Leave",
+            {"employee": emp, "from_date": frm, "leave_type": ltype},
+            "name",
+        )
+        doc = frappe.get_doc("REM Leave", existing) if existing else frappe.new_doc("REM Leave")
+        doc.employee = emp
+        if lv.get("employeeName") and not existing:
+            doc.employee_name = lv.get("employeeName")
+        doc.leave_type = ltype
+        doc.from_date = frm
+        doc.to_date = lv.get("to") or lv.get("to_date") or frm
+        doc.status = lv.get("status") or "Pending"
+        doc.reason = lv.get("reason") or ""
+        if lv.get("approver"):
+            doc.approver = lv.get("approver")
+        doc.save(ignore_permissions=True)
+        if existing:
+            updated += 1
+        else:
+            created += 1
+    frappe.db.commit()
+    return {"created": created, "updated": updated}
+
+
+@frappe.whitelist()
+def shifts_pipeline():
+    """Real shifts from REM Shift doctype."""
+    rows = frappe.get_all(
+        "REM Shift",
+        fields=["name", "shift_code", "shift_name", "start_time", "end_time", "overtime"],
+        order_by="shift_name asc",
+    )
+    out = [{
+        "id": r.name,
+        "code": r.shift_code or "",
+        "name": r.shift_name or "",
+        "start": str(r.start_time or "")[:5],
+        "end": str(r.end_time or "")[:5],
+        "overtime": bool(r.overtime),
+    } for r in rows]
+    return {"count": len(out), "shifts": out}
+
 # ═══ DUES & RECOVERY (Milestone A) ═══
 _DUE_BUCKETS = (
     ("60+ Days", 61), ("30 Days", 31), ("15 Days", 1), ("Due Today", 0), ("Future", -1),
@@ -1863,6 +2159,13 @@ def index():
         "land_legal_load_standard",
         "dues_pipeline",
         "dues_update",
+        "employees_pipeline",
+        "employees_sync",
+        "attendance_pipeline",
+        "attendance_sync",
+        "leave_pipeline",
+        "leave_sync",
+        "shifts_pipeline",
         "download_invoice",
         "demo_confirm",
         "settings_get",
