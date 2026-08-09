@@ -1481,7 +1481,9 @@ function gateVersionPing(){
     }).then(function(d){
       var sv=d&&d.message&&d.message.pwa_version;
       if(!sv)return;
-      var cur=String((window.API&&API.PWA_VERSION)||'0');
+      // NOTE: API is a `const` lexical binding — NOT on window. Use it
+      // directly; window.API is undefined and would make cur='0'.
+      var cur=String((typeof API!=='undefined'&&API.PWA_VERSION)||'0');
       if(String(sv).trim()!==cur.trim()){
         // Stale copy detected. Show a notice + try to refresh the SW in place.
         // NOTE: no automatic location.reload() here — that caused an infinite
