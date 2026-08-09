@@ -1674,6 +1674,207 @@ def settings_set(settings=None):
 
 
 
+
+# ═══ STOCK & PROCUREMENT BRIDGE (Milestone C) ═══
+@frappe.whitelist()
+def inventory_pipeline():
+    """Real stock items with live bin quantities (PWA inventory contract)."""
+    items = frappe.get_all(
+        "Item",
+        filters={"custom_rem_ref": ["is", "set"]},
+        fields=["name", "item_name", "stock_uom", "custom_rem_ref", "custom_rem_site",
+                "custom_rem_category", "custom_reorder_level", "custom_rem_last_received",
+                "valuation_rate", "disabled"],
+        order_by="creation asc",
+        limit_page_length=500,
+    )
+    out = []
+    for it in items:
+        qty = frappe.db.sql(
+            "SELECT COALESCE(SUM(actual_qty),0) FROM `tabBin` WHERE item_code=%s", it.name
+        )[0][0] or 0
+        status = "Adequate"
+        reorder = it.custom_reorder_level or 0
+        if qty == 0:
+            status = "Critical"
+        elif qty < reorder:
+            status = "Warning"
+        out.append({
+            "id": it.custom_rem_ref,
+            "site": it.custom_rem_site or "",
+            "item": it.item_name or "",
+            "category": it.custom_rem_category or "",
+            "qty": qty,
+            "unit": it.stock_uom or "",
+            "price": it.valuation_rate or 0,
+            "value": round((qty or 0) * (it.valuation_rate or 0), 2),
+            "status": status,
+            "reorder": reorder,
+            "lastReceived": it.custom_rem_last_received or "",
+            "name": it.name,
+        })
+    return {"count": len(out), "inventory": out}
+
+
+@frappe.whitelist()
+def inventory_sync(inventory=None):
+    """Upsert stock items from the PWA (dedupe via custom_rem_ref)."""
+    if not inventory or not isinstance(inventory, list):
+        frappe.throw(_("inventory must be a list"), frappe.ValidationError)
+    created = updated = 0
+    for row in inventory:
+        name = frappe.db.get_value("Item", {"custom_rem_ref": str(row.get("id") or "")}, "name")
+        doc = frappe.get_doc("Item", name) if name else frappe.new_doc("Item")
+        if not name:
+            doc.item_code = "REM-" + str(row.get("item") or "Item")[:40].replace(" ", "-")
+            doc.item_name = row.get("item") or doc.item_code
+            doc.item_group = "Products"
+            doc.is_stock_item = 1
+            doc.is_purchase_item = 1
+            doc.stock_uom = row.get("unit") or "Nos"
+        doc.custom_rem_ref = str(row.get("id") or "")
+        if row.get("site"):
+            doc.custom_rem_site = row.get("site")
+        if row.get("category"):
+            doc.custom_rem_category = row.get("category")
+        if row.get("reorder") is not None:
+            doc.custom_reorder_level = row.get("reorder")
+        if row.get("price"):
+            doc.valuation_rate = row.get("price")
+            doc.standard_rate = row.get("price")
+        if row.get("lastReceived"):
+            doc.custom_rem_last_received = row.get("lastReceived")
+        doc.flags.ignore_mandatory = True
+        doc.save(ignore_permissions=True)
+        if name:
+            updated += 1
+        else:
+            created += 1
+    frappe.db.commit()
+    return {"created": created, "updated": updated}
+
+
+@frappe.whitelist()
+def po_pipeline():
+    """Real Purchase Orders (PWA PO contract)."""
+    rows = frappe.get_all(
+        "Purchase Order",
+        fields=["name", "supplier_name", "transaction_date", "schedule_date",
+                "grand_total", "status", "custom_rem_ref", "custom_rem_site",
+                "custom_rem_category", "custom_rem_approved_by", "creation"],
+        order_by="creation desc",
+        limit_page_length=300,
+    )
+    out = []
+    for po in rows:
+        items = frappe.get_all("Purchase Order Item", filters={"parent": po.name},
+                               fields=["item_name", "qty"], limit_page_length=5)
+        items_txt = ", ".join((i.item_name or "") + (" (%s)" % int(i.qty) if i.qty else "") for i in items)
+        out.append({
+            "id": po.custom_rem_ref or po.name,
+            "date": str(po.transaction_date or "")[:10],
+            "vendor": po.supplier_name or "",
+            "site": po.custom_rem_site or "",
+            "items": items_txt,
+            "amount": po.grand_total or 0,
+            "fmt": _fmt_bdt(po.grand_total or 0),
+            "dueDate": str(po.schedule_date or "")[:10],
+            "status": _po_pwa_status(po.status),
+            "category": po.custom_rem_category or "",
+            "approvedBy": po.custom_rem_approved_by or "—",
+            "name": po.name,
+        })
+    return {"count": len(out), "pos": out}
+
+
+def _po_pwa_status(erp_status):
+    m = {"Draft": "Pending Approval", "On Hold": "Pending Approval",
+         "To Receive and Bill": "Approved", "To Bill": "Approved",
+         "To Receive": "Approved", "Delivered": "Delivered",
+         "Completed": "Completed", "Cancelled": "Cancelled", "Closed": "Completed"}
+    return m.get(erp_status or "", erp_status or "Pending Approval")
+
+
+@frappe.whitelist()
+def po_sync(pos=None):
+    """Upsert purchase orders (dedupe via custom_rem_ref)."""
+    if not pos or not isinstance(pos, list):
+        frappe.throw(_("pos must be a list"), frappe.ValidationError)
+    created = updated = 0
+    for po in pos:
+        ref = po.get("id") or ""
+        name = frappe.db.get_value("Purchase Order", {"custom_rem_ref": ref}, "name")
+        doc = frappe.get_doc("Purchase Order", name) if name else frappe.new_doc("Purchase Order")
+        if not name:
+            supplier = _get_or_create_supplier(po.get("vendor") or "")
+            doc.supplier = supplier
+            doc.company = _get_company()
+            doc.transaction_date = po.get("date") or po.get("dueDate") or frappe.utils.today()
+            doc.schedule_date = po.get("dueDate") or doc.transaction_date
+            doc.custom_rem_ref = ref
+        if po.get("site"):
+            doc.custom_rem_site = po.get("site")
+        if po.get("category"):
+            doc.custom_rem_category = po.get("category")
+        if po.get("approvedBy"):
+            doc.custom_rem_approved_by = po.get("approvedBy")
+        if po.get("status"):
+            doc.status = {"Pending Approval": "Draft", "Approved": "To Receive and Bill",
+                          "Delivered": "Delivered", "Completed": "Completed",
+                          "Cancelled": "Cancelled"}.get(po.get("status"), "Draft")
+        doc.flags.ignore_mandatory = True
+        doc.save(ignore_permissions=True)
+        if name:
+            updated += 1
+        else:
+            created += 1
+    frappe.db.commit()
+    return {"created": created, "updated": updated}
+
+
+def _get_or_create_supplier(name):
+    if not name:
+        return frappe.db.get_value("Supplier", {}, "name")
+    s = frappe.db.get_value("Supplier", {"supplier_name": name}, "name")
+    if s:
+        return s
+    d = frappe.new_doc("Supplier")
+    d.supplier_name = str(name)[:140]
+    d.supplier_group = "Local"
+    d.flags.ignore_mandatory = True
+    d.save(ignore_permissions=True)
+    return d.name
+
+
+@frappe.whitelist()
+def receipts_pipeline():
+    """Goods-receipt view: submitted Stock Entries (Material Receipt)."""
+    rows = frappe.get_all(
+        "Stock Entry",
+        filters={"docstatus": 1, "purpose": "Material Receipt"},
+        fields=["name", "posting_date", "supplier_name", "remarks", "total_incoming_value"],
+        order_by="posting_date desc",
+        limit_page_length=300,
+    )
+    out = []
+    for se in rows:
+        items = frappe.get_all("Stock Entry Detail", filters={"parent": se.name},
+                               fields=["item_name", "qty", "uom"], limit_page_length=5)
+        item_txt = ", ".join((i.item_name or "") + (" (%s %s)" % (i.qty, i.uom or "")) for i in items)
+        out.append({
+            "id": se.name,
+            "grn": "GRN-" + str(se.name)[-8:],
+            "poRef": "",
+            "item": item_txt,
+            "qty": sum((i.qty or 0) for i in items),
+            "unit": items[0].uom if items else "",
+            "date": str(se.posting_date or "")[:10],
+            "inspection": "Pass",
+            "receivedBy": se.supplier_name or "",
+            "amount": se.total_incoming_value or 0,
+        })
+    return {"count": len(out), "receipts": out}
+
 # ═══ HR BRIDGE (Milestone B) ═══
 _HR_STATUS_MAP = {
     "Active": "active", "Inactive": "inactive", "Left": "left",
@@ -2166,6 +2367,11 @@ def index():
         "leave_pipeline",
         "leave_sync",
         "shifts_pipeline",
+        "inventory_pipeline",
+        "inventory_sync",
+        "po_pipeline",
+        "po_sync",
+        "receipts_pipeline",
         "download_invoice",
         "demo_confirm",
         "settings_get",

@@ -1157,6 +1157,12 @@ const API_EPS = [
   {n:'leave_pipeline', m:'GET', grp:'crm', d:'Leave requests (REM Leave)'},
   {n:'leave_sync', m:'POST', grp:'crm', d:'Upsert leave requests', b:'{"leave":[]}'},
   {n:'shifts_pipeline', m:'GET', grp:'crm', d:'Shifts (REM Shift)'},
+  // — Stock & Procurement —
+  {n:'inventory_pipeline', m:'GET', grp:'construction', d:'Stock items with live quantities'},
+  {n:'inventory_sync', m:'POST', grp:'construction', d:'Upsert stock items', b:'{"inventory":[]}'},
+  {n:'po_pipeline', m:'GET', grp:'construction', d:'Purchase Orders'},
+  {n:'po_sync', m:'POST', grp:'construction', d:'Upsert purchase orders', b:'{"pos":[]}'},
+  {n:'receipts_pipeline', m:'GET', grp:'construction', d:'Goods receipts (Stock Entries)'},
   // — Projects & Tasks —
   {n:'projects_pipeline', m:'GET', grp:'projects', d:'Projects'},
   {n:'projects_sync', m:'POST', grp:'projects', d:'Upsert projects', b:'{"projects":[]}'},
@@ -11033,6 +11039,46 @@ function crudTaxEntry(){
   );
 }
 
+
+// ═══ STOCK & PROCUREMENT ERP BRIDGE (Milestone C) ═══
+function stockPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  showToast('Loading stock data from ERPNext…','info');
+  var pulls=[
+    ['inventory_pipeline','inventory','mockInventory'],
+    ['po_pipeline','pos','mockPOs'],
+    ['receipts_pipeline','receipts','mockStockReceipts']
+  ];
+  var done=0, total=pulls.length, nSynced=0, firstErr=null;
+  pulls.forEach(function(p){
+    API.call(p[0]).then(function(r){
+      done++;
+      if(r.ok && r.data && Array.isArray(r.data[p[1]])){
+        var rows=r.data[p[1]];
+        var target=null;
+        if(p[2]==='mockInventory') target=mockInventory;
+        else if(p[2]==='mockPOs') target=mockPOs;
+        else if(p[2]==='mockStockReceipts') target=mockStockReceipts;
+        if(target){
+          rows.forEach(function(row){
+            var ex=target.find(function(x){return String(x.id)===String(row.id);});
+            if(ex){ Object.assign(ex,row); } else { target.push(row); }
+          });
+        }
+        DB.save(p[2]==='mockPOs'?'pos':p[2]==='mockStockReceipts'?'stock_receipts':'inventory');
+        nSynced+=rows.length;
+      } else if(!firstErr){
+        firstErr=(r.data&&r.data.error)||('HTTP '+r.status);
+      }
+      if(done===total){
+        if(firstErr) showToast('Partial sync: '+nSynced+' rows, error: '+firstErr,'error');
+        else showToast('Synced '+nSynced+' stock rows from ERPNext','success');
+        renderModule();
+      }
+    });
+  });
+}
+
 function renderStock(el){
   const invTotal=mockInventory.reduce((s,i)=>s+(i.value||0),0);
   const critical=mockInventory.filter(i=>i.status==='Critical').length;
@@ -11050,6 +11096,7 @@ function renderStock(el){
       ${stockTab==='inventory'?`<select id="invCatFilter" onchange="_PG['inv']={page:1,perPage:_pgPerPage};renderModule()" style="padding:4px 6px;font-size:9px;border:1px solid #e0e0e0;border-radius:4px"><option value="">All Categories</option>${['Construction Material','Plumbing','Electrical','Finishes','Safety','Admin'].map(c=>'<option value="'+c+'"'+(g('invCatFilter')===c?' selected':'')+'>'+c+'</option>').join('')}</select>
         <select id="invSiteFilter" onchange="_PG['inv']={page:1,perPage:_pgPerPage};renderModule()" style="padding:4px 6px;font-size:9px;border:1px solid #e0e0e0;border-radius:4px"><option value="">All Sites</option>${['Muktodhara','Jolshiri','Corporate'].map(c=>'<option value="'+c+'"'+(g('invSiteFilter')===c?' selected':'')+'>'+c+'</option>').join('')}</select>`:''}
       <div class="spacer"></div>
+      <button class="action-btn secondary" onclick="stockPullFromERP()" style="padding:3px 7px;font-size:9px" title="Load real stock from ERPNext">🔄 Sync from ERP</button>
       <button class="action-btn secondary" onclick="importData(mockInventory,'Items','inventory',IMPORT_FIELDS.inventory)" style="padding:3px 7px;font-size:9px" title="Import CSV">📥</button><button class="action-btn primary" onclick="crudStockItem()" style="padding:3px 8px;font-size:10px">+ New</button data-perm="Stock & Procurement:Import">
     </div>
     ${stockTab==='inventory'?renderStockInv(pI):
