@@ -1676,6 +1676,298 @@ def settings_set(settings=None):
 
 
 
+
+# ═══ SWEEP 2 BRIDGES (Handover / VO / Labor / Investment / Loan / Party Ledger) ═══
+@frappe.whitelist()
+def handover_pipeline():
+    rows = frappe.get_all("REM Handover",
+        fields=["name", "unit", "customer", "project", "unit_type", "status",
+                "handover_date", "snags", "pos_date", "total_value", "paid_amount",
+                "remarks", "assigned_to"],
+        order_by="creation desc", limit_page_length=500)
+    return {"count": len(rows), "handover": [{
+        "id": r.name, "unit": r.unit or "", "customer": r.customer or "",
+        "project": r.project or "", "type": r.unit_type or "",
+        "status": r.status or "Construction Ongoing",
+        "date": str(r.handover_date or "")[:10], "snags": r.snags or 0,
+        "posDate": str(r.pos_date or "")[:10], "totalValue": r.total_value or 0,
+        "paidAmount": r.paid_amount or 0, "remarks": r.remarks or "",
+        "assignedTo": r.assigned_to or "",
+    } for r in rows]}
+
+
+@frappe.whitelist()
+def handover_sync(handover=None):
+    if not handover or not isinstance(handover, list):
+        frappe.throw(_("handover must be a list"), frappe.ValidationError)
+    created = updated = 0
+    for h in handover:
+        unit = h.get("unit") or ""
+        name = frappe.db.get_value("REM Handover", {"unit": unit}, "name") if unit else None
+        doc = frappe.get_doc("REM Handover", name) if name else frappe.new_doc("REM Handover")
+        doc.unit = unit[:140]
+        if h.get("customer"):
+            doc.customer = h.get("customer")
+        if h.get("project"):
+            doc.project = h.get("project")
+        if h.get("type"):
+            doc.unit_type = h.get("type")
+        if h.get("status"):
+            doc.status = h.get("status")
+        if h.get("date"):
+            doc.handover_date = h.get("date")
+        if h.get("snags") is not None:
+            doc.snags = h.get("snags")
+        if h.get("posDate"):
+            doc.pos_date = h.get("posDate")
+        if h.get("totalValue") is not None:
+            doc.total_value = h.get("totalValue")
+        if h.get("paidAmount") is not None:
+            doc.paid_amount = h.get("paidAmount")
+        if h.get("remarks"):
+            doc.remarks = h.get("remarks")
+        if h.get("assignedTo"):
+            doc.assigned_to = h.get("assignedTo")
+        doc.save(ignore_permissions=True)
+        if name:
+            updated += 1
+        else:
+            created += 1
+    frappe.db.commit()
+    return {"created": created, "updated": updated}
+
+
+@frappe.whitelist()
+def variation_orders_pipeline():
+    rows = frappe.get_all("REM Variation Order",
+        fields=["name", "project", "title", "status", "impact", "originator", "vo_date", "schedule"],
+        order_by="creation desc", limit_page_length=500)
+    return {"count": len(rows), "variations": [{
+        "id": r.name, "project": r.project or "", "title": r.title or "",
+        "status": r.status or "Draft", "impact": r.impact or "",
+        "originator": r.originator or "", "date": str(r.vo_date or "")[:10],
+        "schedule": r.schedule or "",
+    } for r in rows]}
+
+
+@frappe.whitelist()
+def variation_orders_sync(variations=None):
+    if not variations or not isinstance(variations, list):
+        frappe.throw(_("variations must be a list"), frappe.ValidationError)
+    created = updated = 0
+    for v in variations:
+        title = v.get("title") or ""
+        name = frappe.db.get_value("REM Variation Order", {"title": title}, "name") if title else None
+        doc = frappe.get_doc("REM Variation Order", name) if name else frappe.new_doc("REM Variation Order")
+        doc.title = title[:140]
+        if v.get("project"):
+            doc.project = v.get("project")
+        if v.get("status"):
+            doc.status = v.get("status")
+        if v.get("impact"):
+            doc.impact = v.get("impact")
+        if v.get("originator"):
+            doc.originator = v.get("originator")
+        if v.get("date"):
+            doc.vo_date = v.get("date")
+        if v.get("schedule"):
+            doc.schedule = v.get("schedule")
+        doc.save(ignore_permissions=True)
+        if name:
+            updated += 1
+        else:
+            created += 1
+    frappe.db.commit()
+    return {"created": created, "updated": updated}
+
+
+@frappe.whitelist()
+def labor_pipeline():
+    rows = frappe.get_all("REM Labor",
+        fields=["name", "worker_name", "category", "site", "phone", "daily_wage",
+                "status", "rating", "join_date"],
+        order_by="creation desc", limit_page_length=500)
+    return {"count": len(rows), "labor": [{
+        "id": r.name, "name": r.worker_name or "", "category": r.category or "",
+        "site": r.site or "", "phone": r.phone or "", "salary": r.daily_wage or 0,
+        "status": r.status or "Present", "rating": r.rating or 0,
+        "joinDate": str(r.join_date or "")[:10],
+    } for r in rows]}
+
+
+@frappe.whitelist()
+def labor_sync(labor=None):
+    if not labor or not isinstance(labor, list):
+        frappe.throw(_("labor must be a list"), frappe.ValidationError)
+    created = updated = 0
+    for w in labor:
+        wname = w.get("name") or ""
+        name = frappe.db.get_value("REM Labor", {"worker_name": wname}, "name") if wname else None
+        doc = frappe.get_doc("REM Labor", name) if name else frappe.new_doc("REM Labor")
+        doc.worker_name = wname[:140]
+        if w.get("category"):
+            doc.category = w.get("category")
+        if w.get("site"):
+            doc.site = w.get("site")
+        if w.get("phone"):
+            doc.phone = w.get("phone")
+        if w.get("salary") is not None:
+            doc.daily_wage = w.get("salary")
+        if w.get("status"):
+            doc.status = w.get("status")
+        if w.get("rating") is not None:
+            doc.rating = w.get("rating")
+        if w.get("joinDate"):
+            doc.join_date = w.get("joinDate")
+        doc.save(ignore_permissions=True)
+        if name:
+            updated += 1
+        else:
+            created += 1
+    frappe.db.commit()
+    return {"created": created, "updated": updated}
+
+
+@frappe.whitelist()
+def investments_pipeline():
+    rows = frappe.get_all("REM Investment",
+        fields=["name", "investor_name", "project", "amount", "interest_rate",
+                "start_date", "tenure_months", "schedule", "status"],
+        order_by="creation desc", limit_page_length=500)
+    return {"count": len(rows), "investments": [{
+        "id": r.name, "investorName": r.investor_name or "", "project": r.project or "",
+        "amount": r.amount or 0, "rate": r.interest_rate or 0,
+        "startDate": str(r.start_date or "")[:10], "tenureMonths": r.tenure_months or 0,
+        "schedule": r.schedule or "Monthly", "status": r.status or "Active",
+    } for r in rows]}
+
+
+@frappe.whitelist()
+def investments_sync(investments=None):
+    if not investments or not isinstance(investments, list):
+        frappe.throw(_("investments must be a list"), frappe.ValidationError)
+    created = updated = 0
+    for inv in investments:
+        iname = inv.get("investorName") or ""
+        name = frappe.db.get_value("REM Investment", {"investor_name": iname}, "name") if iname else None
+        doc = frappe.get_doc("REM Investment", name) if name else frappe.new_doc("REM Investment")
+        doc.investor_name = iname[:140]
+        if inv.get("project"):
+            doc.project = inv.get("project")
+        if inv.get("amount") is not None:
+            doc.amount = inv.get("amount")
+        if inv.get("rate") is not None:
+            doc.interest_rate = inv.get("rate")
+        if inv.get("startDate"):
+            doc.start_date = inv.get("startDate")
+        if inv.get("tenureMonths") is not None:
+            doc.tenure_months = inv.get("tenureMonths")
+        if inv.get("schedule"):
+            doc.schedule = inv.get("schedule")
+        if inv.get("status"):
+            doc.status = inv.get("status")
+        doc.save(ignore_permissions=True)
+        if name:
+            updated += 1
+        else:
+            created += 1
+    frappe.db.commit()
+    return {"created": created, "updated": updated}
+
+
+@frappe.whitelist()
+def loans_pipeline():
+    rows = frappe.get_all("REM Loan",
+        fields=["name", "loan_type", "lender", "principal", "interest_rate",
+                "tenure_months", "emi", "start_date", "outstanding", "status"],
+        order_by="creation desc", limit_page_length=500)
+    return {"count": len(rows), "loans": [{
+        "id": r.name, "type": r.loan_type or "External", "lender": r.lender or "",
+        "principal": r.principal or 0, "rate": r.interest_rate or 0,
+        "tenureMonths": r.tenure_months or 0, "emi": r.emi or 0,
+        "startDate": str(r.start_date or "")[:10], "outstanding": r.outstanding or 0,
+        "status": r.status or "Active",
+    } for r in rows]}
+
+
+@frappe.whitelist()
+def loans_sync(loans=None):
+    if not loans or not isinstance(loans, list):
+        frappe.throw(_("loans must be a list"), frappe.ValidationError)
+    created = updated = 0
+    for ln in loans:
+        lender = ln.get("lender") or ""
+        name = frappe.db.get_value("REM Loan", {"lender": lender}, "name") if lender else None
+        doc = frappe.get_doc("REM Loan", name) if name else frappe.new_doc("REM Loan")
+        doc.lender = lender[:140]
+        if ln.get("type"):
+            doc.loan_type = ln.get("type")
+        if ln.get("principal") is not None:
+            doc.principal = ln.get("principal")
+        if ln.get("rate") is not None:
+            doc.interest_rate = ln.get("rate")
+        if ln.get("tenureMonths") is not None:
+            doc.tenure_months = ln.get("tenureMonths")
+        if ln.get("emi") is not None:
+            doc.emi = ln.get("emi")
+        if ln.get("startDate"):
+            doc.start_date = ln.get("startDate")
+        if ln.get("outstanding") is not None:
+            doc.outstanding = ln.get("outstanding")
+        if ln.get("status"):
+            doc.status = ln.get("status")
+        doc.save(ignore_permissions=True)
+        if name:
+            updated += 1
+        else:
+            created += 1
+    frappe.db.commit()
+    return {"created": created, "updated": updated}
+
+
+@frappe.whitelist()
+def party_ledger_pipeline():
+    """Real party balances: receivables (customers) + payables (suppliers)
+    from submitted Sales Invoices / Purchase Invoices and Payment Entries."""
+    parties = []
+    # customers with outstanding
+    for r in frappe.get_all("Sales Invoice",
+                            filters={"docstatus": 1, "outstanding_amount": [">", 0]},
+                            fields=["customer", "customer_name", "outstanding_amount", "due_date"],
+                            order_by="due_date asc", limit_page_length=300):
+        parties.append({
+            "name": r.customer_name or r.customer or "",
+            "type": "Customer",
+            "outstanding": r.outstanding_amount or 0,
+            "dueDate": str(r.due_date or "")[:10],
+            "key": "C:" + (r.customer or ""),
+        })
+    # suppliers with unpaid bills
+    for r in frappe.get_all("Purchase Invoice",
+                            filters={"docstatus": 1, "outstanding_amount": [">", 0]},
+                            fields=["supplier", "supplier_name", "outstanding_amount", "due_date"],
+                            order_by="due_date asc", limit_page_length=300):
+        parties.append({
+            "name": r.supplier_name or r.supplier or "",
+            "type": "Supplier",
+            "outstanding": r.outstanding_amount or 0,
+            "dueDate": str(r.due_date or "")[:10],
+            "key": "S:" + (r.supplier or ""),
+        })
+    # aggregate by party
+    agg = {}
+    for p in parties:
+        k = p["key"]
+        if k not in agg:
+            agg[k] = {"name": p["name"], "type": p["type"], "out": 0, "dueDate": ""}
+        agg[k]["out"] += p["outstanding"] or 0
+        if p["dueDate"] and (not agg[k]["dueDate"] or p["dueDate"] < agg[k]["dueDate"]):
+            agg[k]["dueDate"] = p["dueDate"]
+    out = [{"name": v["name"], "type": v["type"], "out": v["out"], "dueDate": v["dueDate"]}
+           for v in agg.values()]
+    out.sort(key=lambda x: x["out"], reverse=True)
+    return {"count": len(out), "parties": out}
+
 # ═══ SWEEP BRIDGES (Fixed Assets / Ticketing / QC / Approvals / BOQ) ═══
 @frappe.whitelist()
 def fixed_assets_pipeline():
@@ -2682,6 +2974,17 @@ def index():
         "approvals_sync",
         "boq_pipeline",
         "boq_sync",
+        "handover_pipeline",
+        "handover_sync",
+        "variation_orders_pipeline",
+        "variation_orders_sync",
+        "labor_pipeline",
+        "labor_sync",
+        "investments_pipeline",
+        "investments_sync",
+        "loans_pipeline",
+        "loans_sync",
+        "party_ledger_pipeline",
         "download_invoice",
         "demo_confirm",
         "settings_get",

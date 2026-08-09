@@ -1173,6 +1173,18 @@ const API_EPS = [
   {n:'approvals_sync', m:'POST', grp:'plots', d:'Upsert approvals', b:'{"approvals":[]}'},
   {n:'boq_pipeline', m:'GET', grp:'construction', d:'BOQ lines (REM BOQ)'},
   {n:'boq_sync', m:'POST', grp:'construction', d:'Upsert BOQ lines', b:'{"boq":[]}'},
+  // — Sweep 2: Handover / VO / Labor / Investment / Loan / Party Ledger —
+  {n:'handover_pipeline', m:'GET', grp:'crm', d:'Handover & post-sales (REM Handover)'},
+  {n:'handover_sync', m:'POST', grp:'crm', d:'Upsert handovers', b:'{"handover":[]}'},
+  {n:'variation_orders_pipeline', m:'GET', grp:'construction', d:'Variation orders (REM VO)'},
+  {n:'variation_orders_sync', m:'POST', grp:'construction', d:'Upsert variation orders', b:'{"variations":[]}'},
+  {n:'labor_pipeline', m:'GET', grp:'construction', d:'Labor force (REM Labor)'},
+  {n:'labor_sync', m:'POST', grp:'construction', d:'Upsert labor', b:'{"labor":[]}'},
+  {n:'investments_pipeline', m:'GET', grp:'plots', d:'Investments (REM Investment)'},
+  {n:'investments_sync', m:'POST', grp:'plots', d:'Upsert investments', b:'{"investments":[]}'},
+  {n:'loans_pipeline', m:'GET', grp:'plots', d:'Loans (REM Loan)'},
+  {n:'loans_sync', m:'POST', grp:'plots', d:'Upsert loans', b:'{"loans":[]}'},
+  {n:'party_ledger_pipeline', m:'GET', grp:'plots', d:'Party balances (receivables/payables)'},
   // — Projects & Tasks —
   {n:'projects_pipeline', m:'GET', grp:'projects', d:'Projects'},
   {n:'projects_sync', m:'POST', grp:'projects', d:'Upsert projects', b:'{"projects":[]}'},
@@ -4988,7 +5000,21 @@ function partyOutstanding(type,name){
   }
   return 0;
 }
+
+var _partyErpRows = null;
+function partyLedgerPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  API.call('party_ledger_pipeline').then(function(r){
+    if(r.ok && Array.isArray(r.data.parties)){
+      _partyErpRows = r.data.parties;
+      showToast('Synced '+r.data.parties.length+' party balances from ERPNext','success');
+      renderModule();
+    } else showToast((r.data&&r.data.error)||'Party ledger pull failed','error');
+  });
+}
+
 function partyRows(){
+  if(_partyErpRows) return _partyErpRows.map(function(p){return {name:p.name,type:p.type,out:p.out||0,phone:'',email:'',status:p.out>0?'Overdue':'Active',company:p.type==='Customer'?'Individual':'Company'};});
   var out=[];
   mockCustomers.forEach(function(c){out.push({name:c.name,type:'Customer',phone:c.phone||'',email:c.email||'',out:partyOutstanding('Customer',c.name),status:c.status||'Active',company:c.entityType==='company'?'Company':'Individual'});});
   mockSuppliers.forEach(function(s){out.push({name:s.name,type:'Supplier',phone:s.phone||'',email:s.email||'',out:partyOutstanding('Supplier',s.name),status:s.status||'Active',company:s.type||''});});
@@ -8320,6 +8346,25 @@ function crudLegalContract(item){
   );
 }
 var hndTab='dashboard';
+
+function handoverPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  API.call('handover_pipeline').then(function(r){
+    if(r.ok && Array.isArray(r.data.handover)){
+      var n=0;
+      r.data.handover.forEach(function(x){
+        var mapped={id:x.id,unit:x.unit,customer:x.customer,project:x.project,type:x.type,status:x.status,date:x.date,snags:x.snags,posDate:x.posDate,totalValue:x.totalValue,paidAmount:x.paidAmount,remarks:x.remarks,assignedTo:x.assignedTo};
+        var ex=mockHandover.find(function(y){return String(y.id)===String(x.id);});
+        if(ex){ Object.assign(ex,mapped); } else { mockHandover.push(mapped); }
+        n++;
+      });
+      DB.save('handover');
+      showToast('Synced '+n+' handover from ERPNext','success');
+      renderModule();
+    } else showToast((r.data&&r.data.error)||'handover pull failed','error');
+  });
+}
+
 function renderHandover(el){
   hndTab=hndTab||'dashboard';
   var total=mockHandover.length,completed=mockHandover.filter(function(h){return h.status==='Completed'}).length;
@@ -8958,6 +9003,25 @@ function crudMaintenance(){
 
 
 
+
+
+function voPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  API.call('variation_orders_pipeline').then(function(r){
+    if(r.ok && Array.isArray(r.data.variations)){
+      var n=0;
+      r.data.variations.forEach(function(x){
+        var mapped={id:x.id,project:x.project,title:x.title,status:x.status,impact:x.impact,originator:x.originator,date:x.date,schedule:x.schedule};
+        var ex=mockVariations.find(function(y){return String(y.id)===String(x.id);});
+        if(ex){ Object.assign(ex,mapped); } else { mockVariations.push(mapped); }
+        n++;
+      });
+      DB.save('variations');
+      showToast('Synced '+n+' variations from ERPNext','success');
+      renderModule();
+    } else showToast((r.data&&r.data.error)||'variations pull failed','error');
+  });
+}
 
 function renderVariations(el){
   const pV=_pg('variations',mockVariations);
@@ -16307,6 +16371,25 @@ document.addEventListener('click',function(e){
 
 // ═══ LABOR MANAGEMENT MODULE ═══
 var ltTab='dashboard';
+
+function laborPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  API.call('labor_pipeline').then(function(r){
+    if(r.ok && Array.isArray(r.data.labor)){
+      var n=0;
+      r.data.labor.forEach(function(x){
+        var mapped={id:x.id,name:x.name,category:x.category,site:x.site,phone:x.phone,salary:x.salary,status:x.status,rating:x.rating,joinDate:x.joinDate};
+        var ex=mockLabor.find(function(y){return String(y.id)===String(x.id);});
+        if(ex){ Object.assign(ex,mapped); } else { mockLabor.push(mapped); }
+        n++;
+      });
+      DB.save('labor');
+      showToast('Synced '+n+' labor from ERPNext','success');
+      renderModule();
+    } else showToast((r.data&&r.data.error)||'labor pull failed','error');
+  });
+}
+
 function renderLabor(el){
   ltTab=ltTab||'dashboard';
   var total=mockLabor.length;
@@ -19600,6 +19683,44 @@ function invAccrued(amt,rate,startDate){return amt*rate/100*(invMonthsElapsed(st
 function invLoanTotalPayable(p,r,t){return p + p*r/100*t/12;}
 function invCalcEmi(p,r,t){var tp=invLoanTotalPayable(p,r,t);return t?Math.round(tp/t):0;}
 function fmtTk(n){return '৳'+(n/10000000).toFixed(2)+' Cr';}
+
+function investmentsPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  API.call('investments_pipeline').then(function(r){
+    if(r.ok && Array.isArray(r.data.investments)){
+      var n=0;
+      r.data.investments.forEach(function(x){
+        var mapped={id:x.id,investorName:x.investorName,project:x.project,amount:x.amount,rate:x.rate,startDate:x.startDate,tenureMonths:x.tenureMonths,schedule:x.schedule,status:x.status};
+        var ex=mockInvestments.find(function(y){return String(y.id)===String(x.id);});
+        if(ex){ Object.assign(ex,mapped); } else { mockInvestments.push(mapped); }
+        n++;
+      });
+      DB.save('investments');
+      showToast('Synced '+n+' investments from ERPNext','success');
+      renderModule();
+    } else showToast((r.data&&r.data.error)||'investments pull failed','error');
+  });
+}
+
+
+function loansPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  API.call('loans_pipeline').then(function(r){
+    if(r.ok && Array.isArray(r.data.loans)){
+      var n=0;
+      r.data.loans.forEach(function(x){
+        var mapped={id:x.id,type:x.type,lender:x.lender,principal:x.principal,rate:x.rate,tenureMonths:x.tenureMonths,emi:x.emi,startDate:x.startDate,outstanding:x.outstanding,status:x.status};
+        var ex=mockLoans.find(function(y){return String(y.id)===String(x.id);});
+        if(ex){ Object.assign(ex,mapped); } else { mockLoans.push(mapped); }
+        n++;
+      });
+      DB.save('loans');
+      showToast('Synced '+n+' loans from ERPNext','success');
+      renderModule();
+    } else showToast((r.data&&r.data.error)||'loans pull failed','error');
+  });
+}
+
 function renderInvestmentLoans(el){
   var totInv=mockInvestments.reduce(function(s,x){return s+(x.amount||0);},0);
   var totAccrued=mockInvestments.filter(function(x){return x.status==='Active';}).reduce(function(s,x){return s+invAccrued(x.amount,x.rate,x.startDate);},0);
