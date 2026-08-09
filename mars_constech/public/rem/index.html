@@ -135,6 +135,9 @@
     .top-actions .icon-btn{width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;color:#666;transition:all .15s}
     .top-actions .icon-btn:hover{background:#f0f0f0;color:#333}
     .top-actions .icon-btn svg{width:16px;height:16px}
+    .top-actions #globalSyncBtn.sync-spinning svg{animation:remSyncSpin 0.9s linear infinite}
+    @keyframes remSyncSpin{to{transform:rotate(360deg)}}
+    #globalSyncBtn.sync-done svg{color:#2e7d32}
     .top-actions .user-avatar{width:26px;height:26px;border-radius:6px;background:#2F80ED;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:600;cursor:pointer}
     .content{flex:1;overflow-y:auto;padding:6px 10px;display:flex;flex-direction:column;gap:4px}
     .toolbar{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
@@ -408,6 +411,7 @@
       #mobileNavBtn{display:flex!important;flex-shrink:0!important}
       .top-actions .icon-btn{display:none!important}
       #moreBtn{display:flex!important}
+      #globalSyncBtn{display:flex!important;flex-shrink:0!important}
       .top-actions{flex:1!important;min-width:0!important;justify-content:flex-end!important;gap:4px!important}
       #searchWrap{flex:1;min-width:0;max-width:calc(100vw - 120px)}
       #searchBar{flex:1!important;min-width:0!important;width:auto!important;max-width:100%!important}
@@ -1012,6 +1016,7 @@
         <div class="icon-btn" onclick="toggleThemePalette(event)" title="Theme Palette" style="position:relative;font-size:15px;line-height:1">🎨<div id="themePalette" style="display:none;position:absolute;top:calc(100% + 8px);right:0;width:252px;background:var(--card-bg,#fff);border:1px solid var(--card-border,#e0e0e0);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.18);z-index:9999;padding:8px"></div></div>
         <div class="icon-btn" onclick="toggleNotifications()" title="Notifications" style="position:relative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><div id="notifBadge">0</div></div>
         <div class="icon-btn" id="moreBtn" onclick="toggleMoreMenu(event)" title="More" style="display:none">⋯</div>
+        <div class="icon-btn" id="globalSyncBtn" onclick="globalSyncAll(event&&event.shiftKey)" title="Sync all with server (Shift+click = force full refresh)" style="position:relative;color:#2F80ED"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:16px;height:16px"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg><span id="globalSyncBadge" style="display:none;position:absolute;top:-4px;right:-4px;background:#2e7d32;color:#fff;font-size:8px;font-weight:700;border-radius:8px;padding:1px 4px;line-height:1.3">✓</span></div>
         <div class="user-avatar" onclick="toggleRoleMenu()" title="Switch Role">SA</div>
       </div>
     </div>
@@ -13028,6 +13033,7 @@ function showSkeleton(el){
 }
 // ═══ TOAST, SEARCH, THEME, ROLE, ZOOM ═══
 function showToast(msg,t='success',undoFn){
+  if(_globalSyncActive && t!=='error') return; // silent window during global sync
   const c=document.getElementById('toastContainer');
   const d=document.createElement('div');d.className='toast '+t;
   const sp=document.createElement('span');sp.style.flex='1';sp.textContent=msg;d.appendChild(sp);
@@ -13043,6 +13049,78 @@ function showToast(msg,t='success',undoFn){
     addNotification(msg,'',t==='success'?'add':t==='error'?'error':'info');
   }
 }
+// ═══ GLOBAL SYNC (top-actions button) ═══
+var _globalSyncActive=false;   // silent window: suppress info toasts
+var _globalSyncQueue=[];       // pulls waiting to dispatch
+var _globalSyncDone=0,_globalSyncTotal=0,_globalSyncSkipped=0;
+var _globalSyncTimer=null;
+var _globalSyncStamps={};
+// modules that have a pull fn; key used for the 60s cooldown stamp
+var SYNC_MODULES=[
+  {k:'land',fn:landPullFromERP},{k:'leads',fn:leadsPullFromERP},
+  {k:'bookings',fn:bookingsPullFromERP},{k:'projects',fn:projectsPullFromERP},
+  {k:'plots',fn:plotsPullFromERP},
+  {k:'dues',fn:duesPullFromERP},{k:'finance',fn:financePullFromERP},
+  {k:'stock',fn:stockPullFromERP},{k:'hr',fn:hrPullFromERP},
+  {k:'construction',fn:constructionPullFromERP},{k:'fixedAssets',fn:fixedAssetsPullFromERP},
+  {k:'tickets',fn:ticketsPullFromERP},{k:'approvals',fn:approvalsPullFromERP},
+  {k:'boq',fn:boqPullFromERP},{k:'handover',fn:handoverPullFromERP},
+  {k:'vo',fn:voPullFromERP},{k:'labor',fn:laborPullFromERP},
+  {k:'investments',fn:investmentsPullFromERP},{k:'loans',fn:loansPullFromERP},
+  {k:'partyLedger',fn:partyLedgerPullFromERP},{k:'brokers',fn:brokersPullFromERP},
+  {k:'complaints',fn:complaintsPullFromERP}
+];
+function globalSyncAll(force){
+  if(_globalSyncActive){ showToast('Sync already in progress…','info'); return; }
+  if(!API||!API.connected){ showToast('Not connected — open Settings › Server Sync first','error'); return; }
+  var now=Date.now();
+  var todo=[];
+  _globalSyncSkipped=0;
+  SYNC_MODULES.forEach(function(m){
+    var last=_globalSyncStamps[m.k]||0;
+    if(!force && last && (now-last)<60000){ _globalSyncSkipped++; return; }
+    todo.push(m);
+  });
+  if(!todo.length){ showToast('Everything is up to date (synced <1min ago). Shift+click to force.','success'); return; }
+  _globalSyncActive=true; _globalSyncDone=0; _globalSyncTotal=todo.length;
+  _globalSyncQueue=todo.slice();
+  _globalSyncStamps={};
+  setSyncBtnState('syncing');
+  showToast('Syncing '+todo.length+' modules from ERPNext…','info');
+  _globalSyncTimer=setInterval(globalSyncTick,450);
+  globalSyncTick();
+}
+function globalSyncTick(){
+  // dispatch up to 4 per tick (staggered — never a 20-request burst)
+  for(var n=0;n<4&&_globalSyncQueue.length;n++){
+    var m=_globalSyncQueue.shift();
+    _globalSyncStamps[m.k]=Date.now();
+    try{ m.fn(); }catch(e){ console.error('global sync '+m.k+' threw',e); }
+    _globalSyncDone++;
+  }
+  if(!_globalSyncQueue.length){
+    clearInterval(_globalSyncTimer); _globalSyncTimer=null;
+    // let the last dispatched batch settle, then release the silent window
+    setTimeout(function(){
+      _globalSyncActive=false;
+      setSyncBtnState('done');
+      try{ renderModule(); }catch(e){}
+      var msg='Synced '+_globalSyncDone+' modules from ERPNext';
+      if(_globalSyncSkipped) msg+=' ('+_globalSyncSkipped+' skipped — recently synced)';
+      showToast(msg,'success');
+      setTimeout(function(){ setSyncBtnState('idle'); },2600);
+    },3500);
+  }
+}
+function setSyncBtnState(s){
+  var b=document.getElementById('globalSyncBtn'); if(!b) return;
+  var bg=document.getElementById('globalSyncBadge');
+  b.classList.remove('sync-spinning','sync-done');
+  if(s==='syncing'){ b.classList.add('sync-spinning'); b.title='Syncing with server…'; }
+  else if(s==='done'){ b.classList.add('sync-done'); b.title='Sync complete — click to sync again'; if(bg){bg.style.display='';} }
+  else { b.title='Sync all with server (Shift+click = force full refresh)'; if(bg){bg.style.display='none';} }
+}
+
 // ═══ GLOBAL SEARCH DROPDOWN ═══
 var _sdHL=-1;
 var _sdRecent=JSON.parse(localStorage.getItem('sd_recent')||'[]');
