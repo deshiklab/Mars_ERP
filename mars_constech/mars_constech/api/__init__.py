@@ -37,9 +37,33 @@ def login(usr=None, pwd=None, email=None, password=None):
 	try:
 		frappe.local.login_manager = frappe.auth.LoginManager()
 		frappe.local.login_manager.authenticate(user=user, pwd=passwd)
-		frappe.local.login_manager.post_login()
 	except frappe.exceptions.AuthenticationError:
 		frappe.throw(_("Invalid login"), frappe.AuthenticationError)
+
+	# M1: honor 2FA when the user has it enabled (mirrors LoginManager.login()).
+	from frappe.twofactor import two_factor_is_enabled, authenticate_for_2factor, confirm_otp_token
+	otp = frappe.form_dict.get("otp")
+	if two_factor_is_enabled(user) and not otp:
+		# stage 1: password ok — mint the OTP challenge, do NOT create a session
+		frappe.form_dict["usr"] = user
+		frappe.form_dict["pwd"] = passwd
+		authenticate_for_2factor(user)
+		frappe.db.rollback()
+		return {
+			"two_factor_required": True,
+			"tmp_id": frappe.local.response.get("tmp_id"),
+			"verification": frappe.local.response.get("verification"),
+			"user": user,
+		}
+
+	if two_factor_is_enabled(user):
+		# stage 2: verify OTP then complete the login
+		if not confirm_otp_token(frappe.local.login_manager, otp=otp,
+								 tmp_id=frappe.form_dict.get("tmp_id")):
+			frappe.throw(_("Invalid OTP"), frappe.AuthenticationError)
+
+	frappe.local.login_manager.post_login()
+	frappe.form_dict.pop("pwd", None)
 
 	token = frappe.local.session.sid if frappe.local.session else frappe.session.sid
 	frappe.db.commit()
@@ -168,32 +192,48 @@ def pay_invoice(invoice_name, gateway="bkash"):
 
 	from mars_constech.mars_constech.payments.gateways import create_payment
 
-	return create_payment(invoice_name, gateway)
+	res = create_payment(invoice_name, gateway)
+	# bind the payment session to this invoice server-side — settlement must
+	# use THIS binding, never caller-supplied invoice/amount (C1)
+	pid = (res or {}).get("payment_id")
+	if pid:
+		frappe.cache().set_value(
+			f"mars_pay_bind_{pid}",
+			{"invoice": invoice_name, "gateway": gateway},
+			expires_in_sec=7200,
+		)
+	return res
 
 
 @frappe.whitelist(allow_guest=True)
-def payment_callback(gateway=None, payment_id=None, invoice=None, amount=None, **kwargs):
-	"""Gateway callback: verify + settle. Also used by the demo payment page."""
+def payment_callback(gateway=None, payment_id=None, **kwargs):
+	"""Gateway callback: verify + settle. Guest-accessible because real
+	gateways call back server-to-server without a session. The target
+	invoice/amount come ONLY from the server-side binding created by
+	pay_invoice — caller-supplied values are ignored (C1)."""
 	if not gateway:
 		gateway = kwargs.get("gateway") or frappe.form_dict.get("gateway")
 	if not payment_id:
 		payment_id = kwargs.get("paymentID") or frappe.form_dict.get("paymentID")
-	if not invoice:
-		invoice = kwargs.get("invoice") or frappe.form_dict.get("invoice")
+	bind = frappe.cache().get_value(f"mars_pay_bind_{payment_id}") if payment_id else None
+	if not bind:
+		return {"ok": False, "message": _("Unknown payment session")}
 
 	from mars_constech.mars_constech.payments.gateways import verify_and_settle
 
-	ok, message, pe = verify_and_settle(gateway, payment_id, invoice, amount)
+	ok, message, pe = verify_and_settle(gateway, payment_id, bind.get("invoice"))
 	if not ok:
 		frappe.local.message = message
 		frappe.local.response.message = message
 		return {"ok": False, "message": message}
+	frappe.cache().delete_value(f"mars_pay_bind_{payment_id}")
 	return {"ok": True, "message": message, "payment_entry": pe}
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def demo_confirm(ref=None, **kwargs):
-	"""Demo-mode confirm: mark the simulated payment as completed."""
+	"""Demo-mode confirm: mark the simulated payment as completed.
+	Session required (C1) — only logged-in portal users can confirm."""
 	if not ref:
 		ref = kwargs.get("ref") or frappe.form_dict.get("ref")
 	if not ref:

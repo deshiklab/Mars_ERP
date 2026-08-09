@@ -259,8 +259,14 @@ def create_payment(invoice_name, gateway, amount=None):
 
 
 def verify_and_settle(gateway, payment_id, invoice_name=None, amount=None):
-	"""Verify a payment; on success settle the invoice. Returns (ok, message, pe_name)."""
+	"""Verify a payment; on success settle the invoice. Returns (ok, message, pe_name).
+
+	C1 hardening: the invoice/amount to settle come from the SERVER-SIDE
+	binding (mars_pay_bind_*) created by pay_invoice, or from the gateway's
+	verified response — never from caller-supplied invoice/amount params
+	(which are ignored)."""
 	adapter = get_adapter(gateway)
+	bind = frappe.cache().get_value(f"mars_pay_bind_{payment_id}")
 	# demo mode: cached payment record acts as the "gateway confirmed" signal
 	if get_settings().sandbox_mode:
 		rec = frappe.cache().get_value(f"mars_demo_pay_{payment_id}")
@@ -272,9 +278,12 @@ def verify_and_settle(gateway, payment_id, invoice_name=None, amount=None):
 
 	res = adapter.verify(payment_id)
 	if res.get("success"):
+		# binding (if present) decides the invoice; gateway decides the amount
+		target_inv = (bind or {}).get("invoice") or invoice_name
+		settle_amount = res.get("amount") or (bind or {}).get("amount") or amount
 		pe = settle_invoice(
-			invoice_name or payment_id,
-			res.get("amount") or amount,
+			target_inv or payment_id,
+			settle_amount,
 			adapter.name,
 			res.get("reference") or payment_id,
 		)
