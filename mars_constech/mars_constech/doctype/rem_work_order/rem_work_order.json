@@ -1,0 +1,46 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-08-09 09:40:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "wo_ref",
+  "contractor",
+  "contractor_name",
+  "project",
+  "scope",
+  "amount",
+  "date",
+  "deadline",
+  "status"
+ ],
+ "fields": [
+  {"fieldname": "wo_ref", "fieldtype": "Data", "label": "WO Ref", "reqd": 1},
+  {"fieldname": "contractor", "fieldtype": "Link", "options": "Supplier", "label": "Contractor (Supplier)"},
+  {"fieldname": "contractor_name", "fieldtype": "Data", "label": "Contractor Name"},
+  {"fieldname": "project", "fieldtype": "Data", "label": "Project"},
+  {"fieldname": "scope", "fieldtype": "Small Text", "label": "Scope of Work"},
+  {"fieldname": "amount", "fieldtype": "Currency", "label": "Amount (BDT)"},
+  {"fieldname": "date", "fieldtype": "Date", "label": "Date"},
+  {"fieldname": "deadline", "fieldtype": "Date", "label": "Deadline"},
+  {"fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "\nPending Review\nApproved\nIn Progress\nCompleted\nOverdue\nCancelled", "default": "Pending Review"}
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-09 09:40:00.000000",
+ "modified_by": "Administrator",
+ "module": "MARS Constech",
+ "name": "REM Work Order",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "System Manager", "share": 1, "write": 1},
+  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "Projects Manager", "share": 1, "write": 1},
+  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "Sales Manager", "share": 1, "write": 1}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

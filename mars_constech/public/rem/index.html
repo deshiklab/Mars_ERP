@@ -1581,6 +1581,68 @@ function journalPushToERP(){
   });
 }
 
+// ═══ CONSTRUCTION ERP BRIDGE (PWA Contractors/WorkOrders/Equipment → ERPNext) ═══
+function constructionPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  showToast('Loading construction from ERPNext…','info');
+  API._req('GET','.contractors_pipeline').then(function(r){
+    if(r.status===200 && Array.isArray(r.data.contractors)){
+      var n=0;
+      r.data.contractors.forEach(function(ep){
+        var existing=mockContractors.find(function(c){return String(c.id)===String(ep.id)||String(c.name).toLowerCase()===String(ep.name).toLowerCase();});
+        if(existing){ Object.assign(existing,ep); n++; }
+        else { mockContractors.push(ep); n++; }
+      });
+      DB.save('contractors',mockContractors);
+      showToast('Contractors: '+n,'success');
+    } else showToast((r.data&&r.data.error)||'Contractor pull failed','error');
+  });
+  API._req('GET','.work_orders_pipeline').then(function(r){
+    if(r.status===200 && Array.isArray(r.data.workOrders)){
+      var n=0;
+      r.data.workOrders.forEach(function(ep){
+        var existing=mockWorkOrders.find(function(w){return String(w.id)===String(ep.id);});
+        if(existing){ Object.assign(existing,ep); n++; }
+        else { mockWorkOrders.push(ep); n++; }
+      });
+      DB.save('workOrders',mockWorkOrders);
+      showToast('Work orders: '+n,'info');
+    } else showToast((r.data&&r.data.error)||'Work order pull failed','error');
+  });
+  API._req('GET','.equipment_pipeline').then(function(r){
+    if(r.status===200 && Array.isArray(r.data.equipment)){
+      var n=0;
+      r.data.equipment.forEach(function(ep){
+        var existing=mockEquipment.find(function(e){return String(e.id)===String(ep.id);});
+        if(existing){ Object.assign(existing,ep); n++; }
+        else { mockEquipment.push(ep); n++; }
+      });
+      DB.save('equipment',mockEquipment);
+      showToast('Equipment: '+n,'info');
+    } else showToast((r.data&&r.data.error)||'Equipment pull failed','error');
+  });
+  setTimeout(function(){ renderModule(); }, 600);
+}
+function constructionPushToERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  showToast('Pushing construction to ERPNext…','info');
+  var ctr=mockContractors.map(function(c){return {id:c.id,name:c.name,type:c.type||'',contact:c.contact||'',email:c.email||'',rating:c.rating||0,status:c.status||'Active',license:c.license||'',insurance:c.insurance||''};});
+  API._req('POST','.contractors_sync',{contractors:ctr}).then(function(r){
+    if(r.status===200) showToast('Contractors: '+r.data.created+' created, '+r.data.updated+' updated','success');
+    else showToast((r.data&&r.data.error)||'Contractor push failed','error');
+  });
+  var wo=mockWorkOrders.map(function(w){return {id:w.id,contractor:w.contractor||'',project:w.project||'',scope:w.scope||'',amount:w.amount||0,date:w.date||'',deadline:w.deadline||'',status:w.status||'Pending Review'};});
+  API._req('POST','.work_orders_sync',{workOrders:wo}).then(function(r){
+    if(r.status===200) showToast('Work orders: '+r.data.created+' created, '+r.data.updated+' updated','success');
+    else showToast((r.data&&r.data.error)||'Work order push failed','error');
+  });
+  var eq=mockEquipment.map(function(e){return {id:e.id,name:e.name,model:e.model||'',type:e.type||'Heavy',site:e.site||'',status:e.status||'Operational',hours:e.hours||'',fuelCost:e.fuelCost||0,operator:e.operator||'',lastService:e.lastService||''};});
+  API._req('POST','.equipment_sync',{equipment:eq}).then(function(r){
+    if(r.status===200) showToast('Equipment: '+r.data.created+' created, '+r.data.updated+' updated','success');
+    else showToast((r.data&&r.data.error)||'Equipment push failed','error');
+  });
+}
+
 window.mockLeads = DB.init('leads', [
   {id:1,name:'Tariqul Islam',territory:'Dhaka North',phone:'+880 1711 000000',email:'tariqul@example.com',property:'Muktodhara - 5 Katha',status:'Negotiation',priority:'High',type:'Local',source:'Bikroy.com',value:'৳1.5 Cr',lastContact:'2h ago',owner:'Hasanul Banna',nextFollowUp:'Today, 3:00 PM',paymentStatus:'Up to Date',facingDir:'South',floorPref:'Any',flatType:'Land',sizeSqFt:'1800 sqft',paymentPlan:'Construction Link',brokerId:null,
    installments:[{date:'Oct 01, 2024',amount:'৳5,00,000',status:'Paid'},{date:'Nov 01, 2024',amount:'৳5,00,000',status:'Due'}],
@@ -8804,6 +8866,7 @@ function renderContractors(el){
         return '<div class="tab '+(ct===t[0]?'active':'')+'" onclick="ctTab=\x27'+t[0]+'\x27;Object.keys(_PG).forEach(function(k){delete _PG[k]});renderModule()">'+t[1]+'</div>';
       }).join('')+'</div>'+
       '<div class="spacer"></div>'+
+      '<button class="action-btn secondary" onclick="constructionPullFromERP()" style="padding:3px 8px;font-size:10px" title="Load live contractors/work orders/equipment from ERPNext">🔄 Sync from ERP</button>'+
       '<button class="action-btn primary" onclick="crudContractor()" style="padding:3px 8px;font-size:10px;display:'+(ct==='contractors'?'':'none')+'">+ New Contractor</button>'+
       '<button class="action-btn primary" onclick="crudWorkOrder()" style="padding:3px 8px;font-size:10px;display:'+(ct==='work_orders'?'':'none')+'">+ New Work Order</button>'+
       '<button class="action-btn primary" onclick="crudContractorPayment()" style="padding:3px 8px;font-size:10px;display:'+(ct==='payments'?'':'none')+'">+ Record Payment</button>'+

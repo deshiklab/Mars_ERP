@@ -1373,6 +1373,212 @@ def payments_pipeline():
 	return {"count": len(out), "payments": out}
 
 
+
+# ═══ CONSTRUCTION BRIDGE (contractors/work orders/equipment → ERPNext) ═══
+
+WO_STAGES = ["Pending Review", "Approved", "In Progress", "Completed", "Overdue", "Cancelled"]
+
+
+@frappe.whitelist()
+def contractors_pipeline():
+	"""Pull REM contractor Suppliers in the PWA contract."""
+	rows = frappe.get_all(
+		"Supplier",
+		filters=[["custom_rem_type", "is", "set"]],
+		fields=["name", "supplier_name", "custom_rem_type", "custom_rem_rating", "custom_rem_license",
+				"custom_rem_insurance", "custom_rem_status", "mobile_no", "email_id"],
+		order_by="name asc",
+		limit_page_length=500,
+	)
+	out = []
+	for s in rows:
+		out.append({
+			"id": s.name,
+			"name": s.supplier_name or s.name,
+			"type": s.custom_rem_type or "",
+			"contact": s.mobile_no or "",
+			"email": s.email_id or "",
+			"rating": s.custom_rem_rating or 0,
+			"status": s.custom_rem_status or "Active",
+			"license": s.custom_rem_license or "",
+			"insurance": s.custom_rem_insurance or "",
+			"projects": [],
+		})
+	return {"count": len(out), "contractors": out}
+
+
+@frappe.whitelist()
+def contractors_sync(contractors=None):
+	"""Upsert contractors pushed from the PWA (dedupe via Supplier name)."""
+	if not contractors or not isinstance(contractors, list):
+		frappe.throw(_("contractors must be a list"), frappe.ValidationError)
+	created = updated = 0
+	for item in contractors:
+		if not isinstance(item, dict) or not item.get("name"):
+			continue
+		existing = frappe.db.get_value("Supplier", {"supplier_name": str(item["name"])})
+		doc = frappe.get_doc("Supplier", existing) if existing else frappe.new_doc("Supplier")
+		doc.flags.ignore_permissions = True
+		doc.supplier_name = str(item["name"])[:140]
+		doc.supplier_group = frappe.db.get_value("Supplier Group", {"is_group": 0}, "name") or "All Supplier Groups"
+		doc.custom_rem_type = str(item.get("type") or "Civil Works")
+		doc.custom_rem_rating = int(item.get("rating") or 0)
+		doc.custom_rem_license = str(item.get("license") or "")
+		doc.custom_rem_insurance = str(item.get("insurance") or "")
+		st = str(item.get("status") or "Active")
+		doc.custom_rem_status = st if st in ("Active", "Inactive") else "Active"
+		doc.mobile_no = str(item.get("contact") or "")
+		doc.email_id = str(item.get("email") or "")
+		if existing:
+			doc.save()
+			updated += 1
+		else:
+			doc.insert()
+			created += 1
+	frappe.db.commit()
+	return {"created": created, "updated": updated}
+
+
+@frappe.whitelist()
+def work_orders_pipeline():
+	"""Pull REM Work Orders in the PWA contract."""
+	rows = frappe.get_all(
+		"REM Work Order",
+		fields=["name", "wo_ref", "contractor_name", "project", "scope", "amount", "date", "deadline", "status"],
+		order_by="creation desc",
+		limit_page_length=500,
+	)
+	out = []
+	for w in rows:
+		out.append({
+			"id": w.wo_ref or w.name,
+			"contractor": w.contractor_name or "",
+			"project": w.project or "",
+			"scope": w.scope or "",
+			"amount": w.amount or 0,
+			"date": str(w.date or "")[:10],
+			"deadline": str(w.deadline or "")[:10],
+			"status": w.status or "Pending Review",
+			"name": w.name,
+		})
+	return {"count": len(out), "workOrders": out}
+
+
+@frappe.whitelist()
+def work_orders_sync(workOrders=None):
+	"""Upsert work orders pushed from the PWA (dedupe via wo_ref)."""
+	if not workOrders or not isinstance(workOrders, list):
+		frappe.throw(_("workOrders must be a list"), frappe.ValidationError)
+	created = updated = 0
+	for item in workOrders:
+		if not isinstance(item, dict) or not item.get("scope"):
+			continue
+		existing = None
+		if item.get("id"):
+			existing = frappe.db.get_value("REM Work Order", {"wo_ref": str(item["id"])})
+		doc = frappe.get_doc("REM Work Order", existing) if existing else frappe.new_doc("REM Work Order")
+		doc.flags.ignore_permissions = True
+		doc.wo_ref = str(item.get("id") or "")[:40]
+		doc.contractor_name = str(item.get("contractor") or "")[:140]
+		doc.project = str(item.get("project") or "")[:140]
+		doc.scope = str(item.get("scope") or "")[:400]
+		doc.amount = parse_bdt(item.get("amount")) if isinstance(item.get("amount"), str) else (item.get("amount") or 0)
+		if item.get("date"):
+			doc.date = str(item["date"])[:10]
+		if item.get("deadline"):
+			doc.deadline = str(item["deadline"])[:10]
+		st = str(item.get("status") or "Pending Review")
+		doc.status = st if st in WO_STAGES else "Pending Review"
+		if existing:
+			doc.save()
+			updated += 1
+		else:
+			doc.insert()
+			created += 1
+	frappe.db.commit()
+	return {"created": created, "updated": updated}
+
+
+@frappe.whitelist()
+def equipment_pipeline():
+	"""Pull REM equipment Assets in the PWA contract."""
+	rows = frappe.get_all(
+		"Asset",
+		filters=[["custom_rem_ref", "is", "set"]],
+		fields=["name", "asset_name", "custom_rem_ref", "custom_rem_model", "custom_rem_type", "custom_rem_site",
+				"custom_rem_status", "custom_rem_hours", "custom_rem_fuel_cost", "custom_rem_operator",
+				"custom_rem_last_service"],
+		order_by="name asc",
+		limit_page_length=500,
+	)
+	out = []
+	for e in rows:
+		out.append({
+			"id": e.custom_rem_ref or e.name,
+			"name": e.asset_name or e.name,
+			"model": e.custom_rem_model or "",
+			"type": e.custom_rem_type or "Heavy",
+			"site": e.custom_rem_site or "",
+			"status": e.custom_rem_status or "Operational",
+			"hours": e.custom_rem_hours or "",
+			"fuelCost": e.custom_rem_fuel_cost or 0,
+			"operator": e.custom_rem_operator or "",
+			"lastService": str(e.custom_rem_last_service or "")[:10],
+		})
+	return {"count": len(out), "equipment": out}
+
+
+@frappe.whitelist()
+def equipment_sync(equipment=None):
+	"""Upsert equipment pushed from the PWA (dedupe via custom_rem_ref)."""
+	if not equipment or not isinstance(equipment, list):
+		frappe.throw(_("equipment must be a list"), frappe.ValidationError)
+	created = updated = 0
+	for item in equipment:
+		if not isinstance(item, dict) or not item.get("name"):
+			continue
+		existing = None
+		if item.get("id"):
+			existing = frappe.db.get_value("Asset", {"custom_rem_ref": str(item["id"])})
+		doc = frappe.get_doc("Asset", existing) if existing else frappe.new_doc("Asset")
+		doc.flags.ignore_permissions = True
+		doc.asset_name = str(item.get("name") or "")[:140]
+		doc.custom_rem_ref = str(item.get("id") or "")
+		doc.custom_rem_model = str(item.get("model") or "")
+		doc.custom_rem_type = str(item.get("type") or "Heavy")
+		doc.custom_rem_site = str(item.get("site") or "")
+		st = str(item.get("status") or "Operational")
+		doc.custom_rem_status = st if st in ("Operational", "Under Repair", "Idle", "Maintenance") else "Operational"
+		doc.custom_rem_hours = str(item.get("hours") or "")
+		doc.custom_rem_fuel_cost = parse_bdt(item.get("fuelCost")) if isinstance(item.get("fuelCost"), str) else (item.get("fuelCost") or 0)
+		doc.custom_rem_operator = str(item.get("operator") or "")
+		if item.get("lastService"):
+			doc.custom_rem_last_service = str(item["lastService"])[:10]
+		# Asset requires the linked Item to be a Fixed Asset item
+		_itm = _get_sales_item()
+		frappe.db.set_value("Item", _itm, "is_fixed_asset", 1)
+		doc.item_code = _itm
+		# Asset has mandatory gross_purchase_amount + purchase_date
+		doc.gross_purchase_amount = doc.custom_rem_fuel_cost or 0
+		doc.purchase_date = frappe.utils.today()
+		loc = frappe.db.get_value("Location", {}, "name")
+		if not loc:
+			ld = frappe.new_doc("Location")
+			ld.flags.ignore_permissions = True
+			ld.location_name = "REM Main Site"
+			ld.insert()
+			loc = ld.name
+		doc.location = loc
+		if existing:
+			doc.save()
+			updated += 1
+		else:
+			doc.insert()
+			created += 1
+	frappe.db.commit()
+	return {"created": created, "updated": updated}
+
+
 # ═══ REM SETTINGS (PWA v2.0 server-backed connection config) ═══
 
 def _rem_settings():
@@ -1503,6 +1709,12 @@ def index():
         "journal_sync",
         "invoices_pipeline",
         "payments_pipeline",
+        "contractors_pipeline",
+        "contractors_sync",
+        "work_orders_pipeline",
+        "work_orders_sync",
+        "equipment_pipeline",
+        "equipment_sync",
     ]
     return {
         "service": "MARS Constech REM ERP API bridge",
