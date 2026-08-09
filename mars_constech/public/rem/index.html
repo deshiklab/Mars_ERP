@@ -1458,7 +1458,10 @@ function syncConnect(){
   if(!url||!em||!pw){showToast('Enter server URL, email and password','error');return;}
   API.url=url;
   API.login(em,pw).then(function(r){
-    if(r.status===200&&r.ok&&r.data&&r.data.user){
+    // REAL success = a token came back. The 2FA challenge response also
+    // carries `user` but NO token — requiring token here keeps the challenge
+    // from being misread as "Connected" (it must fall through to the modal).
+    if(r.status===200&&r.ok&&r.data&&r.data.token){
       if(r.data.user)localStorage.setItem('rem_api_user',r.data.user); showToast('Connected to server','success');
       // First push local (rich seed) to the server so the server has full shapes
       API.pushAll().then(function(pr){
