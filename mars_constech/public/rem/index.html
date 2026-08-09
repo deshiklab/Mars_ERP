@@ -1627,6 +1627,39 @@ submitOtp=function(){
   });
 };
 
+// ═══ STALE-COPY SELF-HEAL ═══
+// If this page is an old build (PWA_VERSION != server pwa_version), unregister
+// any stale service workers and reload ONCE (sessionStorage guard prevents
+// loops). This breaks the 'browser keeps serving the old cached copy' cycle
+// that made every fix look like it didn't deploy.
+function staleCopyHeal(){
+  try{
+    if(sessionStorage.getItem('rem_heal_reloaded'))return;
+    var api=(typeof API!=='undefined'&&API.url)||apiBaseUrl();
+    fetch(api+'.index',{method:'GET',credentials:'omit'}).then(function(r){
+      return r.json().catch(function(){return{};});
+    }).then(function(d){
+      var sv=d&&d.message&&d.message.pwa_version;
+      var cur=(typeof API!=='undefined'&&API.PWA_VERSION)||'0';
+      if(!sv||String(sv).trim()===String(cur).trim())return; // current
+      // stale copy → break the cache cycle once
+      if('serviceWorker' in navigator){
+        navigator.serviceWorker.getRegistrations().then(function(regs){
+          return Promise.all(regs.map(function(reg){return reg.unregister();}));
+        }).catch(function(){});
+      }
+      if('caches' in window){
+        caches.keys().then(function(keys){
+          return Promise.all(keys.map(function(k){return caches.delete(k);}));
+        }).catch(function(){});
+      }
+      sessionStorage.setItem('rem_heal_reloaded','1');
+      location.reload(true);
+    }).catch(function(){});
+  }catch(e){}
+}
+setTimeout(staleCopyHeal, 600);
+
 // Auto-connect on boot when a token is stored: verify via bootstrap, heal a
 // stale stored URL (call() does that), check version + session expiry.
 setTimeout(function(){
@@ -1678,7 +1711,9 @@ function syncConnect(){
   var pw=(document.getElementById('syncPass')||{}).value||'';
   if(!url||!em||!pw){showToast('Enter server URL, email and password','error');return;}
   API.url=url;
-  API.login(em,pw).then(function(r){
+  var btn=document.getElementById('syncBtn')||null;
+  if(btn){btn.disabled=true;btn.textContent='⏳ Connecting…';}
+  API.login(em,pw,null,null,{timeout:8000}).then(function(r){
     // REAL success = a token came back. The 2FA challenge response also
     // carries `user` but NO token — requiring token here keeps the challenge
     // from being misread as "Connected" (it must fall through to the modal).
@@ -1706,7 +1741,11 @@ function syncConnect(){
         '<button class="drawer-btn primary" onclick="submitOtp()" id="otpSubmitBtn">Verify</button>');
       setTimeout(function(){var i=document.getElementById('f_otp');if(i){i.focus();}},120);
       window._otpCtx={em:em,pw:pw,tmpId:tmpId};
-    }else showToast((r.data&&r.data.error)||'Login failed','error');
+    }else showToast((r.data&&(r.data.error||r.data.exception))||'Login failed — check server URL','error');
+    if(btn){btn.disabled=false;btn.textContent='🔌 Connect';}
+  }).catch(function(e){
+    if(btn){btn.disabled=false;btn.textContent='🔌 Connect';}
+    showToast('Connection error: '+(e&&e.message?e.message:'could not reach server'),'error');
   });
 }
 function submitOtp(){
