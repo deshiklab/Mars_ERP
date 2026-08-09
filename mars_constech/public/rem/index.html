@@ -1512,6 +1512,75 @@ function projectsPushToERP(){
   });
 }
 
+// ═══ PLOTS & UNITS ERP BRIDGE (PWA Plots/Blocks → ERPNext Item) ═══
+function plotsPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  showToast('Loading plots from ERPNext…','info');
+  API._req('GET','.plots_pipeline').then(function(r){
+    if(r.status===200 && Array.isArray(r.data.plots)){
+      var n=0;
+      r.data.plots.forEach(function(ep){
+        var existing=mockPlots.find(function(p){return String(p.id)===String(ep.id);});
+        if(existing){ Object.assign(existing,ep); n++; }
+        else { mockPlots.push(ep); n++; }
+      });
+      DB.save('plots',mockPlots);
+      showToast('Synced '+n+' plots from ERPNext','success');
+      renderModule();
+    } else {
+      showToast((r.data&&r.data.error)||'Plot pull failed (HTTP '+r.status+')','error');
+    }
+  });
+}
+function plotsPushToERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  showToast('Pushing plots to ERPNext…','info');
+  var payload=mockPlots.map(function(p){
+    return {id:p.id,type:p.type||'3 Katha',status:p.status||'available',block:p.block||'',katha:p.katha||'',price:p.price||'',booking_ref:p.booking_ref||''};
+  });
+  API._req('POST','.plots_sync',{plots:payload}).then(function(r){
+    if(r.status===200){ showToast('Pushed to ERPNext: '+r.data.created+' created, '+r.data.updated+' updated','success'); }
+    else showToast((r.data&&r.data.error)||'Plot push failed','error');
+  });
+}
+
+// ═══ FINANCE ERP BRIDGE (PWA Finance → native ERPNext accounting) ═══
+function financePullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  showToast('Loading finance from ERPNext…','info');
+  API._req('GET','.finance_pipeline').then(function(r){
+    if(r.status===200){
+      var f=r.data;
+      if(Array.isArray(f.coa)&&f.coa.length){ mockCOA=f.coa; DB.save('coa',mockCOA); }
+      if(Array.isArray(f.banks)&&f.banks.length){ mockBankAccounts=f.banks; DB.save('bank_accounts',mockBankAccounts); }
+      if(Array.isArray(f.journals)&&f.journals.length){
+        mockJournals=f.journals.map(function(j){return {id:j.id,date:j.date,ref:j.ref,desc:j.desc,lines:[]};});
+        DB.save('journals',mockJournals);
+      }
+      showToast('COA: '+f.counts.coa+' · banks: '+f.counts.banks+' · journals: '+f.counts.journals,'success');
+      renderModule();
+    } else showToast((r.data&&r.data.error)||'Finance pull failed','error');
+  });
+  // also pull real invoices + payments
+  API._req('GET','.invoices_pipeline').then(function(ir){
+    if(ir.status===200&&Array.isArray(ir.data.invoices)){ mockInvoices=ir.data.invoices; DB.save('invoices',mockInvoices); showToast('Invoices: '+ir.data.count,'info'); renderModule(); }
+  });
+  API._req('GET','.payments_pipeline').then(function(pr){
+    if(pr.status===200&&Array.isArray(pr.data.payments)){ mockPayments=pr.data.payments; DB.save('payments',mockPayments); showToast('Payments: '+pr.data.count,'info'); renderModule(); }
+  });
+}
+function journalPushToERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  showToast('Pushing journals to ERPNext…','info');
+  var payload=mockJournals.map(function(j){
+    return {id:j.id,date:j.date,ref:j.ref||'',desc:j.desc||'',lines:(j.lines||[]).map(function(l){return {acc:l.acc,dr:l.dr,cr:l.cr,party_type:l.party_type||'',party:l.party||''};})};
+  });
+  API._req('POST','.journal_sync',{journals:payload}).then(function(r){
+    if(r.status===200){ showToast('Journals: '+r.data.created+' created, '+r.data.skipped+' skipped','success'); }
+    else showToast((r.data&&r.data.error)||'Journal push failed','error');
+  });
+}
+
 window.mockLeads = DB.init('leads', [
   {id:1,name:'Tariqul Islam',territory:'Dhaka North',phone:'+880 1711 000000',email:'tariqul@example.com',property:'Muktodhara - 5 Katha',status:'Negotiation',priority:'High',type:'Local',source:'Bikroy.com',value:'৳1.5 Cr',lastContact:'2h ago',owner:'Hasanul Banna',nextFollowUp:'Today, 3:00 PM',paymentStatus:'Up to Date',facingDir:'South',floorPref:'Any',flatType:'Land',sizeSqFt:'1800 sqft',paymentPlan:'Construction Link',brokerId:null,
    installments:[{date:'Oct 01, 2024',amount:'৳5,00,000',status:'Paid'},{date:'Nov 01, 2024',amount:'৳5,00,000',status:'Due'}],
@@ -5588,6 +5657,7 @@ function renderPlots(el){
     <div class="toolbar" style="margin-bottom:6px">
       <div class="tabs">${[['layout','📊 Layout'],['inventory','📋 Inventory'],['pricing','💰 Pricing Matrix'],['open','📦 Open Inventory']].map(function(t){return '<div class="tab '+(plotsTab===t[0]?'active':'')+'" onclick="plotsTab=\''+t[0]+'\';_PG={};renderModule()">'+t[1]+'</div>';}).join('')}</div>
       <div class="spacer"></div>
+      <button class="action-btn secondary" onclick="plotsPullFromERP()" style="padding:3px 8px;font-size:10px" title="Load live plots/units from ERPNext (Item)">🔄 Sync from ERP</button>
       <button class="action-btn primary" onclick="crudPlot()" data-perm="Plots & Blocks:Create" style="padding:3px 8px;font-size:10px;display:'+(plotsTab==='inventory'||plotsTab==='open'?'':'none')+'">+ Add Plot</button>
     </div>
     ${plotsTab==='layout'?renderPlotsLayout():
@@ -10063,6 +10133,7 @@ function renderFinance(el){
     <div class="page-title">Finance Dashboard</div><div class="page-subtitle">${mockTransactions.length} transactions \u00B7 \u09F3 ${fmtNum(netProfit)} cash net</div>
     <div class="toolbar" style="margin-bottom:6px">
       <div class="tabs">${['dashboard','transactions','receive_payment','record_expense','invoices','payments','bank_accounts','transfers','journals','budgets','tax','reconcile','statements','credit_notes'].map(t=>`<div class="tab ${finT===t?'active':''}" onclick="financeTab='${t}';_PG={};renderModule()">${{'dashboard':'\uD83D\uDCCA Dashboard','transactions':'\uD83D\uDCCB Transactions','receive_payment':'\u2B07\uFE0F Receive','record_expense':'\u2B06\uFE0F Expense','invoices':'\uD83D\uDCC4 Invoices','payments':'\uD83D\uDCB0 Payments','bank_accounts':'\uD83C\uDFE6 Banks','transfers':'\uD83D\uDD01 Transfers','journals':'\uD83D\uDCD2 Journals','budgets':'\uD83D\uDCD0 Budgets','tax':'\uD83E\uDDFE Tax','reconcile':'\uD83D\uDD01 Reconcile','statements':'\uD83D\uDCCA Statements','credit_notes':'\uD83E\uDDFE Credit Notes'}[t]}</div>`).join('')}</div>
+      <button class="action-btn secondary" onclick="financePullFromERP()" style="padding:3px 8px;font-size:10px" title="Load live COA/journals/invoices/payments from ERPNext">🔄 Sync from ERP</button>
     </div>
     ${finT==='dashboard'?renderFinanceDashboard(grossIncome,grossExpense,netProfit,bankTotal):
       finT==='transactions'?renderFinanceTransactions():

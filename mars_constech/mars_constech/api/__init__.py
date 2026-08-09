@@ -1048,6 +1048,331 @@ def tasks_sync(tasks=None):
 	return {"created": created, "updated": updated}
 
 
+
+# ═══ PLOTS & UNITS BRIDGE (PWA Plots/Blocks → ERPNext Item) ═══
+
+PLOT_STAGES = ["available", "reserved", "sold", "not_acquired"]
+
+
+def _plot_to_pwa(it):
+	"""Map a native Item (with REM custom fields) to the PWA plot contract."""
+	return {
+		"id": it.item_code or "",
+		"type": it.custom_rem_type or "3 Katha",
+		"status": it.custom_rem_status or "available",
+		"block": it.custom_rem_block or "",
+		"katha": it.custom_rem_katha or "",
+		"price": _fmt_bdt(it.custom_rem_price or 0),
+		"booking_ref": it.custom_rem_booking_ref or "",
+		"name": it.name,
+	}
+
+
+@frappe.whitelist()
+def plots_pipeline():
+	"""Pull all REM plot Items in the PWA contract."""
+	rows = frappe.get_all(
+		"Item",
+		# custom-field DEFAULTS get written onto every existing Item when the
+		# fields are created — block is the marker that separates real plot
+		# Items (A/B/C blocks) from the seeded charge/quote Items.
+		filters=[["custom_rem_block", "is", "set"]],
+		fields=["name", "item_code", "custom_rem_type", "custom_rem_block", "custom_rem_status",
+				"custom_rem_katha", "custom_rem_price", "custom_rem_booking_ref"],
+		order_by="item_code asc",
+		limit_page_length=2000,
+	)
+	return {"count": len(rows), "plots": [_plot_to_pwa(r) for r in rows]}
+
+
+@frappe.whitelist()
+def plots_sync(plots=None):
+	"""Upsert plots pushed from the PWA (dedupe via item_code)."""
+	if not plots or not isinstance(plots, list):
+		frappe.throw(_("plots must be a list"), frappe.ValidationError)
+	created = updated = 0
+	for item in plots:
+		if not isinstance(item, dict) or not item.get("id"):
+			continue
+		existing = frappe.db.get_value("Item", {"item_code": str(item["id"])})
+		doc = frappe.get_doc("Item", existing) if existing else frappe.new_doc("Item")
+		doc.flags.ignore_permissions = True
+		doc.item_code = str(item["id"])[:140]
+		doc.item_name = str(item["id"])[:140]
+		doc.item_group = "All Item Groups"
+		doc.stock_uom = "Nos"
+		doc.is_stock_item = 0
+		doc.custom_rem_type = str(item.get("type") or "3 Katha")
+		doc.custom_rem_block = str(item.get("block") or "")
+		st = str(item.get("status") or "available")
+		doc.custom_rem_status = st if st in PLOT_STAGES else "available"
+		doc.custom_rem_katha = str(item.get("katha") or "")
+		doc.custom_rem_price = parse_bdt(item.get("price"))
+		doc.custom_rem_booking_ref = str(item.get("booking_ref") or "")
+		if existing:
+			doc.save()
+			updated += 1
+		else:
+			doc.insert()
+			created += 1
+	frappe.db.commit()
+	return {"created": created, "updated": updated}
+
+
+@frappe.whitelist()
+def plot_update_status(name=None, status=None, booking_ref=None):
+	"""Set a plot's status (available/reserved/sold/not_acquired)."""
+	if not name or status not in PLOT_STAGES:
+		frappe.throw(_("Invalid plot/status"), frappe.ValidationError)
+	doc = frappe.get_doc("Item", name)
+	doc.custom_rem_status = status
+	if booking_ref is not None:
+		doc.custom_rem_booking_ref = str(booking_ref)
+	doc.save(ignore_permissions=True)
+	frappe.db.commit()
+	return _plot_to_pwa(doc)
+
+
+
+# ═══ FINANCE BRIDGE (PWA Finance → native ERPNext accounting) ═══
+
+ROOT_TYPE_MAP = {"Asset": "Asset", "Liability": "Liability", "Income": "Income", "Expense": "Expense"}
+
+
+def _gl_balance(account):
+	"""Live GL balance for an account (debit - credit)."""
+	row = frappe.db.sql(
+		"SELECT SUM(debit) - SUM(credit) FROM `tabGL Entry` WHERE account=%s AND is_cancelled=0",
+		account,
+	)
+	return float(row[0][0] or 0) if row else 0.0
+
+
+def _acc_to_pwa(a, bal):
+	return {
+		"code": a.name,
+		"name": a.account_name or a.name,
+		"type": ROOT_TYPE_MAP.get(a.root_type or a.report_type or "", a.root_type or "Asset"),
+		"balance": _fmt_bdt(bal),
+	}
+
+
+@frappe.whitelist()
+def finance_pipeline():
+	"""Pull the real chart of accounts (with live GL balances), bank accounts, journals."""
+	# 1. Chart of accounts — non-group accounts with live balances
+	accts = frappe.get_all(
+		"Account",
+		filters={"is_group": 0, "disabled": 0},
+		fields=["name", "account_name", "root_type", "report_type"],
+		order_by="name asc",
+		limit_page_length=2000,
+	)
+	coa = []
+	for a in accts:
+		bal = _gl_balance(a.name)
+		# only include accounts that have activity or are in the PWA's set
+		coa.append(_acc_to_pwa(a, bal))
+
+	# 2. Bank accounts (native Bank Account doctype)
+	banks = frappe.get_all(
+		"Bank Account",
+		fields=["name", "bank", "account_name", "account", "account_type"],
+		order_by="name asc",
+		limit_page_length=200,
+	)
+	bank_list = []
+	for b in banks:
+		bank_list.append({
+			"name": b.bank or b.name or "",
+			"account": b.account or b.account_name or "",
+			"branch": "",
+			"type": b.account_type or "",
+			"balance": "৳0",
+		})
+
+	# 3. Journal entries (native)
+	journals = frappe.get_all(
+		"Journal Entry",
+		filters={"docstatus": 1},
+		fields=["name", "posting_date", "user_remark", "total_debit", "voucher_type"],
+		order_by="posting_date desc",
+		limit_page_length=200,
+	)
+	journal_list = []
+	for j in journals:
+		journal_list.append({
+			"id": j.name,
+			"date": str(j.posting_date or "")[:10],
+			"ref": j.voucher_type or "",
+			"desc": (j.user_remark or "")[:120],
+			"total": j.total_debit or 0,
+		})
+
+	return {
+		"coa": coa,
+		"banks": bank_list,
+		"journals": journal_list,
+		"counts": {"coa": len(coa), "banks": len(bank_list), "journals": len(journal_list)},
+	}
+
+
+def _resolve_account(acc_ref):
+	"""Resolve a PWA account ref ('1-1000 Cash & Bank' or '1110 - Cash - MC') to a native Account name."""
+	if not acc_ref:
+		return ""
+	# 1. exact match
+	if frappe.db.exists("Account", acc_ref):
+		return acc_ref
+	# 2. match by account_name (case-insensitive)
+	name_part = acc_ref.split(" ", 1)[-1].strip() if " " in acc_ref else acc_ref
+	row = frappe.db.sql(
+		"SELECT name FROM `tabAccount` WHERE is_group=0 AND LOWER(account_name)=LOWER(%s) LIMIT 1",
+		name_part,
+	)
+	if row:
+		return row[0][0]
+	# 3. fuzzy: account_name LIKE %part%
+	row = frappe.db.sql(
+		"SELECT name FROM `tabAccount` WHERE is_group=0 AND LOWER(account_name) LIKE LOWER(%s) LIMIT 1",
+		"%" + name_part + "%",
+	)
+	if row:
+		return row[0][0]
+	return ""
+
+
+@frappe.whitelist()
+def journal_sync(journals=None):
+	"""Create native Journal Entries from PWA journals (one per journal)."""
+	if not journals or not isinstance(journals, list):
+		frappe.throw(_("journals must be a list"), frappe.ValidationError)
+	created = skipped = 0
+	company = frappe.db.get_single_value("Global Defaults", "default_company") or ""
+	for item in journals:
+		if not isinstance(item, dict) or not item.get("lines") or not item["lines"]:
+			continue
+		# skip if already synced (dedupe via custom_rem_ref — JE title is auto-set)
+		if item.get("id") and frappe.db.get_value("Journal Entry", {"custom_rem_ref": str(item["id"])}):
+			skipped += 1
+			continue
+		entries = []
+		valid = True
+		for ln in item["lines"] or []:
+			acc = _resolve_account(ln.get("acc") or "")
+			if not acc:
+				valid = False
+				break
+			line = {
+				"account": acc,
+				"debit_in_account_currency": float(ln.get("dr") or 0),
+				"credit_in_account_currency": float(ln.get("cr") or 0),
+			}
+			# AR/AP accounts need party_type + party on the line
+			at = frappe.db.get_value("Account", acc, "account_type")
+			if at in ("Receivable", "Payable"):
+				if not ln.get("party_type") or not ln.get("party"):
+					valid = False
+					break
+				line["party_type"] = str(ln["party_type"])
+				line["party"] = str(ln["party"])
+			entries.append(line)
+		if not valid:
+			skipped += 1
+			continue
+		je = frappe.get_doc({
+			"doctype": "Journal Entry",
+			"posting_date": str(item.get("date") or "")[:10] or frappe.utils.today(),
+			"user_remark": "REM-" + str(item.get("id") or "") + " " + str(item.get("desc") or "")[:100],
+			"custom_rem_ref": str(item.get("id") or ""),
+			"company": company,
+			"voucher_type": "Journal Entry",
+			"accounts": entries,
+		})
+		je.flags.ignore_permissions = True
+		je.flags.ignore_mandatory = True
+		frappe.set_user("Administrator")
+		try:
+			je.insert()
+			je.submit()
+			created += 1
+		except Exception:
+			frappe.db.rollback()
+			skipped += 1
+		finally:
+			frappe.set_user(frappe.session.user)
+	frappe.db.commit()
+	return {"created": created, "skipped": skipped}
+
+
+
+# ═══ INVOICES & PAYMENTS BRIDGE (real Sales Invoice / Payment Entry → PWA) ═══
+
+@frappe.whitelist()
+def invoices_pipeline():
+	"""Pull submitted Sales Invoices in the PWA invoice contract."""
+	rows = frappe.get_all(
+		"Sales Invoice",
+		filters={"docstatus": 1},
+		fields=["name", "customer_name", "posting_date", "due_date", "grand_total", "status", "outstanding_amount"],
+		order_by="posting_date desc",
+		limit_page_length=300,
+	)
+	out = []
+	for r in rows:
+		out.append({
+			"id": r.name,
+			"client": r.customer_name or "",
+			"project": "",
+			"unit": "",
+			"amount": r.grand_total or 0,
+			"status": _inv_status(r.status, r.outstanding_amount),
+			"dueDate": str(r.due_date or "")[:10],
+			"issuedDate": str(r.posting_date or "")[:10],
+			"desc": "",
+			"items": [],
+		})
+	return {"count": len(out), "invoices": out}
+
+
+def _inv_status(erp_status, outstanding):
+	"""Map ERPNext Sales Invoice status → PWA status."""
+	erp_status = erp_status or ""
+	if "Paid" in erp_status:
+		return "Paid"
+	if "Overdue" in erp_status:
+		return "Overdue"
+	if float(outstanding or 0) > 0:
+		return "Unpaid"
+	return erp_status or "Paid"
+
+
+@frappe.whitelist()
+def payments_pipeline():
+	"""Pull submitted Payment Entries in the PWA payment contract."""
+	rows = frappe.get_all(
+		"Payment Entry",
+		filters={"docstatus": 1, "payment_type": "Receive"},
+		fields=["name", "party", "posting_date", "paid_amount", "mode_of_payment", "reference_no"],
+		order_by="posting_date desc",
+		limit_page_length=300,
+	)
+	out = []
+	for r in rows:
+		out.append({
+			"id": r.name,
+			"invoiceId": "",
+			"client": r.party or "",
+			"amount": r.paid_amount or 0,
+			"date": str(r.posting_date or "")[:10],
+			"method": r.mode_of_payment or "",
+			"reference": r.reference_no or "",
+			"status": "Cleared",
+			"notes": "",
+		})
+	return {"count": len(out), "payments": out}
+
+
 # ═══ REM SETTINGS (PWA v2.0 server-backed connection config) ═══
 
 def _rem_settings():
@@ -1171,6 +1496,13 @@ def index():
         "projects_sync",
         "tasks_pipeline",
         "tasks_sync",
+        "plots_pipeline",
+        "plots_sync",
+        "plot_update_status",
+        "finance_pipeline",
+        "journal_sync",
+        "invoices_pipeline",
+        "payments_pipeline",
     ]
     return {
         "service": "MARS Constech REM ERP API bridge",
