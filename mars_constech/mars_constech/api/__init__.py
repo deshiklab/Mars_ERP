@@ -21,12 +21,14 @@ import json
 from datetime import date
 
 import frappe
+from frappe.rate_limiter import rate_limit
 from frappe import _
 
 REM_COLLECTION_DOCTYPE = "REM Collection"
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=10, seconds=60, ip_based=True)
 def login(usr=None, pwd=None, email=None, password=None):
 	"""Login and mint a token. Accepts both (usr/pwd) and (email/password) forms."""
 	user = usr or email
@@ -119,6 +121,7 @@ def bootstrap():
 
 
 @frappe.whitelist()
+@rate_limit(limit=60, seconds=60)
 def sync(collections=None):
 	"""Upsert collections pushed from the PWA. Returns row counts."""
 	if not collections:
@@ -676,6 +679,7 @@ def _fmt_followup(dt):
 
 
 @frappe.whitelist()
+@rate_limit(limit=60, seconds=60)
 def leads_pipeline():
 	"""Pull all leads (native Lead doctype) in the PWA contract."""
 	rows = frappe.get_all(
@@ -837,6 +841,7 @@ def _booking_to_pwa(b):
 
 
 @frappe.whitelist()
+@rate_limit(limit=60, seconds=60)
 def bookings_pipeline():
 	"""Pull all REM Bookings in the PWA contract (incl. payment schedule)."""
 	rows = frappe.get_all(
@@ -1109,6 +1114,7 @@ def _pj_stage(status):
 
 
 @frappe.whitelist()
+@rate_limit(limit=60, seconds=60)
 def projects_pipeline():
 	"""Pull all Projects in the PWA contract."""
 	rows = frappe.get_all(
@@ -1342,6 +1348,7 @@ def _acc_to_pwa(a, bal):
 
 
 @frappe.whitelist()
+@rate_limit(limit=60, seconds=60)
 def finance_pipeline():
 	"""Pull the real chart of accounts (with live GL balances), bank accounts, journals."""
 	# 1. Chart of accounts — non-group accounts with live balances
@@ -1880,6 +1887,7 @@ def lead_activity_add(name=None, activity=None):
 
 
 @frappe.whitelist()
+@rate_limit(limit=60, seconds=60)
 def brokers_pipeline():
     """Brokers from REM Broker doctype (PWA broker card shape)."""
     rows = frappe.get_all("REM Broker",
@@ -1923,6 +1931,7 @@ def brokers_sync(brokers=None):
 
 
 @frappe.whitelist()
+@rate_limit(limit=60, seconds=60)
 def complaints_pipeline():
     """Complaints from native Issue doctype (issue_type=Complaint)."""
     rows = frappe.get_all("Issue",
@@ -2571,6 +2580,7 @@ def boq_sync(boq=None):
 
 # ═══ STOCK & PROCUREMENT BRIDGE (Milestone C) ═══
 @frappe.whitelist()
+@rate_limit(limit=60, seconds=60)
 def inventory_pipeline():
     """Real stock items with live bin quantities (PWA inventory contract)."""
     items = frappe.get_all(
@@ -2776,6 +2786,7 @@ _HR_STATUS_MAP = {
 
 
 @frappe.whitelist()
+@rate_limit(limit=60, seconds=60)
 def employees_pipeline():
     """Real employees from the native Employee doctype (PWA contract)."""
     rows = frappe.get_all(
@@ -3089,6 +3100,7 @@ def _due_bucket(days):
 
 
 @frappe.whitelist()
+@rate_limit(limit=60, seconds=60)
 def dues_pipeline():
     """Real Dues & Recovery: unpaid installments per booking + unpaid invoices.
 
@@ -3321,10 +3333,14 @@ def index():
         "equipment_pipeline",
         "equipment_sync",
     ]
-    return {
+    out = {
         "service": "MARS Constech REM ERP API bridge",
         "status": "ok",
         "usage": "Append an endpoint to this base URL, e.g. .../api.method.login",
-        "endpoints": endpoints,
+        "endpoints": None,
         "server_time": frappe.utils.now(),
     }
+    # M2: guests get health only — no API enumeration without a session.
+    if frappe.session.user and frappe.session.user != "Guest":
+        out["endpoints"] = endpoints
+    return out
