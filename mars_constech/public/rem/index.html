@@ -1034,7 +1034,7 @@
         <div class="icon-btn" onclick="toggleNotifications()" title="Notifications" style="position:relative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><div id="notifBadge">0</div></div>
         <div class="icon-btn" id="moreBtn" onclick="toggleMoreMenu(event)" title="More" style="display:none">⋯</div>
         <div class="icon-btn" id="globalSyncBtn" onclick="globalSyncAll(event&&event.shiftKey)" title="Sync all with server (Shift+click = force full refresh)" style="position:relative;color:#2F80ED"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:16px;height:16px"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg><span id="globalSyncBadge" style="display:none;position:absolute;top:-4px;right:-4px;background:#2e7d32;color:#fff;font-size:8px;font-weight:700;border-radius:8px;padding:1px 4px;line-height:1.3">✓</span></div>
-        <div class="user-avatar" onclick="toggleRoleMenu()" title="Switch Role">SA</div>
+        <div class="user-avatar" onclick="toggleRoleMenu()" title="User Profile">MM</div>
       </div>
     </div>
     <div id="moreDropdown" class="more-dropdown"></div>
@@ -1056,7 +1056,7 @@
         <span class="ft-extra" onclick="toggleLang()" id="footerLangBtn" style="cursor:pointer;font-size:9px;font-weight:700;color:#555;padding:1px 5px;border:1px solid #d0d8e8;border-radius:4px" title="বাংলা / English">EN</span>
         <span class="ft-extra" onclick="toggleDarkMode()" id="footerThemeBtn" style="cursor:pointer;font-size:12px;padding:1px 4px;border-radius:3px" title="Toggle Theme">🌙</span>
         <span class="ft-extra" style="color:#e0e0e0">|</span>
-        <span class="ft-extra" id="footerRoleBtn" onclick="toggleRoleMenu()" style="cursor:pointer;font-size:10px;font-weight:600;color:#2F80ED;padding:1px 6px;border:1px solid #d0d8e8;border-radius:4px" title="Switch Role">SA</span>
+        <span class="ft-extra" id="footerRoleBtn" onclick="toggleRoleMenu()" style="cursor:pointer;font-size:10px;font-weight:600;color:#2F80ED;padding:1px 6px;border:1px solid #d0d8e8;border-radius:4px" title="User Profile">MM</span>
       </div>
     </div>
   </div>
@@ -1069,14 +1069,26 @@
 </div></div>
 
 <div id="roleMenuPanel" class="slide-out"><div class="backdrop" onclick="toggleRoleMenu()"></div><div class="panel">
-  <div style="padding:12px 14px;border-bottom:1px solid #e8e8e8"><span style="font-size:13px;font-weight:600">Switch Role</span></div>
-  <div style="flex:1;overflow-y:auto;padding:10px">
-    <div style="margin-bottom:6px;font-size:10px;color:#888">Current: <span id="roleDisplay" style="font-weight:600;color:#2F80ED">Super Admin</span></div>
-    <div onclick="setRole('Super Admin')" class="role-opt" data-role="Super Admin" style="padding:8px 10px;border-radius:6px;cursor:pointer;margin-bottom:3px;background:#eef3ff;font-weight:500;font-size:12px">Super Admin</div>
-    <div onclick="setRole('Sales Agent')" class="role-opt" data-role="Sales Agent" style="padding:8px 10px;border-radius:6px;cursor:pointer;margin-bottom:3px;font-size:12px">Sales Agent</div>
-    <div onclick="setRole('Site Engineer')" class="role-opt" data-role="Site Engineer" style="padding:8px 10px;border-radius:6px;cursor:pointer;margin-bottom:3px;font-size:12px">Site Engineer</div>
-    <div onclick="setRole('Finance')" class="role-opt" data-role="Finance" style="padding:8px 10px;border-radius:6px;cursor:pointer;margin-bottom:3px;font-size:12px">Finance</div>
-    <div style="margin-top:10px;border-top:1px solid #e8e8e8;padding-top:8px"><button onclick="resetDemoData()" style="width:100%;padding:7px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;color:#c62828;background:#fff5f5;border:1px solid #ffcdd2">↺ Reset Demo Data</button></div>
+  <div style="padding:14px 16px;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;gap:12px">
+    <div id="pfAvatar" style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#2f80ed,#0d1b2a);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700">MM</div>
+    <div style="flex:1;min-width:0">
+      <div id="pfName" style="font-size:13px;font-weight:600;color:#0d1b2a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
+      <div id="pfEmail" style="font-size:10px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:12px 14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 10px;background:#f5f8ff;border:1px solid #e0e8f5;border-radius:8px;margin-bottom:6px">
+      <span style="font-size:10px;color:#555">Role</span>
+      <span id="roleDisplay" style="font-size:11px;font-weight:600;color:#2F80ED">Super Admin</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 10px;background:#fafafa;border:1px solid #eee;border-radius:8px;margin-bottom:6px">
+      <span style="font-size:10px;color:#555">Session</span>
+      <span id="pfSession" style="font-size:10px;color:#666">8h</span>
+    </div>
+    <div id="pfRoles" style="font-size:9px;color:#999;padding:2px 4px 8px;line-height:1.5"></div>
+  </div>
+  <div style="padding:12px 14px;border-top:1px solid #e8e8e8">
+    <button onclick="profileSignOut()" style="width:100%;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:11px;font-weight:600;color:#c62828;background:#fff5f5;border:1px solid #ffcdd2">⎋ Sign Out</button>
   </div>
 </div></div>
 
@@ -1518,6 +1530,7 @@ function _onPwaLogin(d){
   localStorage.setItem('rem_api_token',d.token);
   localStorage.setItem('rem_api_url',API.url);
   if(d.user)localStorage.setItem('rem_api_user',d.user);
+  if(d.full_name)localStorage.setItem('rem_api_name',d.full_name);
   if(d.roles)localStorage.setItem('rem_api_roles',JSON.stringify(d.roles));
   var role=_pwaRoleFor(d.roles);
   currentRole=role;
@@ -12696,7 +12709,7 @@ function resetPermissions(){
   renderModule();
 }
 function _rolesMatrixHtml(){
-  return '<div class="card"><div class="card-header"><h3>🔐 Permission Matrix — Role: '+currentRole+'</h3><button class="action-btn primary" onclick="showToast(\'Permissions saved!\',\'success\')" style="padding:3px 7px;font-size:9px">Save Permissions</button></div><div class="card-body" style="padding:0"><div class="table-wrap" style="max-height:380px;overflow-y:auto"><table style="font-size:10px"><thead><tr style="position:sticky;top:0;background:#fff"><th style="min-width:130px;background:#fff;z-index:1">Module</th>'+PERMISSION_ACTIONS.map(function(a){return '<th style="text-align:center;min-width:55px;background:#f0f4ff;color:#2F80ED;font-size:9px">'+a+'</th>';}).join('')+'</tr></thead><tbody>'+PERMISSION_MODULES.map(function(m,mi){var perms=(MOCK_PERMISSIONS[currentRole]||MOCK_PERMISSIONS['Super Admin'])[mi];return '<tr><td style="font-weight:500;padding:5px 10px">'+m+'</td>'+PERMISSION_ACTIONS.map(function(a,ai){return '<td style="text-align:center;padding:5px"><div onclick="showToast(\'Toggle permission for '+m+': '+a+'\',\'info\')" style="width:20px;height:20px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;background:'+(perms[ai]==='✓'?'#2F80ED':'#e0e0e0')+';color:#fff;font-size:10px;font-weight:700;transition:all .15s;user-select:none">'+(perms[ai]==='✓'?'✓':'')+'</div></td>';}).join('')+'</tr>';}).join('')+'</tbody></table></div></div></div><div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span style="font-size:10px;color:#888">Quick role switch:</span>'+['Super Admin','Sales Agent','Site Engineer','Finance'].map(function(r){return '<div onclick="setRole(\''+r+'\')" style="padding:4px 10px;border-radius:6px;cursor:pointer;font-size:10px;font-weight:500;background:'+(r===currentRole?'#2F80ED':'#f0f0f0')+';color:'+(r===currentRole?'#fff':'#555')+';border:none;transition:all .15s">'+r+'</div>';}).join('')+'</div>';
+  return '<div class="card"><div class="card-header"><h3>🔐 Permission Matrix — Role: '+currentRole+'</h3><button class="action-btn primary" onclick="showToast(\'Permissions saved!\',\'success\')" style="padding:3px 7px;font-size:9px">Save Permissions</button></div><div class="card-body" style="padding:0"><div class="table-wrap" style="max-height:380px;overflow-y:auto"><table style="font-size:10px"><thead><tr style="position:sticky;top:0;background:#fff"><th style="min-width:130px;background:#fff;z-index:1">Module</th>'+PERMISSION_ACTIONS.map(function(a){return '<th style="text-align:center;min-width:55px;background:#f0f4ff;color:#2F80ED;font-size:9px">'+a+'</th>';}).join('')+'</tr></thead><tbody>'+PERMISSION_MODULES.map(function(m,mi){var perms=(MOCK_PERMISSIONS[currentRole]||MOCK_PERMISSIONS['Super Admin'])[mi];return '<tr><td style="font-weight:500;padding:5px 10px">'+m+'</td>'+PERMISSION_ACTIONS.map(function(a,ai){return '<td style="text-align:center;padding:5px"><div onclick="showToast(\'Toggle permission for '+m+': '+a+'\',\'info\')" style="width:20px;height:20px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;background:'+(perms[ai]==='✓'?'#2F80ED':'#e0e0e0')+';color:#fff;font-size:10px;font-weight:700;transition:all .15s;user-select:none">'+(perms[ai]==='✓'?'✓':'')+'</div></td>';}).join('')+'</tr>';}).join('')+'</tbody></table></div></div></div><div style="margin-top:8px;font-size:10px;color:#999">Access is determined by your signed-in ERPNext role. Ask an Administrator to change roles in the ERPNext desk.</div>';
 }
 // ═══ CALENDAR & ANNOUNCEMENTS (Phase 1.5 + 1.6) ═══
 window.mockCalendarEvents = DB.init('calendar_events', [
@@ -13591,7 +13604,39 @@ function printReport(){
     setTimeout(function(){pr.style.display='none';},100);
   },200);
 }
-function toggleRoleMenu(){document.getElementById('roleMenuPanel').classList.toggle('active')}
+function toggleRoleMenu(){updateProfile();document.getElementById('roleMenuPanel').classList.toggle('active')}
+function _userInitials(){
+  var u=localStorage.getItem('rem_api_user')||'';
+  var n=localStorage.getItem('rem_api_name')||'';
+  var src=(n||u||'User');
+  return src.split(/[\s@._-]+/).filter(Boolean).slice(0,2).map(function(w){return w[0].toUpperCase()}).join('')||'U';
+}
+function updateProfile(){
+  var u=localStorage.getItem('rem_api_user')||'—';
+  var n=localStorage.getItem('rem_api_name')||'';
+  var roles=[]; try{ roles=JSON.parse(localStorage.getItem('rem_api_roles')||'[]'); }catch(e){}
+  var nm=document.getElementById('pfName'); if(nm)nm.textContent=n||u;
+  var em=document.getElementById('pfEmail'); if(em)em.textContent=u;
+  var av=document.getElementById('pfAvatar'); if(av)av.textContent=_userInitials();
+  var rd=document.getElementById('roleDisplay'); if(rd)rd.textContent=currentRole||'—';
+  var ps=document.getElementById('pfSession');
+  if(ps)ps.textContent=API._sessionLeft?API._sessionLeft():'8h';
+  var pr=document.getElementById('pfRoles');
+  if(pr)pr.textContent=roles.length?('Server roles: '+roles.join(', ')):'';
+  var fb=document.getElementById('footerRoleBtn'); if(fb)fb.textContent=_userInitials();
+}
+function profileSignOut(){
+  if(!confirm('Sign out of REM ERP?'))return;
+  API.logout().then(function(){
+    API.token=''; API.connected=false;
+    localStorage.removeItem('rem_api_token'); localStorage.removeItem('rem_session_started');
+    localStorage.removeItem('rem_api_roles'); localStorage.removeItem('rem_role');
+    currentRole='Super Admin';
+    showLoginGate();
+    showToast('Signed out — see you soon','info');
+  });
+}
+
 function resetDemoData(){if(!confirm('Reset ALL demo data to pristine seed state?'))return;localStorage.clear();location.reload();}
 function closeLeadPanel(){document.getElementById('leadSlideOut').classList.remove('active')}
 // ═══ ROLE-BASED ACCESS CONTROL ═══
@@ -13686,13 +13731,11 @@ function canApprove(mod){return hasPerm(mod||currentModule||'Dashboard','Approve
 function setRole(role){
   currentRole=role;
   localStorage.setItem('rem_role',role);
-  document.getElementById('roleDisplay').textContent=role;
-  document.querySelectorAll('.role-opt').forEach(function(e){
-    e.style.background=e.dataset.role===role?'#eef3ff':'transparent';
-    e.style.fontWeight=e.dataset.role===role?'600':'400';
-  });
+  var rd=document.getElementById('roleDisplay');
+  if(rd)rd.textContent=role;
+  // footer button shows the USER initials, not the role (profile button)
   var fb=document.getElementById('footerRoleBtn');
-  if(fb)fb.textContent=role.split(' ').map(function(w){return w[0]}).join('').slice(0,2).toUpperCase();
+  if(fb)fb.textContent=_userInitials();
   document.querySelectorAll('#sidebarNav .sidebar-item').forEach(function(el){
     var g=el.id.replace('s_','');
     if(!g||g===''||role==='Super Admin'){el.style.display='flex';return}
@@ -14293,15 +14336,10 @@ function clearSearch(){var el=document.getElementById('searchActLog');if(el){el.
 initTheme();
 if(typeof setLang==='function')setLang(localStorage.getItem('rem_lang')||'en');
 var savedRole=localStorage.getItem('rem_role');
-if(savedRole&&['Super Admin','Sales Agent','Site Engineer','Finance'].indexOf(savedRole)>=0){
+if(savedRole){
   currentRole=savedRole;
-  document.getElementById('roleDisplay').textContent=savedRole;
-  document.querySelectorAll('.role-opt').forEach(function(e){
-    e.style.background=e.dataset.role===savedRole?'#eef3ff':'transparent';
-    e.style.fontWeight=e.dataset.role===savedRole?'600':'400';
-  });
-  var fb=document.getElementById('footerRoleBtn');
-  if(fb)fb.textContent=savedRole.split(' ').map(function(w){return w[0]}).join('').slice(0,2).toUpperCase();
+  var rd=document.getElementById('roleDisplay'); if(rd)rd.textContent=savedRole;
+  var fb=document.getElementById('footerRoleBtn'); if(fb)fb.textContent=_userInitials();
 }
 let backupTab='all';
 let currentZoom=100;
@@ -18193,7 +18231,7 @@ function buildMoreMenu(){
     '<div class="mm-mod" onclick="toggleLang();closeMoreMenu()"><span>🔤 '+(LANG==='bn'?'English (EN)':'বাংলা (BN)')+'</span></div>'+
     '<div class="mm-sep"></div>'+
     '<div class="mm-mod" onclick="toggleNotifications();closeMoreMenu()"><span>🔔 Notifications <span class="mm-badge" style="background:#2F80ED">'+notifCount+'</span></span></div>'+
-    '<div class="mm-mod" onclick="toggleRoleMenu();closeMoreMenu()"><span>👤 Switch Role</span></div>';
+    '<div class="mm-mod" onclick="toggleRoleMenu();closeMoreMenu()"><span>👤 User Profile</span></div>';
   md.innerHTML=html;
 }
 // ═══ TAB SCROLL ARROWS (mobile) ═══

@@ -30,7 +30,8 @@ app_license = "mit"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/mars_constech/css/mars_constech.css"
-# web_include_js = "/assets/mars_constech/js/mars_constech.js"
+# REM ERP: adds the 'Open REM ERP PWA' shortcut to the ERPNext login page
+web_include_js = "/assets/mars_constech/js/rem_pwa_login_link.js"
 
 # include custom scss in every website theme (without file extension ".scss")
 # website_theme_scss = "mars_constech/public/scss/website"
