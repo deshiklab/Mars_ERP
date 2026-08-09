@@ -14,13 +14,25 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: () => import('../views/DashboardView.vue'),
-      meta: { module: 'dashboard' }
+      meta: { module: 'dashboard', title: 'Dashboard' }
     },
     {
       path: '/leads',
       name: 'leads',
       component: () => import('../views/LeadsView.vue'),
-      meta: { module: 'crm' }
+      meta: { module: 'crm', title: 'CRM & Leads' }
+    },
+    {
+      path: '/bookings',
+      name: 'bookings',
+      component: () => import('../views/BookingsView.vue'),
+      meta: { module: 'bookings', title: 'Bookings' }
+    },
+    {
+      path: '/dues',
+      name: 'dues',
+      component: () => import('../views/DuesView.vue'),
+      meta: { module: 'dues', title: 'Dues & Collections' }
     },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]

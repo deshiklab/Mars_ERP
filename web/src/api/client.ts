@@ -8,7 +8,9 @@
  */
 import type {
   ApiError,
+  Booking,
   BootstrapResponse,
+  Due,
   Lead,
   LoginResponse,
   PipelineResponse
@@ -113,6 +115,24 @@ class ApiClient {
 
   async leadUpdateStatus(id: string, status: string): Promise<ApiResult<{ ok: boolean }>> {
     return this.request<{ ok: boolean }>('lead_update_status', { method: 'POST', body: { id, status } })
+  }
+
+  async bookingsPipeline(): Promise<ApiResult<PipelineResponse<Booking>>> {
+    return this.request<PipelineResponse<Booking>>('bookings_pipeline')
+  }
+
+  async bookingUpdateStatus(id: string, status: string): Promise<ApiResult<{ ok: boolean }>> {
+    return this.request<{ ok: boolean }>('booking_update_status', { method: 'POST', body: { id, status } })
+  }
+
+  async duesPipeline(): Promise<ApiResult<PipelineResponse<Due>>> {
+    return this.request<PipelineResponse<Due>>('dues_pipeline')
+  }
+
+  async duesUpdate(id: string, status: string, paid?: number): Promise<ApiResult<{ ok: boolean }>> {
+    const body: Record<string, unknown> = { id, status }
+    if (paid !== undefined) body.paid = paid
+    return this.request<{ ok: boolean }>('dues_update', { method: 'POST', body })
   }
 
   async sync(collection: string): Promise<ApiResult<{ rows: number }>> {

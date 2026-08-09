@@ -1,9 +1,9 @@
 /**
- * Data store — server snapshot (bootstrap) + CRM leads.
+ * Data store — server snapshot (bootstrap) + CRM leads + bookings + dues.
  */
 import { defineStore } from 'pinia'
 import { api, apiErrorText } from '@/api/client'
-import type { Lead } from '@/api/types'
+import type { Booking, Due, Lead } from '@/api/types'
 
 export interface DashboardStats {
   bookings: number
@@ -18,6 +18,10 @@ interface DataState {
   stats: DashboardStats | null
   leads: Lead[]
   leadsLoading: boolean
+  bookings: Booking[]
+  bookingsLoading: boolean
+  dues: Due[]
+  duesLoading: boolean
   error: string
 }
 
@@ -26,6 +30,10 @@ export const useDataStore = defineStore('data', {
     stats: null,
     leads: [],
     leadsLoading: false,
+    bookings: [],
+    bookingsLoading: false,
+    dues: [],
+    duesLoading: false,
     error: ''
   }),
 
@@ -65,6 +73,54 @@ export const useDataStore = defineStore('data', {
       if (r.ok) {
         const lead = this.leads.find((l) => l.id === id)
         if (lead) lead.status = status
+        return true
+      }
+      this.error = apiErrorText(r)
+      return false
+    },
+
+    async loadBookings(): Promise<void> {
+      this.bookingsLoading = true
+      this.error = ''
+      const r = await api.bookingsPipeline()
+      if (r.ok && r.data) {
+        const arr = r.data['bookings']
+        this.bookings = Array.isArray(arr) ? (arr as Booking[]) : []
+      } else {
+        this.error = apiErrorText(r)
+      }
+      this.bookingsLoading = false
+    },
+
+    async updateBookingStatus(id: string, status: string): Promise<boolean> {
+      const r = await api.bookingUpdateStatus(id, status)
+      if (r.ok) {
+        const b = this.bookings.find((x) => x.id === id)
+        if (b) b.status = status
+        return true
+      }
+      this.error = apiErrorText(r)
+      return false
+    },
+
+    async loadDues(): Promise<void> {
+      this.duesLoading = true
+      this.error = ''
+      const r = await api.duesPipeline()
+      if (r.ok && r.data) {
+        const arr = r.data['dues']
+        this.dues = Array.isArray(arr) ? (arr as Due[]) : []
+      } else {
+        this.error = apiErrorText(r)
+      }
+      this.duesLoading = false
+    },
+
+    async updateDueStatus(id: string, status: string): Promise<boolean> {
+      const r = await api.duesUpdate(id, status)
+      if (r.ok) {
+        const d = this.dues.find((x) => x.id === id)
+        if (d) d.status = status
         return true
       }
       this.error = apiErrorText(r)

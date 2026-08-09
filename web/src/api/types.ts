@@ -49,6 +49,50 @@ export interface Lead {
   notes?: string
 }
 
+/** A booking installment. */
+export interface Installment {
+  no: number
+  date: string
+  amount: number
+  status: string
+}
+
+/** A REM Booking. */
+export interface Booking {
+  id: string
+  client: string
+  date: string
+  property: string
+  unit: string
+  price: string
+  advance: string
+  status: string
+  type: string
+  terms: string
+  schedStart: string
+  total_paid: number
+  total_due: number
+  installments: Installment[]
+}
+
+/** A due/collection record. */
+export interface Due {
+  id: string
+  customer: string
+  phone: string
+  project: string
+  unit: string
+  totalPrice: number
+  paid: number
+  due: number
+  dueDate: string
+  daysOverdue: number
+  status: string
+  bucket: string
+  lastFollowUp?: string
+  promises?: string
+}
+
 export interface PipelineResponse<T> {
   [key: string]: T[] | number | string | undefined
 }

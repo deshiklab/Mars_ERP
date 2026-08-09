@@ -23,13 +23,13 @@ function toggleFullscreen() {
   }
 }
 
-/** Groups mirroring the HTML PWA sidebar (id, label, icon, module id per view). */
+/** Groups mirroring the HTML PWA sidebar (id, label, icon, module, path). */
 const groups = [
   { id: 'executive', label: 'Executive', icon: '📊', module: 'dashboard', path: '/' },
   { id: 'sales_crm', label: 'Sales & CRM', icon: '🎯', module: 'crm', path: '/leads' },
-  { id: 'land_projects', label: 'Projects', icon: '🏗️', module: 'dashboard' },
+  { id: 'land_projects', label: 'Projects', icon: '🏗️', module: 'dashboard', path: '/bookings' },
   { id: 'construction', label: 'Engineering & Construction', icon: '🔧', module: 'dashboard' },
-  { id: 'finance_admin', label: 'Accounts & Finance', icon: '💰', module: 'dashboard' },
+  { id: 'finance_admin', label: 'Accounts & Finance', icon: '💰', module: 'dashboard', path: '/dues' },
   { id: 'hr_admin', label: 'Admin & Operations', icon: '💼', module: 'dashboard' },
   { id: 'collaboration', label: 'Collaboration', icon: '🤝', module: 'dashboard' }
 ]
@@ -41,6 +41,10 @@ function visibleGroups() {
 function isActive(g: { path?: string; module: string }): boolean {
   if (g.path) return route.path === g.path
   return false
+}
+
+function gotoGroup(g: { path?: string; module: string }) {
+  router.push(g.path ?? '/')
 }
 </script>
 
@@ -64,7 +68,7 @@ function isActive(g: { path?: string; module: string }): boolean {
             class="rem-sidebar-item"
             :class="{ active: isActive(g) }"
             :title="g.label"
-            @click="g.path ? router.push(g.path) : undefined"
+            @click="gotoGroup(g)"
           >
             {{ g.icon }}
           </button>
