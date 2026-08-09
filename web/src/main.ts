@@ -5,19 +5,17 @@ import { createPinia } from 'pinia'
 
 import App from './App.vue'
 import router from './router'
+import { api } from './api/client'
+import { useAuthStore } from './stores/auth'
 
 // ── PWA / service worker registration ────────────────────────────────
-// vite-plugin-pwa (registerType: 'autoUpdate') generates the worker and the
-// virtual `virtual:pwa-register` module. Calling registerSW() wires the
-// auto-update lifecycle: the new SW installs, activates, and the app is
-// reloaded automatically to pick up the latest build.
+// vite-plugin-pwa (registerType: 'autoUpdate') — new SW installs and the
+// app reloads automatically to the latest build.
 import { registerSW } from 'virtual:pwa-register'
 
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
-    // A new version is ready (autoUpdate keeps the old one serving until
-    // this resolves) — we auto-reload for a seamless experience.
     updateSW(true)
   },
   onOfflineReady() {
@@ -25,9 +23,18 @@ const updateSW = registerSW({
   }
 })
 
-const app = createApp(App)
+// ── Session restore + 401 handling ────────────────────────────────────
+const auth = useAuthStore()
+auth.restore()
 
+api.setOnUnauthorized(() => {
+  // a dead session mid-flight → back to the login gate
+  if (router.currentRoute.value.name !== 'login') {
+    router.push('/login')
+  }
+})
+
+const app = createApp(App)
 app.use(createPinia())
 app.use(router)
-
 app.mount('#app')

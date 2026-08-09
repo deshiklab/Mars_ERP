@@ -48,11 +48,11 @@ export default defineConfig({
       },
       workbox: {
         // API data sync + static assets:
-        // - Static assets (JS/CSS/images): StaleWhileRevalidate — instant
-        //   shell from cache, refreshed in the background.
         // - Same-origin API calls (the Frappe bridge): NetworkFirst — always
         //   try the network first so server data stays fresh, fall back to
         //   the cache only when offline.
+        // - Static assets (JS/CSS/images): StaleWhileRevalidate — instant
+        //   shell from cache, refreshed in the background.
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         navigateFallback: '/index.html',
         runtimeCaching: [
@@ -104,6 +104,16 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
+    }
+  },
+  server: {
+    // Dev proxy: the browser only talks to its own origin (5173); Vite
+    // forwards /api to the Frappe bench — no CORS config needed.
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
+      }
     }
   }
 })
