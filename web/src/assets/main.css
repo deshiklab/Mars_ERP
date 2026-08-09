@@ -1,7 +1,6 @@
 @import "tailwindcss";
 
 /* ═══ REM ERP — PWA design system (mirrors the HTML PWA) ═══ */
-/* Fonts: Inter, Arial, sans-serif (Bengali fallback: Noto Serif Bengali) */
 :root {
   --rem-blue: #2f80ed;
   --rem-blue-soft: #f0f4ff;
@@ -25,12 +24,13 @@ html, body {
   height: 100%;
 }
 
-/* ── App shell: 72px white sidebar + content ── */
+/* ── App shell ── */
 .app-shell {
   display: flex;
   height: 100vh;
 }
 
+/* ── Sidebar ── */
 .rem-sidebar {
   width: 72px;
   min-width: 72px;
@@ -89,6 +89,8 @@ html, body {
   transition: all 0.15s;
   margin: 1px 0;
   font-size: 18px;
+  border: none;
+  background: transparent;
 }
 
 .rem-sidebar-item:hover {
@@ -118,7 +120,7 @@ html, body {
   margin: 6px 0;
 }
 
-/* ── Top bar: 44px white ── */
+/* ── Top bar ── */
 .rem-topbar {
   height: 44px;
   min-height: 44px;
@@ -188,6 +190,28 @@ html, body {
   justify-content: center;
   font-size: 9px;
   font-weight: 700;
+}
+
+/* ── Top nav tabs ── */
+.top-nav-item {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.top-nav-item:hover {
+  color: #333;
+}
+
+.top-nav-item.active {
+  color: #2f80ed;
+  border-bottom-color: #2f80ed;
+  font-weight: 600;
 }
 
 /* ── Content ── */
@@ -276,6 +300,53 @@ html, body {
 .stat-card .trend {
   font-size: 8px;
   color: #2e7d32;
+}
+
+/* ── Dashboard quick cards ── */
+.dashboard-quick {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.quick-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.quick-card:hover {
+  border-color: #2f80ed;
+  box-shadow: 0 0 0 1px rgba(47, 128, 237, 0.15);
+}
+
+.quick-card .icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.quick-card .info .title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #333;
+}
+
+.quick-card .info .count {
+  font-size: 9px;
+  color: #888;
 }
 
 /* ── Tables ── */
@@ -486,7 +557,7 @@ html, body {
   border: none;
 }
 
-/* ── Badges / status pills ── */
+/* ── Badges / pills ── */
 .pill {
   display: inline-block;
   padding: 1px 8px;
