@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import DataTable from '@/components/DataTable.vue'
+import type { TableColumn, TableAction, TableTab } from '@/components/DataTable.vue'
 import type { Lead } from '@/api/types'
 
 const data = useDataStore()
@@ -13,10 +15,8 @@ onMounted(() => {
 })
 
 const statusOptions = ['New Inquiry', 'Contacted', 'Site Visit', 'Negotiation', 'Booking', 'Lost']
-
 const sources = ['Website', 'Facebook', 'Referral', 'Walk-in', 'Agent', 'Bikroy', 'NRB Direct', 'Cold Call']
 
-/** Status pill colors — mirrors leadBadgeColor/status colors in the HTML PWA. */
 function statusStyle(status: string): { bg: string; fg: string } {
   const map: Record<string, [string, string]> = {
     'New Inquiry': ['#e3f2fd', '#1565c0'],
@@ -34,14 +34,80 @@ function priorityColor(p: string): string {
   return p === 'High' ? '#c62828' : p === 'Medium' ? '#e65100' : '#888'
 }
 
-const filtered = computed(() => {
-  if (!statusFilter.value) return data.leads
-  return data.leads.filter((l) => l.status === statusFilter.value)
+const esc = (s: string) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+
+const columns = computed<TableColumn<Lead>[]>(() => [
+  {
+    key: 'name',
+    label: 'Lead',
+    renderHtml: (l) =>
+      `<div style="font-weight:500;color:#333">${esc(l.name)}</div><div style="font-size:9px;color:#888">${esc(l.email)} · ${esc(l.phone)}</div>`
+  },
+  {
+    key: 'source',
+    label: 'Source',
+    renderHtml: (l) =>
+      `<span style="display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:8px;background:#f0f4ff;color:#2f80ed;font-weight:600">${esc(l.source)}</span>`
+  },
+  {
+    key: 'priority',
+    label: 'Priority',
+    sortable: true,
+    renderHtml: (l) => `<span style="font-weight:600;font-size:10px;color:${priorityColor(l.priority)}">${esc(l.priority)}</span>`
+  },
+  {
+    key: 'score',
+    label: 'Score',
+    sortable: true,
+    renderHtml: (l) =>
+      `<span style="display:inline-flex;padding:1px 5px;border-radius:4px;font-size:9px;font-weight:600;background:#eef3ff;color:#2f80ed">${l.score ?? '—'}</span>`
+  },
+  {
+    key: 'follow_up',
+    label: 'Follow-up',
+    renderHtml: (l) => `<span style="font-size:9px;font-weight:500;color:#888">${esc(l.follow_up ?? '—')}</span>`
+  },
+  {
+    key: 'status',
+    label: 'Status',
+    sortable: true,
+    renderHtml: (l) => {
+      const s = statusStyle(l.status)
+      return `<span class="pill" style="background:${s.bg};color:${s.fg}">${esc(l.status)}</span>`
+    }
+  }
+])
+
+const tabs = computed<TableTab[]>(() => [
+  { id: 'all', label: 'All', count: data.leads.length },
+  { id: 'new', label: 'New', count: data.leads.filter((l) => l.status === 'New Inquiry').length },
+  { id: 'visit', label: 'Site Visit', count: data.leads.filter((l) => l.status === 'Site Visit').length },
+  { id: 'booking', label: 'Booking', count: data.leads.filter((l) => l.status === 'Booking').length },
+  { id: 'lost', label: 'Lost', count: data.leads.filter((l) => l.status === 'Lost').length }
+])
+
+const tabRows = computed(() => {
+  if (!statusFilter.value || statusFilter.value === 'all') return data.leads
+  const map: Record<string, string> = { new: 'New Inquiry', visit: 'Site Visit', booking: 'Booking', lost: 'Lost' }
+  const st = map[statusFilter.value]
+  return st ? data.leads.filter((l) => l.status === st) : data.leads
 })
 
-async function setStatus(leadId: string, event: Event) {
-  const status = (event.target as HTMLSelectElement).value
-  await data.updateLeadStatus(leadId, status)
+function onTabChange(tab: string) {
+  statusFilter.value = tab
+}
+
+const actions = computed<TableAction[]>(() => [
+  { label: 'View Details', icon: '👁', onClick: () => {} },
+  { label: 'Mark Site Visit', icon: '📍', onClick: (r) => setStatus(r as unknown as Lead, 'Site Visit') },
+  { label: 'Mark Negotiation', icon: '🤝', onClick: (r) => setStatus(r as unknown as Lead, 'Negotiation') },
+  { label: 'Mark Booking', icon: '✅', onClick: (r) => setStatus(r as unknown as Lead, 'Booking') },
+  { label: 'Mark Lost', icon: '❌', onClick: (r) => setStatus(r as unknown as Lead, 'Lost') },
+  { label: 'Delete', icon: '🗑', onClick: (r) => console.log('delete', (r as unknown as Lead).id) }
+])
+
+async function setStatus(l: Lead, status: string) {
+  await data.updateLeadStatus(l.id, status)
 }
 
 function openAddDrawer() {
@@ -49,13 +115,11 @@ function openAddDrawer() {
   showAddDrawer.value = true
 }
 
-/** Mirrors the HTML PWA askFields modal flow (server call stubbed to sync). */
 async function saveLead() {
   if (!newLead.value.name.trim()) {
     data.error = 'Lead name is required'
     return
   }
-  // TODO: wire to a server create-lead endpoint when available
   showAddDrawer.value = false
   data.error = ''
 }
@@ -66,14 +130,7 @@ async function saveLead() {
     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px">
       <span class="page-title">CRM & Leads</span>
       <span class="page-subtitle">{{ data.leads.length }} leads · server-synced</span>
-      <div style="margin-left: auto; display: flex; gap: 6px">
-        <select
-          v-model="statusFilter"
-          style="padding: 3px 8px; font-size: 10px; border: 1px solid #e0e0e0; border-radius: 6px; outline: none; color: #555; background: #fff"
-        >
-          <option value="">All statuses</option>
-          <option v-for="s in statusOptions" :key="s" :value="s">{{ s }}</option>
-        </select>
+      <div style="margin-left: auto">
         <button class="action-btn primary" @click="openAddDrawer">+ Add Lead</button>
       </div>
     </div>
@@ -81,76 +138,17 @@ async function saveLead() {
     <p v-if="data.error" style="font-size: 11px; color: #c62828; margin: 6px 0">{{ data.error }}</p>
     <p v-if="data.leadsLoading" style="font-size: 11px; color: #888; padding: 16px">Loading leads…</p>
 
-    <!-- Table: mirrors the HTML PWA table-wrap/rem-table -->
-    <div v-else class="card">
-      <div class="table-wrap">
-        <table class="rem-table">
-          <thead>
-            <tr>
-              <th>Lead</th>
-              <th>Source</th>
-              <th>Priority</th>
-              <th>Score</th>
-              <th>Follow-up</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="l in filtered" :key="l.id">
-              <td>
-                <div style="font-weight: 500; color: #333">{{ l.name }}</div>
-                <div style="font-size: 9px; color: #888">{{ l.email }} · {{ l.phone }}</div>
-              </td>
-              <td style="font-size: 10px; color: #555">
-                <span
-                  style="display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 8px; background: #f0f4ff; color: #2f80ed; font-weight: 600"
-                >
-                  {{ l.source }}
-                </span>
-              </td>
-              <td style="font-weight: 600; font-size: 10px" :style="{ color: priorityColor(l.priority) }">
-                {{ l.priority }}
-              </td>
-              <td>
-                <span
-                  style="display: inline-flex; align-items: center; gap: 2px; padding: 1px 5px; border-radius: 4px; font-size: 9px; font-weight: 600; background: #eef3ff; color: #2f80ed"
-                >
-                  {{ l.score ?? '—' }}
-                </span>
-              </td>
-              <td style="font-size: 9px; font-weight: 500; color: #888">{{ l.follow_up ?? '—' }}</td>
-              <td>
-                <select
-                  :value="l.status"
-                  :style="{
-                    padding: '1px 3px',
-                    fontSize: '9px',
-                    border: '1px solid #e0e0e0',
-                    borderRadius: '3px',
-                    cursor: 'pointer',
-                    maxWidth: '100px',
-                    background: statusStyle(l.status).bg,
-                    color: statusStyle(l.status).fg,
-                    fontWeight: 600,
-                    outline: 'none'
-                  }"
-                  @change="setStatus(l.id, $event)"
-                >
-                  <option v-for="s in statusOptions" :key="s" :value="s">{{ s }}</option>
-                </select>
-              </td>
-            </tr>
-            <tr v-if="filtered.length === 0">
-              <td colspan="6" style="text-align: center; color: #888; padding: 20px; font-size: 11px">
-                No leads found
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <DataTable
+      v-else
+      :columns="columns"
+      :rows="tabRows"
+      :tabs="tabs"
+      :actions="actions"
+      search-placeholder="Search leads, source, status…"
+      @tab-change="onTabChange"
+    />
 
-    <!-- Add-lead drawer: mirrors the HTML PWA drawer modal -->
+    <!-- Add-lead drawer -->
     <div v-if="showAddDrawer" class="drawer-overlay active">
       <div class="drawer-sheet">
         <div class="drawer-header">

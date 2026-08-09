@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import DataTable from '@/components/DataTable.vue'
+import type { TableAction, TableColumn, TableTab } from '@/components/DataTable.vue'
 import type { Booking } from '@/api/types'
 
 const data = useDataStore()
@@ -26,19 +28,84 @@ function statusStyle(status: string): { bg: string; fg: string } {
   return { bg, fg }
 }
 
-const filtered = computed(() => {
-  if (!statusFilter.value) return data.bookings
-  return data.bookings.filter((b) => b.status === statusFilter.value)
-})
-
 function bdt(n: number): string {
   if (n >= 10000000) return `৳ ${(n / 10000000).toFixed(2)} Cr`
   if (n >= 100000) return `৳ ${(n / 100000).toFixed(1)} Lac`
   return `৳ ${n.toLocaleString()}`
 }
 
-async function setStatus(id: string, event: Event) {
-  const status = (event.target as HTMLSelectElement).value
+const esc = (s: string) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+
+const columns = computed<TableColumn<Booking>[]>(() => [
+  {
+    key: 'id',
+    label: 'Booking',
+    sortable: true,
+    renderHtml: (b) =>
+      `<div style="font-weight:600;color:#2f80ed">${esc(b.id)}</div><div style="font-size:9px;color:#888">${esc(b.date)} · ${esc(b.type)}</div>`
+  },
+  {
+    key: 'client',
+    label: 'Client',
+    renderHtml: (b) => `<span style="font-weight:500;color:#333">${esc(b.client)}</span>`
+  },
+  {
+    key: 'property',
+    label: 'Property / Unit',
+    renderHtml: (b) =>
+      `<div style="color:#333">${esc(b.property)}</div><div style="font-size:9px;color:#888">${esc(b.unit)}</div>`
+  },
+  { key: 'price', label: 'Price', renderHtml: (b) => `<span style="font-size:10px;color:#555">${esc(b.price)}</span>` },
+  {
+    key: 'total_paid',
+    label: 'Paid',
+    sortable: true,
+    renderHtml: (b) => `<span style="font-size:10px;color:#2e7d32;font-weight:600">${bdt(b.total_paid)}</span>`
+  },
+  {
+    key: 'total_due',
+    label: 'Due',
+    sortable: true,
+    renderHtml: (b) => `<span style="font-size:10px;color:#c62828;font-weight:600">${bdt(b.total_due)}</span>`
+  },
+  {
+    key: 'status',
+    label: 'Status',
+    sortable: true,
+    renderHtml: (b) => {
+      const s = statusStyle(b.status)
+      return `<span class="pill" style="background:${s.bg};color:${s.fg}">${esc(b.status)}</span>`
+    }
+  }
+])
+
+const tabs = computed<TableTab[]>(() => [
+  { id: 'all', label: 'All', count: data.bookings.length },
+  { id: 'confirmed', label: 'Confirmed', count: data.bookings.filter((b) => b.status === 'Confirmed').length },
+  { id: 'booked', label: 'Booked', count: data.bookings.filter((b) => b.status === 'Booked').length },
+  { id: 'handed', label: 'Handed Over', count: data.bookings.filter((b) => b.status === 'Handed Over').length },
+  { id: 'cancelled', label: 'Cancelled', count: data.bookings.filter((b) => b.status === 'Cancelled').length }
+])
+
+const tabRows = computed(() => {
+  if (!statusFilter.value || statusFilter.value === 'all') return data.bookings
+  const map: Record<string, string> = { confirmed: 'Confirmed', booked: 'Booked', handed: 'Handed Over', cancelled: 'Cancelled' }
+  const st = map[statusFilter.value]
+  return st ? data.bookings.filter((b) => b.status === st) : data.bookings
+})
+
+function onTabChange(tab: string) {
+  statusFilter.value = tab
+}
+
+const actions = computed<TableAction[]>(() => [
+  { label: 'View Details', icon: '👁', onClick: (r) => (detail.value = r as unknown as Booking) },
+  { label: 'Mark Confirmed', icon: '✅', onClick: (r) => setStatus((r as unknown as Booking).id, 'Confirmed') },
+  { label: 'Mark Handed Over', icon: '🔑', onClick: (r) => setStatus((r as unknown as Booking).id, 'Handed Over') },
+  { label: 'Cancel Booking', icon: '❌', onClick: (r) => setStatus((r as unknown as Booking).id, 'Cancelled') }
+])
+
+async function setStatus(id: string, status: string) {
   await data.updateBookingStatus(id, status)
 }
 </script>
@@ -47,77 +114,23 @@ async function setStatus(id: string, event: Event) {
   <div class="fade-in">
     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px">
       <span class="page-title">Bookings</span>
-      <span class="page-subtitle">{{ data.bookings.length }} bookings · {{ data.bookings.filter((b) => b.status === 'Confirmed').length }} confirmed</span>
-      <div style="margin-left: auto">
-        <select
-          v-model="statusFilter"
-          style="padding: 3px 8px; font-size: 10px; border: 1px solid #e0e0e0; border-radius: 6px; outline: none; color: #555; background: #fff"
-        >
-          <option value="">All statuses</option>
-          <option v-for="s in statusOptions" :key="s" :value="s">{{ s }}</option>
-        </select>
-      </div>
+      <span class="page-subtitle">
+        {{ data.bookings.length }} bookings · {{ data.bookings.filter((b) => b.status === 'Confirmed').length }} confirmed
+      </span>
     </div>
 
     <p v-if="data.error" style="font-size: 11px; color: #c62828; margin: 6px 0">{{ data.error }}</p>
     <p v-if="data.bookingsLoading" style="font-size: 11px; color: #888; padding: 16px">Loading bookings…</p>
 
-    <div v-else class="card">
-      <div class="table-wrap">
-        <table class="rem-table">
-          <thead>
-            <tr>
-              <th>Booking</th>
-              <th>Client</th>
-              <th>Property / Unit</th>
-              <th>Price</th>
-              <th>Paid</th>
-              <th>Due</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="b in filtered" :key="b.id" style="cursor: pointer" @click="detail = b">
-              <td style="font-weight: 600; color: #2f80ed">{{ b.id }}</td>
-              <td>
-                <div style="font-weight: 500; color: #333">{{ b.client }}</div>
-                <div style="font-size: 9px; color: #888">{{ b.date }} · {{ b.type }}</div>
-              </td>
-              <td>
-                <div style="color: #333">{{ b.property }}</div>
-                <div style="font-size: 9px; color: #888">{{ b.unit }}</div>
-              </td>
-              <td style="font-size: 10px; color: #555">{{ b.price }}</td>
-              <td style="font-size: 10px; color: #2e7d32; font-weight: 600">{{ bdt(b.total_paid) }}</td>
-              <td style="font-size: 10px; color: #c62828; font-weight: 600">{{ bdt(b.total_due) }}</td>
-              <td @click.stop>
-                <select
-                  :value="b.status"
-                  :style="{
-                    padding: '1px 3px',
-                    fontSize: '9px',
-                    border: '1px solid #e0e0e0',
-                    borderRadius: '3px',
-                    cursor: 'pointer',
-                    maxWidth: '110px',
-                    background: statusStyle(b.status).bg,
-                    color: statusStyle(b.status).fg,
-                    fontWeight: 600,
-                    outline: 'none'
-                  }"
-                  @change="setStatus(b.id, $event)"
-                >
-                  <option v-for="s in statusOptions" :key="s" :value="s">{{ s }}</option>
-                </select>
-              </td>
-            </tr>
-            <tr v-if="filtered.length === 0">
-              <td colspan="7" style="text-align: center; color: #888; padding: 20px; font-size: 11px">No bookings found</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <DataTable
+      v-else
+      :columns="columns"
+      :rows="tabRows"
+      :tabs="tabs"
+      :actions="actions"
+      search-placeholder="Search bookings, clients…"
+      @tab-change="onTabChange"
+    />
 
     <!-- Booking detail drawer -->
     <div v-if="detail" class="drawer-overlay active" @click.self="detail = null">
@@ -150,10 +163,9 @@ async function setStatus(id: string, event: Event) {
                   <td>{{ inst.date }}</td>
                   <td>{{ bdt(inst.amount) }}</td>
                   <td>
-                    <span
-                      class="pill"
-                      :style="inst.status === 'Paid' ? 'background:#e8f5e9;color:#2e7d32' : 'background:#fff3e0;color:#e65100'"
-                    >{{ inst.status }}</span>
+                    <span class="pill" :style="inst.status === 'Paid' ? 'background:#e8f5e9;color:#2e7d32' : 'background:#fff3e0;color:#e65100'">
+                      {{ inst.status }}
+                    </span>
                   </td>
                 </tr>
                 <tr v-if="!detail.installments || detail.installments.length === 0">
