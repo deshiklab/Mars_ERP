@@ -3405,6 +3405,14 @@ def dues_update(id=None, last_follow_up=None, notes=None, promise_date=None,
 
 
 @frappe.whitelist(allow_guest=True)
+def _pwa_version_hint():
+    try:
+        return frappe.db.get_single_value("REM Settings", "pwa_version")
+    except Exception:
+        return None
+
+
+@frappe.whitelist(allow_guest=True)
 def index():
     """GET-able landing for the API base URL: endpoint map + health."""
     endpoints = [
@@ -3492,6 +3500,7 @@ def index():
         "status": "ok",
         "usage": "Append an endpoint to this base URL, e.g. .../api.method.login",
         "endpoints": None,
+        "pwa_version": _pwa_version_hint(),
         "server_time": frappe.utils.now(),
     }
     # M2: guests get health only — no API enumeration without a session.

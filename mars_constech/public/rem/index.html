@@ -948,6 +948,7 @@
     <div class="form-group" style="text-align:left"><label class="form-label">Password</label>
       <input class="form-input" id="lg_pass" type="password" placeholder="••••••••" autocomplete="current-password" style="padding:10px 12px"></div>
     <div style="font-size:9px;color:#999;margin-bottom:8px;text-align:left">Server: <span id="lg_server">…</span></div>
+    <div id="lg_ver" style="font-size:9px;color:#e65100;margin-bottom:6px;text-align:left;min-height:12px"></div>
     <div id="lg_err" style="font-size:10px;color:#e53935;min-height:14px;margin:2px 0 8px"></div>
     <button class="action-btn primary" onclick="loginGateSignIn()" id="lg_btn" style="width:100%;padding:11px;font-size:13px">🔐 Sign In</button>
     <script>/* Enter submits the gate form */
@@ -1366,11 +1367,12 @@ const API = {
     if(raw) return r.raw;
     return {status:r.status, data:r.data};
   },
-  async login(email, pass, otp, tmp_id){
+  async login(email, pass, otp, tmp_id, opts){
+    opts=opts||{};
     var body={email:email,password:pass};
     if(otp){ body.otp=otp; }
     if(tmp_id){ body.tmp_id=tmp_id; }
-    var r=await this.call('login',{method:'POST',body:body});
+    var r=await this.call('login',{method:'POST',body:body,timeout:opts.timeout||20000});
     if(r.ok&&r.data&&r.data.token){
       this.token=r.data.token; this.connected=true;
       localStorage.setItem('rem_api_token',this.token);
@@ -1467,6 +1469,25 @@ function showLoginGate(){
   document.getElementById('loginGate').style.display='flex';
   var ls=document.getElementById('lg_server');
   if(ls)ls.textContent=apiBaseUrl();
+  gateVersionPing();
+}
+function gateVersionPing(){
+  // If this copy is older than the server's, tell the user to reload —
+  // critical for stale cached tabs that never reach the app (logged out).
+  try{
+    var api=API.url||apiBaseUrl();
+    fetch(api+'.index',{method:'GET',credentials:'omit'}).then(function(r){
+      return r.json().catch(function(){return{};});
+    }).then(function(d){
+      var sv=d&&d.message&&d.message.pwa_version;
+      if(!sv)return;
+      var cur=String((window.API&&API.PWA_VERSION)||'0');
+      if(String(sv).trim()!==cur.trim()){
+        var e=document.getElementById('lg_ver');
+        if(e)e.textContent='⚠️ New PWA v'+sv+' available — close & reopen this tab to update';
+      }
+    }).catch(function(){});
+  }catch(e){}
 }
 function hideLoginGate(){
   document.getElementById('loginGate').style.display='none';
@@ -1483,7 +1504,7 @@ function loginGateSignIn(){
   var btn=document.getElementById('lg_btn'); if(btn)btn.disabled=true;
   if(btn)btn.textContent='⏳ Signing in…';
   API.url=apiBaseUrl();
-  API.login(em,pw).then(function(r){
+  API.login(em,pw,null,null,{timeout:8000}).then(function(r){
     if(r.status===200&&r.ok&&r.data&&r.data.token){
       _onPwaLogin(r.data);
     }else if(r.status===200&&r.data&&r.data.two_factor_required){
