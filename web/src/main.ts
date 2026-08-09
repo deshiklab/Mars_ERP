@@ -23,7 +23,16 @@ const updateSW = registerSW({
   }
 })
 
-// ── Session restore + 401 handling ────────────────────────────────────
+// ── App bootstrap ─────────────────────────────────────────────────────
+// IMPORTANT: pinia must be installed BEFORE any useAuthStore() call —
+// calling a store without an active pinia throws and kills the whole app
+// (the blank-white-screen bug).
+const app = createApp(App)
+const pinia = createPinia()
+app.use(pinia)
+app.use(router)
+
+// Session restore + 401 handling (pinia is active now).
 const auth = useAuthStore()
 auth.restore()
 
@@ -34,7 +43,4 @@ api.setOnUnauthorized(() => {
   }
 })
 
-const app = createApp(App)
-app.use(createPinia())
-app.use(router)
 app.mount('#app')
