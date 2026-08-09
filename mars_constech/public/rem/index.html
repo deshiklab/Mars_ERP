@@ -1147,6 +1147,8 @@ const API_EPS = [
   {n:'booking_update_status', m:'POST', grp:'crm', d:'Set booking status', b:'{"name":"BKG-...","status":"..."}'},
   {n:'booking_invoice', m:'POST', grp:'crm', d:'Create/submit Sales Invoice', b:'{"name":"BKG-...","amount":18000000}'},
   {n:'booking_payment', m:'POST', grp:'crm', d:'Record Payment Entry', b:'{"name":"BKG-...","amount":5000000}'},
+  {n:'dues_pipeline', m:'GET', grp:'crm', d:'Dues & Recovery: unpaid installments + invoice outstanding'},
+  {n:'dues_update', m:'POST', grp:'crm', d:'Record follow-up / promise on a booking', b:'{"id":"BKG-00004","last_follow_up":"2026-08-09","notes":"...","promise_amount":5000000}'},
   // — Projects & Tasks —
   {n:'projects_pipeline', m:'GET', grp:'projects', d:'Projects'},
   {n:'projects_sync', m:'POST', grp:'projects', d:'Upsert projects', b:'{"projects":[]}'},
@@ -5648,6 +5650,36 @@ function openCampaign(id){
   );
 }
 
+
+// ═══ DUES & RECOVERY ERP BRIDGE (Milestone A) ═══
+function duesPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  showToast('Loading real dues from ERPNext…','info');
+  API.call('dues_pipeline').then(function(r){
+    if(r.ok && Array.isArray(r.data.dues)){
+      var server=r.data.dues;
+      var n=0;
+      server.forEach(function(ep){
+        var existing=mockDues.find(function(x){return String(x.id)===String(ep.id);});
+        if(existing){ Object.assign(existing,ep); n++; }
+        else { mockDues.push(ep); n++; }
+      });
+      DB.save('dues');
+      showToast('Synced '+n+' dues from ERPNext','success');
+      renderModule();
+    } else {
+      showToast((r.data&&r.data.error)||'Dues pull failed (HTTP '+r.status+')','error');
+    }
+  });
+}
+function duesSaveFollowUp(id, fields){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  API.call('dues_update',{method:'POST',body:Object.assign({id:id},fields||{})}).then(function(r){
+    if(r.ok){ showToast('Follow-up saved to ERPNext','success'); }
+    else showToast((r.data&&r.data.error)||'Save failed','error');
+  });
+}
+
 function renderDues(el){
   const totalDue=mockDues.reduce((s,d)=>s+(d.due||0),0);
   const totalPaid=mockDues.reduce((s,d)=>s+(d.paid||0),0);
@@ -5663,6 +5695,7 @@ function renderDues(el){
     <div class="toolbar" style="margin-bottom:6px">
       <div class="tabs">${['dashboard','all_dues','promises','reminders'].map(t=>`<div class="tab ${duesTab===t?'active':''}" onclick="duesTab='${t}';_PG={};renderModule()">${{'dashboard':'\uD83D\uDCCA Dashboard','all_dues':'\uD83D\uDCCB All Dues','promises':'\uD83E\uDD1D Promises','reminders':'\uD83D\uDD14 Payment Reminders'}[t]}</div>`).join('')}</div>
       <div class="spacer"></div>
+      <button class="action-btn secondary" onclick="duesPullFromERP()" style="padding:3px 8px;font-size:10px" title="Load real dues from ERPNext (unpaid installments + outstanding invoices)">🔄 Sync from ERP</button>
       <button class="action-btn primary" onclick="recordDuesPayment()" style="padding:3px 8px;font-size:10px">+ Record Payment</button>
     </div>
     ${duesTab==='dashboard'?renderDuesDashboard(totalDue,totalPaid,totalLateFee,critical,overdue,upcoming):
@@ -5826,6 +5859,7 @@ function recordPromise(){
       d.promises.push({date:document.getElementById('rp_p_date').value||new Date().toISOString().slice(0,10),amount:amt,kept:null});
       d.notes+=' | Promise: \u09F3 '+amt.toLocaleString('en-IN')+' by '+document.getElementById('rp_p_date').value;
       DB.save('dues');
+      if(API.connected) duesSaveFollowUp(id[1],{notes:d.notes,promise_date:document.getElementById('rp_p_date').value,promise_amount:amt});
       showToast('Promise recorded!','success');renderModule();
     }
   );

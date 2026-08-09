@@ -18,6 +18,7 @@ Lifecycle) additionally have real doctypes.
 """
 
 import json
+from datetime import date
 
 import frappe
 from frappe import _
@@ -1672,6 +1673,180 @@ def settings_set(settings=None):
 	return _rem_settings()
 
 
+# ═══ DUES & RECOVERY (Milestone A) ═══
+_DUE_BUCKETS = (
+    ("60+ Days", 61), ("30 Days", 31), ("15 Days", 1), ("Due Today", 0), ("Future", -1),
+)
+
+
+def _due_status(days):
+    """PWA dues status from days overdue (negative = future)."""
+    if days >= 61:
+        return "Critical"
+    if days > 0:
+        return "Overdue"
+    if days == 0:
+        return "Due Today"
+    return "Upcoming"
+
+
+def _due_bucket(days):
+    for name, th in _DUE_BUCKETS:
+        if days >= th:
+            return name
+    return "Future"
+
+
+@frappe.whitelist()
+def dues_pipeline():
+    """Real Dues & Recovery: unpaid installments per booking + unpaid invoices.
+
+    Returns PWA mockDues-shaped rows: id, customer, phone, project, unit,
+    totalPrice, paid, due, dueDate, daysOverdue, status, bucket, lastFollowUp,
+    promises, lateFee, notes, source.
+    """
+    rows = []
+    # 1) Booking installments (REM Booking — the live doctype)
+    bookings = frappe.get_all(
+        "REM Booking",
+        fields=["name", "custom_booking_ref", "customer_name", "customer", "project_name",
+                "unit", "deal_value", "total_paid", "total_due", "status"],
+        order_by="creation desc",
+        limit_page_length=500,
+    )
+    for b in bookings:
+        doc = frappe.get_doc("REM Booking", b.name)
+        unpaid = [i for i in (doc.installments or []) if i.status != "Paid"]
+        if not unpaid:
+            continue
+        # oldest unpaid installment drives aging
+        dated = [i for i in unpaid if i.due_date]
+        dated.sort(key=lambda i: str(i.due_date))
+        anchor = dated[0] if dated else None
+        due_amt = sum((i.amount or 0) for i in unpaid)
+        paid = (b.total_paid or 0)
+        if anchor:
+            days = (date.today() - anchor.due_date).days
+        else:
+            days = 0 if (b.total_due or 0) > 0 else -1
+        rows.append({
+            "id": b.custom_booking_ref or b.name,
+            "customer": b.customer_name or b.customer or "",
+            "phone": _customer_phone(b.customer or ""),
+            "project": b.project_name or "",
+            "unit": b.unit or "",
+            "totalPrice": b.deal_value or 0,
+            "paid": paid,
+            "due": due_amt or (b.total_due or 0),
+            "dueDate": str(anchor.due_date) if anchor else "",
+            "daysOverdue": max(days, 0),
+            "status": _due_status(days),
+            "bucket": _due_bucket(days),
+            "lastFollowUp": doc.custom_last_follow_up or "",
+            "promises": _parse_promises(doc.custom_promise_log),
+            "lateFee": doc.custom_late_fee or 0,
+            "notes": doc.custom_follow_up_notes or "",
+            "source": "booking",
+        })
+    # 2) Sales Invoices with outstanding (finance truth)
+    invs = frappe.get_all(
+        "Sales Invoice",
+        filters={"docstatus": 1, "outstanding_amount": [">", 0]},
+        fields=["name", "customer_name", "customer", "due_date", "grand_total",
+                "outstanding_amount", "status"],
+        order_by="due_date asc",
+        limit_page_length=300,
+    )
+    for inv in invs:
+        days = (date.today() - inv.due_date).days if inv.due_date else 0
+        rows.append({
+            "id": inv.name,
+            "customer": inv.customer_name or inv.customer or "",
+            "phone": _customer_phone(inv.customer or ""),
+            "project": "",
+            "unit": "",
+            "totalPrice": inv.grand_total or 0,
+            "paid": (inv.grand_total or 0) - (inv.outstanding_amount or 0),
+            "due": inv.outstanding_amount or 0,
+            "dueDate": str(inv.due_date or "")[:10],
+            "daysOverdue": max(days, 0),
+            "status": _due_status(days),
+            "bucket": _due_bucket(days),
+            "lastFollowUp": "",
+            "promises": [],
+            "lateFee": 0,
+            "notes": inv.status or "",
+            "source": "invoice",
+        })
+    rows.sort(key=lambda r: r["daysOverdue"], reverse=True)
+    return {"count": len(rows), "dues": rows}
+
+
+def _customer_phone(customer):
+    if not customer:
+        return ""
+    try:
+        # Contact linked via Dynamic Link
+        link = frappe.db.get_value(
+            "Contact Link", {"link_doctype": "Customer", "link_name": customer}, "parent"
+        )
+        if link:
+            return frappe.db.get_value("Contact", link, "mobile_no") or ""
+    except Exception:
+        pass
+    return ""
+
+
+def _parse_promises(log):
+    if not log:
+        return []
+    try:
+        v = json.loads(log)
+        return v if isinstance(v, list) else []
+    except Exception:
+        return []
+
+
+@frappe.whitelist()
+def dues_update(id=None, last_follow_up=None, notes=None, promise_date=None,
+                promise_amount=None, late_fee=None, promise_kept=None):
+    """Record a follow-up / promise on a REM Booking (dues workbench).
+
+    id = booking name (REM Booking doc name) or custom_booking_ref.
+    promise_kept: optional {date, amount} kept flag — appends to promise log.
+    """
+    if not id:
+        frappe.throw(_("id (booking) required"), frappe.ValidationError)
+    name = frappe.db.get_value("REM Booking", {"custom_booking_ref": id}, "name") or id
+    doc = frappe.get_doc("REM Booking", name)
+    if last_follow_up is not None:
+        doc.db_set("custom_last_follow_up", str(last_follow_up))
+    if notes is not None:
+        doc.db_set("custom_follow_up_notes", str(notes))
+    if promise_date is not None:
+        doc.db_set("custom_promise_date", promise_date or None)
+    if promise_amount is not None:
+        try:
+            doc.db_set("custom_promise_amount", float(promise_amount))
+        except Exception:
+            pass
+    if late_fee is not None:
+        try:
+            doc.db_set("custom_late_fee", float(late_fee))
+        except Exception:
+            pass
+    if promise_kept is not None and isinstance(promise_kept, dict):
+        log = _parse_promises(doc.custom_promise_log)
+        log.append({
+            "date": str(promise_kept.get("date") or "")[:10],
+            "amount": promise_kept.get("amount") or 0,
+            "kept": bool(promise_kept.get("kept")),
+        })
+        doc.db_set("custom_promise_log", json.dumps(log))
+    frappe.db.commit()
+    return {"ok": True, "name": name}
+
+
 @frappe.whitelist(allow_guest=True)
 def index():
     """GET-able landing for the API base URL: endpoint map + health."""
@@ -1686,6 +1861,8 @@ def index():
         "land_legal_checklist",
         "land_legal_update",
         "land_legal_load_standard",
+        "dues_pipeline",
+        "dues_update",
         "download_invoice",
         "demo_confirm",
         "settings_get",
