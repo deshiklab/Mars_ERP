@@ -24,13 +24,13 @@ def get_context(context):
 
 	# bookings for this customer
 	context.bookings = frappe.get_all(
-		"Booking",
-		filters={"customer": customer},
+		"REM Booking",
+		filters={"customer_name": customer},
 		fields=[
-			"name", "property", "unit", "total_price", "advance_paid",
-			"total_paid", "total_due", "status", "booking_date", "type",
+			"name", "project_name", "unit", "deal_value", "advance_paid",
+			"total_paid", "total_due", "status", "creation", "booking_type",
 		],
-		order_by="booking_date desc",
+		order_by="creation desc",
 		limit_page_length=50,
 	)
 
@@ -39,9 +39,9 @@ def get_context(context):
 	booking_names = [b.name for b in context.bookings]
 	if booking_names:
 		context.installments = frappe.get_all(
-			"Booking Installment",
+			"REM Booking Installment",
 			filters=[["parent", "in", booking_names]],
-			fields=["parent", "installment_no", "due_date", "amount", "paid_amount", "status"],
+			fields=["parent", "installment_no", "due_date", "amount", "status"],
 			order_by="due_date asc",
 			limit_page_length=200,
 		)
@@ -93,7 +93,7 @@ def get_context(context):
 	# totals
 	context.totals = {
 		"bookings": len(context.bookings),
-		"booked_value": sum(b.total_price or 0 for b in context.bookings),
+		"booked_value": sum(b.deal_value or 0 for b in context.bookings),
 		"paid": sum(b.total_paid or 0 for b in context.bookings),
 		"due": sum(b.total_due or 0 for b in context.bookings),
 		"invoices": len(context.invoices),
@@ -111,7 +111,7 @@ def get_context(context):
 			"type": "due",
 			"title": _("Payment due"),
 			"message": _("{0} has ৳{1} outstanding. Please contact our accounts team to arrange payment.").format(
-				biggest.property or biggest.name,
+				biggest.project_name or biggest.name,
 				_round_cr(biggest.total_due),
 			),
 		}

@@ -78,9 +78,9 @@
 			{% for b in bookings %}
 				<tr>
 					<td><strong>{{ b.name }}</strong></td>
-					<td>{{ b.property }} {% if b.unit %}<span style="color:#94a3b8;">· {{ b.unit }}</span>{% endif %}</td>
+					<td>{{ b.project_name }} {% if b.unit %}<span style="color:#94a3b8;">· {{ b.unit }}</span>{% endif %}</td>
 					<td>{{ b.type }}</td>
-					<td>৳{{ "%.1f"|format((b.total_price or 0) / 10000000) }} Cr</td>
+					<td>৳{{ "%.1f"|format((b.deal_value or 0) / 10000000) }} Cr</td>
 					<td class="text-success">৳{{ "%.1f"|format((b.total_paid or 0) / 10000000) }} Cr</td>
 					<td>{% if b.total_due %}<span style="color:#dc2626;font-weight:600;">৳{{ "%.2f"|format((b.total_due or 0) / 100000) }} Lac</span>{% else %}<span style="color:#059669;">—</span>{% endif %}</td>
 					<td>
