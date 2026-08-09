@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="pwa/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="pwa/icon-192.png">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-  <title>REM ERP v2.0 — PWA Edition (ERPNext-integrated)</title>
+  <title>REM ERP v2.1 — PWA Edition (ERPNext-integrated)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -939,7 +939,7 @@
   <div id="sidebar">
     <div class="sidebar-logo">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-      <div class="sidebar-brand-text">REM ERP <span class="sb-version">v2.0</span></div>
+      <div class="sidebar-brand-text">REM ERP <span class="sb-version">v2.1</span></div>
     </div>
     <div class="sidebar-scroll" id="sidebarNav">
       <!-- G1: Executive -->
@@ -1119,140 +1119,277 @@ function apiBaseUrl(){
   if(o.indexOf('http://')===0||o.indexOf('https://')===0)return o+'/api/method/mars_constech.mars_constech.api';
   return 'http://localhost:8000/api/method/mars_constech.mars_constech.api';
 }
+// ═══ PWA API INTEGRATION LAYER v2.1 — registry-driven bridge to ERPNext ═══
+// Single source of truth for every bridge endpoint (name, method, guest access,
+// sample query/body). The API tester dropdown AND the diagnostics suite are both
+// generated from this registry — adding an endpoint here lights it up everywhere.
+const API_EPS = [
+  // — Core session & settings —
+  {n:'index', m:'GET', g:1, grp:'core', d:'Health — endpoint list'},
+  {n:'login', m:'POST', g:1, grp:'core', d:'Login → token/full_name/session_expiry', b:'{"email":"manager@mars.com","password":"••••"}'},
+  {n:'logout', m:'POST', grp:'core', d:'End session'},
+  {n:'bootstrap', m:'GET', grp:'core', d:'Collections + meta (pwa_version, settings)'},
+  {n:'sync', m:'POST', grp:'core', d:'Push collections blob', b:'{"collections":{"customers":[]}}'},
+  {n:'settings_get', m:'GET', grp:'core', d:'REM Settings config (server-backed)'},
+  {n:'settings_set', m:'POST', grp:'core', d:'Save REM Settings config', b:'{"settings":{"auto_heal":1,"live_land":1}}'},
+  // — Land Acquisition & Legal —
+  {n:'land_pipeline', m:'GET', grp:'land', d:'Land acquisitions + legal status'},
+  {n:'land_sync', m:'POST', grp:'land', d:'Upsert proposals', b:'{"proposals":[]}'},
+  {n:'land_legal_checklist', m:'GET', grp:'land', d:'Legal checklist for an acquisition', q:'name=LA-00021'},
+  {n:'land_legal_update', m:'POST', grp:'land', d:'Update legal item statuses', b:'{"name":"LA-00021","items":[]}'},
+  {n:'land_legal_load_standard', m:'POST', grp:'land', d:'Load the 14-item standard checklist', b:'{"name":"LA-00021"}'},
+  // — CRM (Leads) & Bookings —
+  {n:'leads_pipeline', m:'GET', grp:'crm', d:'Leads'},
+  {n:'leads_sync', m:'POST', grp:'crm', d:'Upsert leads', b:'{"leads":[]}'},
+  {n:'lead_update_status', m:'POST', grp:'crm', d:'Set lead status', b:'{"name":"LD-...","status":"Booking"}'},
+  {n:'bookings_pipeline', m:'GET', grp:'crm', d:'Bookings (REM Booking doctype)'},
+  {n:'bookings_sync', m:'POST', grp:'crm', d:'Upsert bookings', b:'{"bookings":[]}'},
+  {n:'booking_update_status', m:'POST', grp:'crm', d:'Set booking status', b:'{"name":"BKG-...","status":"..."}'},
+  {n:'booking_invoice', m:'POST', grp:'crm', d:'Create/submit Sales Invoice', b:'{"name":"BKG-...","amount":18000000}'},
+  {n:'booking_payment', m:'POST', grp:'crm', d:'Record Payment Entry', b:'{"name":"BKG-...","amount":5000000}'},
+  // — Projects & Tasks —
+  {n:'projects_pipeline', m:'GET', grp:'projects', d:'Projects'},
+  {n:'projects_sync', m:'POST', grp:'projects', d:'Upsert projects', b:'{"projects":[]}'},
+  {n:'tasks_pipeline', m:'GET', grp:'projects', d:'Tasks', q:'project='},
+  {n:'tasks_sync', m:'POST', grp:'projects', d:'Upsert tasks', b:'{"tasks":[]}'},
+  // — Plots (Items) & Finance —
+  {n:'plots_pipeline', m:'GET', grp:'plots', d:'Plot Items'},
+  {n:'plots_sync', m:'POST', grp:'plots', d:'Upsert plots', b:'{"plots":[]}'},
+  {n:'plot_update_status', m:'POST', grp:'plots', d:'Set plot status', b:'{"name":"...","status":"sold"}'},
+  {n:'finance_pipeline', m:'GET', grp:'plots', d:'Chart of accounts + GL balances'},
+  {n:'journal_sync', m:'POST', grp:'plots', d:'Create Journal Entry', b:'{"journals":[]}'},
+  {n:'invoices_pipeline', m:'GET', grp:'plots', d:'Submitted Sales Invoices'},
+  {n:'payments_pipeline', m:'GET', grp:'plots', d:'Payment Entries'},
+  // — Construction: contractors / work orders / equipment —
+  {n:'contractors_pipeline', m:'GET', grp:'construction', d:'Contractors (Suppliers)'},
+  {n:'contractors_sync', m:'POST', grp:'construction', d:'Upsert contractors', b:'{"contractors":[]}'},
+  {n:'work_orders_pipeline', m:'GET', grp:'construction', d:'Work orders'},
+  {n:'work_orders_sync', m:'POST', grp:'construction', d:'Upsert work orders', b:'{"work_orders":[]}'},
+  {n:'equipment_pipeline', m:'GET', grp:'construction', d:'Equipment (Assets)'},
+  {n:'equipment_sync', m:'POST', grp:'construction', d:'Upsert equipment', b:'{"equipment":[]}'},
+  // — Payments (portal / gateways) —
+  {n:'download_invoice', m:'GET', grp:'payments', d:'Invoice PDF', q:'invoice_name=ACC-SINV-...'},
+  {n:'pay_invoice', m:'POST', grp:'payments', d:'Start gateway payment', b:'{"invoice_name":"...","gateway":"bkash"}'},
+  {n:'payment_callback', m:'GET', g:1, grp:'payments', d:'Gateway callback', q:'gateway=bkash&payment_id=...'},
+  {n:'demo_confirm', m:'POST', g:1, grp:'payments', d:'Demo payment confirm', b:'{"ref":"..."}'}
+];
+const API_GROUPS = [
+  ['core','Core session & settings'],['land','Land Acquisition & Legal'],['crm','CRM & Bookings'],
+  ['projects','Projects & Tasks'],['plots','Plots & Finance'],['construction','Construction'],
+  ['payments','Payments (portal)']
+];
+function apiEpFind(name){ for(var i=0;i<API_EPS.length;i++){ if(API_EPS[i].n===name) return API_EPS[i]; } return null; }
+
+// ═══ API — unified connection layer ═══
 const API = {
+  PWA_VERSION: '2.1.0',
   url: localStorage.getItem('rem_api_url') || apiBaseUrl(),
   token: localStorage.getItem('rem_api_token') || '',
-  connected: false, lastSync: localStorage.getItem('rem_last_sync') || null,
-  _queue: {}, _timer: null,
+  connected: false,
+  lastSync: localStorage.getItem('rem_last_sync') || null,
+  _queue: {}, _timer: null, _req_healing: false,
+  _sessionExpiry: null, _sessionStartedAt: parseInt(localStorage.getItem('rem_session_started')||'0',10),
+  _serverSettings: null, _serverVersion: null,
+  onDisconnect: null,   // hook: fired when the session dies (401) — UI can re-render
+
   _base(){ return (this.url||'').replace(/\/+$/,''); },
-  _h(method){ const h={}; if(method!=='GET'&&method!=='DELETE')h['Content-Type']='application/json'; if(this.token)h['Authorization']='Bearer '+this.token; return h; },
-  async _req(method, path, body, raw){
-    const canonical = apiBaseUrl();
-    // Self-heal: if the stored URL is stale/wrong-origin, use the canonical
-    // bridge and retry once. Triggers on BOTH network exceptions AND
-    // HTTP error statuses (404/417/500 — a wrong path returns 417, not a throw).
-    const healNeeded = () => API.url.indexOf('mars_constech.mars_constech.api')<0 || API.url.indexOf(canonical.split('/api/')[0])!==0;
-    const heal = () => { API.url=canonical; localStorage.setItem('rem_api_url',API.url); };
+  // Frappe authenticates via sid param / cookie — NOT the Authorization header,
+  // so no Bearer is ever sent.
+  _h(method){ const h={}; if(method!=='GET'&&method!=='DELETE')h['Content-Type']='application/json'; return h; },
+
+  // "170:00" → milliseconds
+  _expiryToMs(hms){
+    var p=String(hms||'').split(':'); if(p.length<2)return 0;
+    return ((+p[0]||0)*3600+(+p[1]||0)*60+(+p[2]||0))*1000;
+  },
+  _expiryHuman(exp){
+    var p=String(exp||'').split(':'); if(p.length<2)return exp||'—';
+    var h=+p[0]||0, m=+p[1]||0;
+    if(h>=24)return Math.floor(h/24)+'d '+(h%24)+'h';
+    if(h>0)return h+'h '+(m?m+'m':'');
+    return m+'m';
+  },
+  // Remaining session as a human string, or null when unknown
+  _sessionLeft(){
+    if(!this.token)return null;
+    if(this._sessionExpiry && this._sessionStartedAt){
+      var left=this._sessionStartedAt+this._sessionExpiry-Date.now();
+      if(left<=0)return 'expired';
+      var d=Math.floor(left/86400000), h=Math.floor(left%86400000/3600000), m=Math.floor(left%3600000/60000);
+      return (d?d+'d ':'')+(h?h+'h ':'')+m+'m';
+    }
+    return null;
+  },
+
+  // ── Core request path — every bridge call goes through here ──
+  async call(name, o){
+    o=o||{};
+    var ep=apiEpFind(name), t0=Date.now(), timeout=o.timeout||20000;
+    var path='.'+name+(o.query?((String(o.query).indexOf('?')===0?'':'?')+o.query):'');
+    var method=(o.method||(ep?ep.m:null)||'GET').toUpperCase();
+    // sid-param auth: only when we have a token AND the endpoint is not guest
+    if(this.token && !(ep&&ep.g)) path += (path.indexOf('?')>=0?'&':'?')+'sid='+encodeURIComponent(this.token);
+    var controller=(typeof AbortController!=='undefined')?new AbortController():null;
+    var timer=controller?setTimeout(function(){ controller.abort(); }, timeout):null;
     try{
-      // Auth: Frappe authenticates via the session cookie OR the sid query
-      // param — NOT the Authorization header. We use credentials:'omit' (no
-      // cookies; file:// pages can't hold them), so append sid=<token> to the
-      // path. This works for same-origin AND file:// (Origin: null) openings.
-      var _p = path + (this.token ? (path.indexOf('?')>=0?'&':'?')+'sid='+encodeURIComponent(this.token) : '');
-      const res = await fetch(this._base()+_p, {method, headers:this._h(method), credentials:'omit', body:body?JSON.stringify(body):undefined});
-      if(res.status===401){ this.connected=false; localStorage.removeItem('rem_api_token'); this.token=''; }
-      if(raw) return res;
-      const data = await res.json().catch(()=>({}));
-      // Frappe wraps whitelisted-method returns in {message: ...} — unwrap so
-      // the rest of the PWA keeps reading r.data.token / r.data.collections.
-      const body = (data && typeof data.message !== 'undefined') ? data.message : data;
-      // HTTP-level failure on a stale URL: heal + retry once (e.g. 417 from a
-      // wrong dotted path, 500 from a bare base URL, 404 from a wrong origin).
-      if(res.status>=400 && res.status<600 && healNeeded() && !this._req_healing){
-        this._req_healing=true;
-        heal();
-        const r2=await this._req(method, path, body, raw);
-        this._req_healing=false;
-        return r2;
+      var res=await fetch(this._base()+path, {
+        method:method, headers:this._h(method), credentials:'omit',
+        signal:controller?controller.signal:undefined,
+        body:(o.body!==undefined&&o.body!==null)?JSON.stringify(o.body):undefined
+      });
+      if(timer)clearTimeout(timer);
+      // 401 = session dead → clear token, fire hook (UI re-renders to Disconnected)
+      if(res.status===401){
+        this.connected=false;
+        var hadToken=!!this.token;
+        this.token=''; localStorage.removeItem('rem_api_token'); localStorage.removeItem('rem_session_started');
+        if(hadToken&&this.onDisconnect){ try{ this.onDisconnect(); }catch(e){} }
       }
-      return {status:res.status, data: body};
+      if(o.raw) return {status:res.status, ok:res.status>=200&&res.status<300, ms:Date.now()-t0, raw:res};
+      var data=await res.json().catch(function(){ return {}; });
+      var body=(data&&typeof data.message!=='undefined')?data.message:data;
+      // Self-heal: stale/wrong-origin URL → canonical, retry once (covers HTTP
+      // 4xx/5xx like 417 from a wrong dotted path AND network throws).
+      if(res.status>=400&&res.status<600&&this._healNeeded()&&!this._req_healing){
+        this._req_healing=true; this._heal();
+        var r2=await this.call(name,o); this._req_healing=false; return r2;
+      }
+      return {status:res.status, ok:res.status>=200&&res.status<300, ms:Date.now()-t0, data:body};
     }catch(e){
-      if(this._req_healing)return {status:0, data:{error:'Network error — is the server running at '+this._base()+'?'}};
-      if(healNeeded()){
-        this._req_healing=true;
-        heal();
-        const r2=await this._req(method, path, body, raw);
-        this._req_healing=false;
-        return r2;
+      if(timer)clearTimeout(timer);
+      if(this._req_healing)return {status:0, ok:false, ms:Date.now()-t0, data:{error:'Network error — is the server running at '+this._base()+'?'}};
+      if(this._healNeeded()){
+        this._req_healing=true; this._heal();
+        var r3=await this.call(name,o); this._req_healing=false; return r3;
       }
-      return {status:0, data:{error:'Network error — is the server running at '+this._base()+'?'}};
+      var msg=(e&&e.name==='AbortError')?('Request timed out after '+(timeout/1000)+'s'):'Network error — is the server running at '+this._base()+'?';
+      return {status:0, ok:false, ms:Date.now()-t0, data:{error:msg}};
     }
   },
-  async login(email, pass){
-    const r = await this._req('POST','.login',{email,password:pass});
-    if(r.status===200 && r.data.token){ this.token=r.data.token; this.connected=true; localStorage.setItem('rem_api_token',this.token); localStorage.setItem('rem_api_url',this.url); if(r.data.user)localStorage.setItem('rem_api_user',r.data.user); this._sessionExpiry=r.data.session_expiry||this._sessionExpiry; }
-    return r;
+  _healNeeded(){
+    var canonical=apiBaseUrl();
+    return this.url.indexOf('mars_constech.mars_constech.api')<0 || this.url.indexOf(canonical.split('/api/')[0])!==0;
   },
-  _sessionExpiry: null,
-  _serverSettings: null,
+  _heal(){ this.url=apiBaseUrl(); localStorage.setItem('rem_api_url',this.url); },
+  // Legacy compat — the module-bridge call sites keep using _req(method, path, body, raw)
+  async _req(method, path, body, raw){
+    var name=String(path).replace(/^\./,'').split('?')[0];
+    var q=String(path).split('?')[1]||'';
+    var r=await this.call(name,{method:method,query:q,body:body,raw:raw});
+    if(raw) return r.raw;
+    return {status:r.status, data:r.data};
+  },
+  async login(email, pass){
+    var r=await this.call('login',{method:'POST',body:{email:email,password:pass}});
+    if(r.ok&&r.data&&r.data.token){
+      this.token=r.data.token; this.connected=true;
+      localStorage.setItem('rem_api_token',this.token);
+      localStorage.setItem('rem_api_url',this.url);
+      if(r.data.user)localStorage.setItem('rem_api_user',r.data.user);
+      if(r.data.session_expiry){
+        this._sessionExpiry=this._expiryToMs(r.data.session_expiry);
+        this._sessionStartedAt=Date.now();
+        localStorage.setItem('rem_session_started',String(this._sessionStartedAt));
+      }
+      // pull server-backed settings right after login
+      var s=await this.call('settings_get');
+      if(s.ok) this._serverSettings=s.data;
+    }
+    return {status:r.status, data:r.data};
+  },
   async logout(){
-    await this._req('POST','.logout',null);
-    this.token=''; this.connected=false; localStorage.removeItem('rem_api_token');
+    await this.call('logout',{method:'POST'});
+    this.token=''; this.connected=false;
+    localStorage.removeItem('rem_api_token'); localStorage.removeItem('rem_session_started');
   },
   // Pull server snapshot into localStorage. Returns {changed, n}.
   async bootstrap(){
-    const r = await this._req('GET','.bootstrap');
-    if(r.status!==200) return {status:r.status, changed:false, n:0, error:r.data.error};
-    const cols = r.data.collections||{};
-    let changed=false, n=0;
+    var r=await this.call('bootstrap');
+    if(!r.ok) return {status:r.status, changed:false, n:0, error:(r.data&&r.data.error)||('HTTP '+r.status)};
+    var cols=r.data.collections||{};
+    var changed=false, n=0;
     Object.keys(cols).forEach(function(k){
       if(k==='_meta'||!Array.isArray(cols[k]))return;
-      const s=JSON.stringify(cols[k]);
+      var s=JSON.stringify(cols[k]);
       if(localStorage.getItem('rem_'+k)!==s){ try{localStorage.setItem('rem_'+k,s);}catch(e){} changed=true; }
       n+=cols[k].length;
     });
-    this.connected=true; this.lastSync=r.data.meta.server_time;
-    localStorage.setItem('rem_last_sync', r.data.meta.server_time);
-    return {status:200, changed, n};
+    this.connected=true;
+    this.lastSync=(r.data.meta&&r.data.meta.server_time)||null;
+    if(this.lastSync)localStorage.setItem('rem_last_sync',this.lastSync);
+    if(r.data.meta){
+      if(r.data.meta.settings)this._serverSettings=r.data.meta.settings;
+      if(r.data.meta.pwa_version)this._serverVersion=r.data.meta.pwa_version;
+    }
+    return {status:200, changed:changed, n:n};
   },
   async pushAll(){
-    const cols={};
+    var cols={};
     Object.keys(DB._data).forEach(function(k){ if(k!=='_meta') cols[k]=DB._data[k]; });
-    const r = await this._req('POST','.sync',{collections:cols});
-    if(r.status===200){ this.lastSync=new Date().toISOString(); localStorage.setItem('rem_last_sync',this.lastSync); }
-    return r;
+    var r=await this.call('sync',{method:'POST',body:{collections:cols}});
+    if(r.ok){ this.lastSync=new Date().toISOString(); localStorage.setItem('rem_last_sync',this.lastSync); }
+    return {status:r.status, data:r.data};
   },
   queueSync(key){
-    if(!this.connected || !this._base())return;
-    const self=this;
+    if(!this.connected||!this._base())return;
+    var self=this;
     this._queue[key]=JSON.parse(JSON.stringify(DB._data[key]||null));
     if(this._timer)clearTimeout(this._timer);
     this._timer=setTimeout(function(){
-      const cols=self._queue; self._queue={}; self._timer=null;
-      self._req('POST','.sync',{collections:cols}).then(function(r){
-        if(r.status===200){ self.lastSync=new Date().toISOString(); localStorage.setItem('rem_last_sync',self.lastSync); }
+      var cols=self._queue; self._queue={}; self._timer=null;
+      self.call('sync',{method:'POST',body:{collections:cols}}).then(function(r){
+        if(r.ok){ self.lastSync=new Date().toISOString(); localStorage.setItem('rem_last_sync',self.lastSync); }
       });
-    }, 800);
+    },800);
   },
-  // Download a report with Bearer auth (fetch -> blob -> <a download>)
+  // Download via sid param (Frappe ignores Bearer) — fetch → blob → <a download>
   async download(path, filename){
-    if(!this.connected || !this._base()){ showToast('Connect to server first (Settings → Server Sync)','error'); return; }
+    if(!this.connected||!this._base()){ showToast('Connect to server first (Settings → Server Sync)','error'); return; }
     try{
-      const res = await fetch(this._base()+path, {headers:{'Authorization':'Bearer '+this.token}});
-      if(!res.ok){ const d=await res.json().catch(()=>({})); showToast(d.error||('Download failed ('+res.status+')'),'error'); return; }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href=url; a.download=filename||'download'; document.body.appendChild(a); a.click();
-      setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 500);
+      var name=String(path).replace(/^\./,'').split('?')[0];
+      var q=String(path).split('?')[1]||'';
+      var r=await this.call(name,{query:q,raw:true,timeout:30000});
+      if(!r.ok){
+        var d=r.status?await r.raw.json().catch(function(){return {};}):{};
+        showToast((d&&d.error)||('Download failed ('+r.status+')'),'error'); return;
+      }
+      var blob=await r.raw.blob();
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a'); a.href=url; a.download=filename||'download';
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); },500);
       showToast('Downloaded '+filename,'success');
     }catch(e){ showToast('Download failed','error'); }
   }
 };
-// Auto-connect on boot if a token is stored (verify token; do NOT pull over local edits)
+
+// Auto-connect on boot when a token is stored: verify via bootstrap, heal a
+// stale stored URL (call() does that), check version + session expiry.
 setTimeout(function(){
-  if(!API.token || !API._base())return;
-  API._req('GET','.bootstrap').then(function(r){
-    if(r.status===200){
-      API.connected=true; API.lastSync=(r.data.meta||{}).server_time||null; localStorage.setItem('rem_last_sync',API.lastSync||'');
-      var _meta=r.data.meta||{};
-      API._serverSettings=_meta.settings||null;
-      API._sessionExpiry=_meta.session_expiry||API._sessionExpiry;
-      // v2.0 version check: server ships newer PWA → prompt reload
-      if(_meta.pwa_version && _meta.pwa_version!=='2.0.0'){ setTimeout(function(){ showToast('New PWA v'+_meta.pwa_version+' available — reload to update','info'); },2500); }
-    }
-    else if(API.url.indexOf('mars_constech.mars_constech.api')<0 || API.url.indexOf(apiBaseUrl().split('/api/')[0])!==0){
-      // Stale/wrong stored rem_api_url (wrong path like 'mars_constech.api', or
-      // an origin that no longer matches this page / file:// opening) — heal
-      // back to the canonical bridge URL and retry once.
-      API.url=apiBaseUrl();
-      localStorage.setItem('rem_api_url',API.url);
-      API._req('GET','.bootstrap').then(function(r2){
-        if(r2.status===200){ API.connected=true; API.lastSync=(r2.data.meta||{}).server_time||null; localStorage.setItem('rem_last_sync',API.lastSync||''); }
-      });
+  if(!API.token||!API._base())return;
+  API.call('bootstrap').then(function(r){
+    if(r.ok){
+      API.connected=true;
+      API.lastSync=(r.data.meta||{}).server_time||null;
+      if(API.lastSync)localStorage.setItem('rem_last_sync',API.lastSync);
+      API._serverSettings=(r.data.meta||{}).settings||null;
+      API._serverVersion=(r.data.meta||{}).pwa_version||null;
+      var sx=(r.data.meta||{}).session_expiry;
+      if(sx)API._sessionExpiry=API._expiryToMs(sx);
+      // session already expired while away → clear it
+      if(API._sessionExpiry&&API._sessionStartedAt&&(API._sessionStartedAt+API._sessionExpiry-Date.now())<=0){
+        API.token=''; API.connected=false;
+        localStorage.removeItem('rem_api_token'); localStorage.removeItem('rem_session_started');
+        showToast('Session expired — reconnect (Settings → Server Sync)','info');
+        return;
+      }
+      if(API._serverVersion&&API._serverVersion!==API.PWA_VERSION){
+        setTimeout(function(){ showToast('New PWA v'+API._serverVersion+' available — reload to update','info'); },2500);
+      }
     }
   });
 }, 900);
+
 
 function syncConnect(){
   var url=(document.getElementById('syncUrl')||{}).value||'';
@@ -1279,11 +1416,6 @@ function syncPull(){
   showToast('Pulling server data…','info');
   API.bootstrap().then(function(r){ if(r.status===200&&r.changed)location.reload(); else { showToast('Server data is up to date','info'); renderModule(); } });
 }
-
-
-
-
-// ═══ ERPNext CONNECTION CENTER (Settings › Server Sync) ═══
 function syncSaveCfg(toServer){
   var cfg={};
   cfg.autoConnect=document.getElementById('cfgAutoConnect')?document.getElementById('cfgAutoConnect').checked:true;
@@ -1291,10 +1423,10 @@ function syncSaveCfg(toServer){
   cfg.autoHeal=document.getElementById('cfgHealUrl')?document.getElementById('cfgHealUrl').checked:true;
   cfg.liveLand=document.getElementById('cfgLiveLand')?document.getElementById('cfgLiveLand').checked:true;
   localStorage.setItem('rem_conn_cfg',JSON.stringify(cfg));
-  // v2.0: persist server-side (REM Settings) when connected — shared across devices
+  // server-backed (REM Settings) when connected — shared across devices
   if(API.connected){
-    API._req('POST','.settings_set',{settings:{auto_connect:cfg.autoConnect?1:0,push_on_save:cfg.pushOnSave?1:0,auto_heal:cfg.autoHeal?1:0,live_land:cfg.liveLand?1:0}}).then(function(r){
-      if(r.status===200){ API._serverSettings=r.data; showToast('Config saved to ERPNext (REM Settings)','success'); }
+    API.call('settings_set',{method:'POST',body:{settings:{auto_connect:cfg.autoConnect?1:0,push_on_save:cfg.pushOnSave?1:0,auto_heal:cfg.autoHeal?1:0,live_land:cfg.liveLand?1:0}}}).then(function(r){
+      if(r.ok){ API._serverSettings=r.data; showToast('Config saved to ERPNext (REM Settings)','success'); }
       else showToast((r.data&&r.data.error)||'Could not save config to ERPNext','error');
     });
   } else if(toServer){
@@ -1305,17 +1437,15 @@ function syncSaveCfg(toServer){
 }
 function syncLoadFromERP(){
   if(!API.connected){ showToast('Connect first to load settings from ERPNext','error'); return; }
-  API._req('GET','.settings_get').then(function(r){
-    if(r.status===200){
+  API.call('settings_get').then(function(r){
+    if(r.ok){
       var s=r.data; API._serverSettings=s;
       if(document.getElementById('cfgAutoConnect'))document.getElementById('cfgAutoConnect').checked=!!s.auto_connect;
       if(document.getElementById('cfgPushSave'))document.getElementById('cfgPushSave').checked=!!s.push_on_save;
       if(document.getElementById('cfgHealUrl'))document.getElementById('cfgHealUrl').checked=!!s.auto_heal;
       if(document.getElementById('cfgLiveLand'))document.getElementById('cfgLiveLand').checked=!!s.live_land;
-      // mirror into local cache
       localStorage.setItem('rem_conn_cfg',JSON.stringify({autoConnect:!!s.auto_connect,pushOnSave:!!s.push_on_save,autoHeal:!!s.auto_heal,liveLand:!!s.live_land}));
-      // version banner
-      if(s.pwa_version && s.pwa_version!=='2.0.0'){ showToast('New PWA version '+s.pwa_version+' available on server — reload to update','info'); }
+      if(s.pwa_version&&s.pwa_version!==API.PWA_VERSION){ showToast('New PWA version '+s.pwa_version+' available on server — reload to update','info'); }
       showToast('Settings loaded from ERPNext','success');
     } else showToast((r.data&&r.data.error)||'Load failed','error');
   });
@@ -1331,9 +1461,33 @@ function syncClearStorage(){
   localStorage.removeItem('rem_api_url');
   localStorage.removeItem('rem_api_token');
   localStorage.removeItem('rem_api_user');
+  localStorage.removeItem('rem_session_started');
   API.token=''; API.connected=false;
   showToast('Stored connection cleared — reconnect to ERPNext','info');
   renderModule();
+}
+// ── API tester — registry-driven ──
+function apiTestEpOptions(){
+  var sel=document.getElementById('apiTestEp'); if(!sel)return;
+  var cur=sel.value||'index';
+  var html='';
+  API_GROUPS.forEach(function(g){
+    html+='<optgroup label="'+g[1]+'">';
+    API_EPS.forEach(function(e){
+      if(e.grp!==g[0])return;
+      html+='<option value="'+e.n+'"'+(e.n===cur?' selected':'')+'>'+e.n+(e.g?' (guest)':'')+'</option>';
+    });
+    html+='</optgroup>';
+  });
+  sel.innerHTML=html;
+  apiTestOnEpChange();
+}
+function apiTestOnEpChange(){
+  var sel=document.getElementById('apiTestEp'); if(!sel)return;
+  var ep=apiEpFind(sel.value); if(!ep)return;
+  var mm=document.getElementById('apiTestMethod'); if(mm)mm.value=ep.m;
+  var q=document.getElementById('apiTestQ'); if(q&&ep.q)q.value=ep.q;
+  var b=document.getElementById('apiTestBody'); if(b&&ep.b)b.value=ep.b;
 }
 function apiTestSend(){
   var ep=(document.getElementById('apiTestEp')||{}).value||'index';
@@ -1341,59 +1495,61 @@ function apiTestSend(){
   var q=(document.getElementById('apiTestQ')||{}).value||'';
   var bodyRaw=(document.getElementById('apiTestBody')||{}).value||'';
   var el=document.getElementById('apiTestResult');
-  var path='.'+ep+(q?'?'+q:'');
   var body=null;
   if(bodyRaw.trim()){ try{ body=JSON.parse(bodyRaw); }catch(e){ el.textContent='❌ Invalid JSON body: '+e.message; return; } }
-  el.textContent='⏳ '+method+' '+path+' …';
-  var t0=Date.now();
-  API._req(method,path,body).then(function(r){
-    var ms=Date.now()-t0;
+  el.textContent='⏳ '+method+' .'+ep+(q?'?'+q:'')+' …';
+  API.call(ep,{method:method,query:q,body:body}).then(function(r){
     var pretty=JSON.stringify(r.data,null,2);
-    if(r.status===200)el.textContent='✅ 200 OK · '+ms+' ms\n\n'+pretty;
-    else el.textContent='⚠ HTTP '+r.status+' · '+ms+' ms\n\n'+pretty;
+    if(r.ok)el.textContent='✅ '+r.status+' OK · '+r.ms+' ms\n\n'+pretty;
+    else el.textContent='⚠ HTTP '+r.status+' · '+r.ms+' ms'+(r.data&&r.data.error?('\n'+r.data.error):'')+'\n\n'+pretty;
   });
 }
 function apiTestQuick(which){
-  if(which==='index'){ apiTestSet('.index','GET',''); }
-  else if(which==='pipeline'){ apiTestSet('.land_pipeline','GET',''); }
-  else if(which==='legal'){ apiTestSet('.land_legal_checklist?name=LA-00021','GET',''); }
-  else if(which==='login'){ apiTestSet('.login','POST','{"email":"'+(localStorage.getItem('rem_api_user')||'manager@mars.com')+'","password":"Bismillah@123"}'); }
+  var eps={
+    index:['index','GET','',''],
+    pipeline:['land_pipeline','GET','',''],
+    legal:['land_legal_checklist','GET','name=LA-00021',''],
+    settings:['settings_get','GET','',''],
+    login:['login','POST','','{"email":"'+(localStorage.getItem('rem_api_user')||'manager@mars.com')+'","password":"Bismillah@123"}']
+  };
+  var t=eps[which]; if(!t)return;
+  var sel=document.getElementById('apiTestEp'); if(sel)sel.value=t[0];
+  var mm=document.getElementById('apiTestMethod'); if(mm)mm.value=t[1];
+  var q=document.getElementById('apiTestQ'); if(q)q.value=t[2];
+  var b=document.getElementById('apiTestBody'); if(b)b.value=t[3];
   apiTestSend();
 }
-function apiTestSet(path,method,body){
-  var ep=path.replace(/^\./,'').split('?')[0];
-  var sel=document.getElementById('apiTestEp'); if(sel){ for(var i=0;i<sel.options.length;i++){ if(sel.options[i].value===ep)sel.selectedIndex=i; } }
-  var mm=document.getElementById('apiTestMethod'); if(mm)mm.value=method;
-  var q=document.getElementById('apiTestQ'); if(q)q.value=path.split('?')[1]||'';
-  var b=document.getElementById('apiTestBody'); if(b)b.value=body;
-}
+// Registry-driven diagnostics: every guest endpoint, plus the core authed ones
 function syncTestAll(){
   showToast('Running API diagnostics…','info');
   var out=document.getElementById('apiTestResult');
   var log=[]; var ok=0, fail=0;
-  var tests=[
-    ['index (guest)','.index','GET',null],
-    ['bootstrap (auth)','.bootstrap','GET',null],
-    ['land_pipeline','.land_pipeline','GET',null],
-    ['legal checklist LA-00021','.land_legal_checklist?name=LA-00021','GET',null]
-  ];
+  var tests=[];
+  API_EPS.forEach(function(e){
+    // guest endpoints that need no payload (login/demo_confirm require a body —
+    // they are exercised by the tester's quick buttons, not the auto-suite)
+    if(e.g && !e.b) tests.push([e.n+' (guest)', e.n, e.m, e.q||'']);
+  });
+  if(API.connected){
+    ['bootstrap','settings_get','land_pipeline','leads_pipeline','bookings_pipeline','projects_pipeline','tasks_pipeline','plots_pipeline','finance_pipeline','contractors_pipeline','work_orders_pipeline','equipment_pipeline'].forEach(function(n){
+      tests.push([n, n, 'GET', '']);
+    });
+  }
   (function run(i){
     if(i>=tests.length){
-      var summary='\n════ SUMMARY ════\n✅ '+ok+' passed · ❌ '+fail+' failed'+(API.connected?'':'\nℹ Not connected — auth endpoints may 403 (expected)');
+      var summary='\n════ SUMMARY ════\n✅ '+ok+' passed · ❌ '+fail+' failed'+(API.connected?'':' (guest endpoints only — connect to test authed ones)');
       out.textContent=log.join('\n')+summary;
       showToast(fail===0?'All '+ok+' API tests passed':'API tests: '+ok+' ok, '+fail+' failed',fail===0?'success':'error');
       return;
     }
     var t=tests[i];
-    API._req(t[2],t[1],t[3]).then(function(r){
-      var ms=' ('+(r.status===200?'200 OK':'HTTP '+r.status)+')';
-      log.push((r.status===200?'✅ ':'❌ ')+t[0]+ms);
-      if(r.status===200)ok++;else fail++;
+    API.call(t[1],{method:t[2],query:t[3]}).then(function(r){
+      log.push((r.ok?'✅ ':'❌ ')+t[0]+' — '+r.status+(r.ok?' OK':'')+' ('+r.ms+' ms)');
+      if(r.ok)ok++;else fail++;
       run(i+1);
     });
   })(0);
 }
-
 // ═══ LEADS ERP BRIDGE (PWA CRM → ERPNext Lead doctype) ═══
 function leadsPullFromERP(){
   if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
@@ -3122,7 +3278,7 @@ function renderDashboard(el){
   const a=mockPlots.filter(p=>p.status==='available').length, s=mockPlots.filter(p=>p.status==='sold').length, r=mockPlots.filter(p=>p.status==='reserved').length;
   const _saleVal=mockBookings.reduce((s,b)=>s+parseMoneyStr(b.price),0);
   const _sale26=mockBookings.filter(b=>String(b.date||'').indexOf('2026')>=0).reduce((s,b)=>s+parseMoneyStr(b.price),0);
-  el.innerHTML=`<div class="fade-in"><div class="page-title">Dashboard</div><div class="page-subtitle">REM ERP v2.0 · Role: ${currentRole} · ${Object.keys(GROUPS).reduce(function(s,g){return s+GROUPS[g].mods.length},0)} Modules</div>
+  el.innerHTML=`<div class="fade-in"><div class="page-title">Dashboard</div><div class="page-subtitle">REM ERP v2.1 · Role: ${currentRole} · ${Object.keys(GROUPS).reduce(function(s,g){return s+GROUPS[g].mods.length},0)} Modules</div>
     <div style="margin:8px 0"><button class="action-btn primary" onclick="printRoleReport()" style="padding:3px 12px;font-size:10px">🖨 Print Report</button></div>
     <div class="stats-row" style="margin-bottom:12px">${[
       ['Available Plots',a,'#4caf50','+2 this month'],['Sold Plots',s,'#e53935',''],['Reserved',r,'#1e88e5',''],
@@ -3175,7 +3331,7 @@ function renderDashSales(el){
   var stages=LEAD_STAGES.slice();var maxC=0;stages.forEach(function(s){if((stCount[s]||0)>maxC)maxC=stCount[s];});
   var hotLeads=mockLeads.slice().sort(function(a,b){var p={High:0,Medium:1,Low:2};return (p[a.priority]||9)-(p[b.priority]||9)}).slice(0,6);
   var recentB=mockBookings.slice().sort(function(a,b){return String(b.date).localeCompare(String(a.date))}).slice(0,6);
-  el.innerHTML='<div class="fade-in"><div class="page-title">Dashboard</div><div class="page-subtitle">REM ERP v2.0 · Role: Sales Agent · Pipeline &amp; Performance</div><div style="margin:8px 0"><button class="action-btn primary" onclick="printRoleReport()" style="padding:3px 12px;font-size:10px">🖨 Print Report</button></div>'
+  el.innerHTML='<div class="fade-in"><div class="page-title">Dashboard</div><div class="page-subtitle">REM ERP v2.1 · Role: Sales Agent · Pipeline &amp; Performance</div><div style="margin:8px 0"><button class="action-btn primary" onclick="printRoleReport()" style="padding:3px 12px;font-size:10px">🖨 Print Report</button></div>'
     +dashStats([['Pipeline Value','৳'+(pipeVal/10000000).toFixed(1)+' Cr','#2e7d32',''],['Hot Leads',hot,'#c62828',''],['Open Deals',openDeals,'#1565c0',''],['Sales YTD 2026','৳'+(sale26/10000000).toFixed(1)+' Cr','#2F80ED',''],['Confirmed Bookings',booked,'#00838f',''],['Conversion',conv+'%','#7b1fa2','']])
     +dashQuick([['CRM & Leads',mockLeads.length+' leads','crm','#fff3e0','#e65100'],['Bookings',mockBookings.length+' active','bookings','#e3f2fd','#1565c0'],['Proposals',(window.mockProposals||[]).length+' total','proposals','#ede7f6','#5e35b1'],['Dues & Recovery',mockDues.length+' accts','dues_recovery','#fce4ec','#c62828'],['Customers',mockCustomers.length+' clients','customers','#e0f2f1','#00695c']])
     +'<div class="dash-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
@@ -3211,7 +3367,7 @@ function renderDashFinance(el){
   var overInvs=mockInvoices.filter(function(i){return i.status==='Overdue'}).slice(0,6);
   var topDues=mockDues.slice().sort(function(a,b){return (b.due||0)-(a.due||0)}).slice(0,6);
   var recentTx=mockTransactions.slice().sort(function(a,b){return String(b.date).localeCompare(String(a.date))}).slice(0,6);
-  el.innerHTML='<div class="fade-in"><div class="page-title">Dashboard</div><div class="page-subtitle">REM ERP v2.0 · Role: Finance · Cash Position &amp; Receivables</div><div style="margin:8px 0"><button class="action-btn primary" onclick="printRoleReport()" style="padding:3px 12px;font-size:10px">🖨 Print Report</button></div>'
+  el.innerHTML='<div class="fade-in"><div class="page-title">Dashboard</div><div class="page-subtitle">REM ERP v2.1 · Role: Finance · Cash Position &amp; Receivables</div><div style="margin:8px 0"><button class="action-btn primary" onclick="printRoleReport()" style="padding:3px 12px;font-size:10px">🖨 Print Report</button></div>'
     +dashStats([['Bank Balance','৳'+(bankTotal/10000000).toFixed(2)+' Cr','#1565c0',''],['Cash Inflow','৳'+(inflow/100000).toFixed(1)+' L','#2e7d32',''],['Cash Outflow','৳'+(outflow/100000).toFixed(1)+' L','#c62828',''],['Receivables','৳'+(receiv/100000).toFixed(1)+' L','#e65100',''],['Overdue Invoices',overInv,'#c62828',''],['Dues Accounts',duesActive+' active','#e65100','']])
     +dashQuick([['Finance',mockTransactions.length+' txns','finance','#fce4ec','#c62828'],['Bookings',mockBookings.length+' active','bookings','#e8f5e9','#2e7d32'],['Dues & Recovery',mockDues.length+' accts','dues_recovery','#fff3e0','#e65100'],['Investment & Loans','6 inv · 5 loans','investment_loans','#ede7f6','#5e35b1'],['Customers',mockCustomers.length+' clients','customers','#e0f7fa','#00838f']])
     +'<div class="dash-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
@@ -3244,7 +3400,7 @@ function renderDashEngineer(el){
   var pA=mockPlots.filter(function(p){return p.status==='available'}).length;
   var lowInv=mockInventory.filter(function(i){return i.status!=='Adequate'||(i.reorder&&i.qty<=i.reorder);});
   var unitsByProj=mockProperties.slice().sort(function(a,b){return (b.units||[]).length-(a.units||[]).length}).slice(0,5);
-  el.innerHTML='<div class="fade-in"><div class="page-title">Dashboard</div><div class="page-subtitle">REM ERP v2.0 · Role: Site Engineer · Projects &amp; Construction</div><div style="margin:8px 0"><button class="action-btn primary" onclick="printRoleReport()" style="padding:3px 12px;font-size:10px">🖨 Print Report</button></div>'
+  el.innerHTML='<div class="fade-in"><div class="page-title">Dashboard</div><div class="page-subtitle">REM ERP v2.1 · Role: Site Engineer · Projects &amp; Construction</div><div style="margin:8px 0"><button class="action-btn primary" onclick="printRoleReport()" style="padding:3px 12px;font-size:10px">🖨 Print Report</button></div>'
     +dashStats([['Active Projects',actP,'#2e7d32',''],['Avg Progress',avgProg+'%','#2F80ED',''],['Units Sold',uS,'#c62828',''],['Units Available',uA,'#2e7d32',''],['Plots Available',pA,'#4caf50',''],['Stock Alerts',lowInv.length,'#e65100','']])
     +dashQuick([['Projects',mockProjects.length+' active','projects','#e0f2f1','#00695c'],['Flats & Units',mockProperties.length+' props','properties_units','#e3f2fd','#1565c0'],['Plots & Blocks',mockPlots.length+' plots','plots','#e8f5e9','#2e7d32'],['Stock & Procurement',mockInventory.length+' items','stock','#fff3e0','#e65100'],['Contractors',mockContractors.length+' vendors','contractors','#fce4ec','#c62828']])
     +'<div class="dash-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
@@ -3273,7 +3429,7 @@ function renderDashEngineerCharts(){
 // ═══ ROLE REPORT PACKS (B1) — one-click printable per-role reports ═══
 function printRoleReport(){
   var role=currentRole;
-  var title='REM ERP v2.0 — '+(role==='Super Admin'?'Executive':role)+' Report';
+  var title='REM ERP v2.1 — '+(role==='Super Admin'?'Executive':role)+' Report';
   var when=new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
   function row(l,v){return '<tr><td style="padding:5px 10px;border-bottom:1px solid #eee;font-size:11px;color:#555">'+l+'</td><td style="padding:5px 10px;border-bottom:1px solid #eee;font-size:12px;font-weight:600;text-align:right">'+v+'</td></tr>';}
   function sec(t){return '<div style="font-size:13px;font-weight:700;color:#2F80ED;margin:16px 0 6px">'+t+'</div>';}
@@ -3321,7 +3477,7 @@ function printRoleReport(){
     body+=sec('Recent Bookings')+'<table style="width:100%;border-collapse:collapse"><tr>'+th('ID')+th('Client')+th('Amount','right')+th('Status')+'</tr>'+mockBookings.slice().sort(function(a,b){return String(b.date).localeCompare(String(a.date))}).slice(0,8).map(function(b){return '<tr>'+td(b.id)+td(b.client)+td(b.price,'right')+td(b.status)+'</tr>';}).join('')+'</table>';
   }
   var html='<div style="font-family:Inter,Arial,sans-serif;max-width:720px;margin:0 auto;padding:24px;color:#222">'
-    +'<div style="border-bottom:3px solid #2F80ED;padding-bottom:12px;margin-bottom:14px"><div style="font-size:18px;font-weight:800;color:#2F80ED">REM ERP v2.0</div><div style="font-size:14px;font-weight:600;margin-top:2px">'+title+'</div><div style="font-size:10px;color:#888;margin-top:3px">Generated '+when+' · Role: '+role+' · '+mockProjects.length+' projects · '+mockBookings.length+' bookings</div></div>'
+    +'<div style="border-bottom:3px solid #2F80ED;padding-bottom:12px;margin-bottom:14px"><div style="font-size:18px;font-weight:800;color:#2F80ED">REM ERP v2.1</div><div style="font-size:14px;font-weight:600;margin-top:2px">'+title+'</div><div style="font-size:10px;color:#888;margin-top:3px">Generated '+when+' · Role: '+role+' · '+mockProjects.length+' projects · '+mockBookings.length+' bookings</div></div>'
     +body
     +'<div style="margin-top:18px;border-top:1px solid #ddd;padding-top:8px;font-size:9px;color:#999;text-align:center">REM Real Estate Management Ltd — 50 modules · 11 groups · Confidential demo data · MARS Construction proposal</div>'
     +'</div>';
@@ -9910,7 +10066,7 @@ window.mockCreditNotes = DB.init('credit_notes', [
 ]);
 function _balNum(s){return parseInt(String(s||'').replace(/[^0-9]/g,''))||0;}
 window.mockLicense = DB.init('license', {
-  product:'REM ERP v2.0',client:'MARS CONSTECH LIMITED',licenseKey:'MMC-2026-REM10-4831',status:'Active',issued:'2026-07-01',expires:'2027-01-31',serverFee:12000,supportFee:10000,
+  product:'REM ERP v2.1',client:'MARS CONSTECH LIMITED',licenseKey:'MMC-2026-REM10-4831',status:'Active',issued:'2026-07-01',expires:'2027-01-31',serverFee:12000,supportFee:10000,
   contract:800000,
   installments:[
     {no:1,label:'Advance (15%)',amount:120000,due:'2026-07-15',status:'Paid',paidDate:'2026-07-14'},
@@ -9938,7 +10094,7 @@ function renderLicense(el){
   var doneCheck=L.checklist.filter(function(c){return c.status==='Done';}).length;
   var stCol={Active:'#2e7d32',Grace:'#e65100',Suspended:'#c62828'}[L.status]||'#888';
   var stBg={Active:'#e8f5e9',Grace:'#fff3e0',Suspended:'#ffebee'}[L.status]||'#f5f5f5';
-  el.innerHTML='<div class="fade-in"><div class="page-title">License & SLA</div><div class="page-subtitle">REM ERP v2.0 · '+L.client+' · Contract \u09F3'+L.contract.toLocaleString('en-IN')+' · '+pct+'% collected</div>'+
+  el.innerHTML='<div class="fade-in"><div class="page-title">License & SLA</div><div class="page-subtitle">REM ERP v2.1 · '+L.client+' · Contract \u09F3'+L.contract.toLocaleString('en-IN')+' · '+pct+'% collected</div>'+
     (L.status==='Suspended'?'<div style="margin-bottom:8px;padding:10px 14px;background:#ffebee;border:1px solid #ffcdd2;border-radius:8px;font-size:11px;color:#c62828;font-weight:600">⛔ LICENSE SUSPENDED — subscription payments overdue. System is in read-only mode until reconciliation. Contact BITSCOL support (server ৳'+L.serverFee.toLocaleString('en-IN')+'/mo · support ৳'+L.supportFee.toLocaleString('en-IN')+'/mo).</div>':'')+
     (L.status==='Grace'?'<div style="margin-bottom:8px;padding:10px 14px;background:#fff3e0;border:1px solid #ffe0b2;border-radius:8px;font-size:11px;color:#e65100;font-weight:600">⚠ GRACE PERIOD — installment '+L.installments.filter(function(i){return i.status==='Due';}).map(function(i){return '#'+i.no;}).join(', ')+' is due. Pay within 15 days to avoid suspension.</div>':'')+
     '<div class="stats-row" style="margin-bottom:8px">'+[
@@ -12438,7 +12594,7 @@ function renderSettings(el){
     }).join('');
     mc='<div class="card"><div class="card-header"><h3>🗂️ Menu Setup</h3><div style="font-size:9px;color:#888">Show/hide sidebar groups & reorder them (sidebar, mobile nav & search follow this order)</div></div><div class="card-body" style="padding:8px;max-height:560px;overflow-y:auto">'+grpRows+'</div></div>'+
       '<div style="margin-top:6px;padding:8px 10px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;font-size:9px;color:#2e7d32">💡 Hiding a group hides its sidebar icon and removes it from the mobile nav & search — module permissions are unchanged.</div>';
-  }else if(settingsTab==='sync'){
+    }else if(settingsTab==='sync'){
     var _sv=(API._serverSettings||{});
     var _lastSync=API.lastSync?String(API.lastSync).slice(0,19).replace('T',' '):'—';
     var _storedUrl=localStorage.getItem('rem_api_url')||'';
@@ -12446,12 +12602,14 @@ function renderSettings(el){
     var _autoConn=_connCfg.autoConnect===undefined?true:_connCfg.autoConnect;
     var _pushSave=_connCfg.pushOnSave===undefined?true:_connCfg.pushOnSave;
     var _healUrl=_connCfg.autoHeal===undefined?true:_connCfg.autoHeal;
+    var _liveLand=_connCfg.liveLand===undefined?true:_connCfg.liveLand;
+    var _sessLeft=API._sessionLeft?API._sessionLeft():null;
     // ---------- 1. CONNECTION ----------
     mc='<div class="card" style="margin-bottom:10px"><div class="card-header"><h3>🔌 ERPNext (Frappe) Connection</h3><span class="badge-status '+(API.connected?'badge-active':'badge-closed')+'" style="margin-left:6px">'+(API.connected?'Connected':'Disconnected')+'</span></div><div class="card-body">'+
-      '<div style="font-size:10px;color:#666;line-height:1.6;margin-bottom:10px">Connect this PWA to the MARS ERPNext (Frappe) server. The bridge exposes login/bootstrap/sync plus live-data endpoints (land pipeline, legal vetting). When connected, Project Acquisition and Legal Vetting read real ERP records.</div>'+
+      '<div style="font-size:10px;color:#666;line-height:1.6;margin-bottom:10px">Connect this PWA to the MARS ERPNext (Frappe) server. The bridge exposes 41 endpoints — core session, land & legal, CRM & bookings, projects, plots & finance, construction, payments — all listed in the API Tester below.</div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'+
-        '<div class="form-group"><label class="form-label">API Base URL</label><input class="form-input" id="syncUrl" value="'+API._base()+'" placeholder="http://localhost:8000/api/method/mars_constech.mars_constech.api"/></div>'+
-        '<div class="form-group"><label class="form-label">Status</label><div style="padding:6px 8px;font-size:10px;background:'+(API.connected?'#e8f5e9':'#f5f5f5')+';border:1px solid '+(API.connected?'#c8e6c9':'#e0e0e0')+';border-radius:6px;color:'+(API.connected?'#2e7d32':'#888')+'">'+(API.connected?('Connected · user '+(localStorage.getItem('rem_api_user')||'—')+' · last sync '+_lastSync):'Not connected')+'</div></div>'+
+        '<div class="form-group"><label class="form-label">API Base URL</label><input class="form-input" id="syncUrl" value="'+API._base()+'"/></div>'+
+        '<div class="form-group"><label class="form-label">Status</label><div style="padding:6px 8px;font-size:10px;background:'+(API.connected?'#e8f5e9':'#f5f5f5')+';border:1px solid '+(API.connected?'#c8e6c9':'#e0e0e0')+';border-radius:6px;color:'+(API.connected?'#2e7d32':'#888')+'">'+(API.connected?('Connected · user '+(localStorage.getItem('rem_api_user')||'—')+( _sessLeft&&_sessLeft!=='expired'?(' · session '+_sessLeft+' left'):'')+' · last sync '+_lastSync):'Not connected')+'</div></div>'+
       '</div>'+
       (API.connected?'':'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'+
         '<div class="form-group"><label class="form-label">Email</label><input class="form-input" id="syncEmail" value="'+(localStorage.getItem('rem_api_user')||'')+'" placeholder="manager@mars.com"/></div>'+
@@ -12466,7 +12624,7 @@ function renderSettings(el){
         '<button class="action-btn secondary" onclick="syncTestAll()" style="padding:4px 12px;font-size:10px">🧪 Test APIs</button>'+
       '</div>'+
       (_storedUrl&&_storedUrl!==API._base()?'<div style="font-size:9px;color:#e65100;margin-bottom:4px">⚠ Stored URL ('+landEsc(_storedUrl)+') differs from the field above — Connect will use the field value; Reset URL clears the stored one.</div>':'')+
-      '<div style="font-size:9px;color:#999">URL is auto-derived from the page origin when empty; stored URL (localStorage rem_api_url) overrides it until Reset. If the stored URL is stale the app auto-heals on any failed call.</div>'+
+      '<div style="font-size:9px;color:#999">URL is auto-derived from the page origin when empty; stored URL (localStorage rem_api_url) overrides it until Reset. If the stored URL is stale the app auto-heals on any failed call. Requests time out after 20s.</div>'+
     '</div></div>'+
     // ---------- 2. CONFIGURATION (server-backed: REM Settings in ERPNext) ----------
     '<div class="card" style="margin-bottom:10px"><div class="card-header"><h3>⚙️ Connection Configuration</h3><span class="badge-status '+(API.connected?'badge-active':'badge-closed')+'" style="margin-left:6px;font-size:9px">'+(API.connected?'synced to ERPNext (REM Settings)':'local only · connect to sync')+'</span></div><div class="card-body">'+
@@ -12475,7 +12633,7 @@ function renderSettings(el){
         '<label style="display:flex;align-items:center;gap:6px;font-size:10px;padding:5px 8px;background:#f9f9fb;border-radius:4px;cursor:pointer"><input type="checkbox" id="cfgAutoConnect" '+( _autoConn?'checked':'')+' onchange="syncSaveCfg()"/> Auto-connect on load</label>'+
         '<label style="display:flex;align-items:center;gap:6px;font-size:10px;padding:5px 8px;background:#f9f9fb;border-radius:4px;cursor:pointer"><input type="checkbox" id="cfgPushSave" '+( _pushSave?'checked':'')+' onchange="syncSaveCfg()"/> Push on every save (debounced)</label>'+
         '<label style="display:flex;align-items:center;gap:6px;font-size:10px;padding:5px 8px;background:#f9f9fb;border-radius:4px;cursor:pointer"><input type="checkbox" id="cfgHealUrl" '+( _healUrl?'checked':'')+' onchange="syncSaveCfg()"/> Auto-heal stale URL</label>'+
-        '<label style="display:flex;align-items:center;gap:6px;font-size:10px;padding:5px 8px;background:#f9f9fb;border-radius:4px;cursor:pointer"><input type="checkbox" id="cfgLiveLand" '+( _connCfg.liveLand?'checked':'')+' onchange="syncSaveCfg()"/> Live land pipeline (Legal Vetting reads ERP)</label>'+
+        '<label style="display:flex;align-items:center;gap:6px;font-size:10px;padding:5px 8px;background:#f9f9fb;border-radius:4px;cursor:pointer"><input type="checkbox" id="cfgLiveLand" '+( _liveLand?'checked':'')+' onchange="syncSaveCfg()"/> Live land pipeline (Legal Vetting reads ERP)</label>'+
       '</div>'+
       '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
         (API.connected?'<button class="action-btn secondary" onclick="syncLoadFromERP()" style="padding:3px 10px;font-size:9px">⬇ Reload settings from ERP</button>':'')+
@@ -12486,32 +12644,33 @@ function renderSettings(el){
     // ---------- 2b. SYSTEM (ERPNext System Settings mirror) ----------
     '<div class="card" style="margin-bottom:10px"><div class="card-header"><h3>🖥️ ERPNext System Info</h3><span style="font-size:9px;color:#888">read from the Frappe server</span></div><div class="card-body">'+
       (API.connected?('<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">'+
-        '<div style="padding:6px 8px;background:#f9f9fb;border-radius:6px;font-size:10px"><div style="color:#888;font-size:9px">PWA version (server)</div><div style="font-weight:600" id="sysPwaVersion">'+(_sv.pwa_version||'—')+'</div></div>'+
-        '<div style="padding:6px 8px;background:#f9f9fb;border-radius:6px;font-size:10px"><div style="color:#888;font-size:9px">Session expiry (System Settings)</div><div style="font-weight:600" id="sysSessionExpiry">'+(_sv.session_expiry||'—')+'</div></div>'+
+        '<div style="padding:6px 8px;background:#f9f9fb;border-radius:6px;font-size:10px"><div style="color:#888;font-size:9px">PWA version (server)</div><div style="font-weight:600">'+(_sv.pwa_version||'—')+(API._serverVersion&&API._serverVersion!==API.PWA_VERSION?' <span style="color:#e65100">(new!)</span>':'')+'</div></div>'+
+        '<div style="padding:6px 8px;background:#f9f9fb;border-radius:6px;font-size:10px"><div style="color:#888;font-size:9px">Session expiry (System Settings)</div><div style="font-weight:600">'+(_sv.session_expiry?API._expiryHuman(_sv.session_expiry):'—')+( _sessLeft?' <span style="color:'+(_sessLeft==='expired'?'#c62828':'#2e7d32')+'">('+_sessLeft+')</span>':'')+'</div></div>'+
         '<div style="padding:6px 8px;background:#f9f9fb;border-radius:6px;font-size:10px"><div style="color:#888;font-size:9px">Last connected user</div><div style="font-weight:600">'+(_sv.last_connected_user||'—')+'</div></div>'+
-        '<div style="padding:6px 8px;background:#f9f9fb;border-radius:6px;font-size:10px"><div style="color:#888;font-size:9px">Last sync (server)</div><div style="font-weight:600">'+(_sv.last_sync_time||'—')+'</div></div>'+
+        '<div style="padding:6px 8px;background:#f9f9fb;border-radius:6px;font-size:10px"><div style="color:#888;font-size:9px">Last sync (server)</div><div style="font-weight:600">'+(_sv.last_sync_time?String(_sv.last_sync_time).slice(0,19).replace('T',' '):'—')+'</div></div>'+
       '</div>') : '<div style="font-size:9px;color:#888">Connect to see ERPNext System Settings (session expiry, versions, last activity).</div>')+
       '<div style="font-size:9px;color:#999;margin-top:6px">Session auth is native ERPNext: login mints a Frappe session (sid) which every call passes as <code>?sid=</code> — no custom tokens. If the session expires, reconnect with your ERPNext credentials.</div>'+
     '</div></div>'+
-    // ---------- 3. API TESTER ----------
-    '<div class="card" style="margin-bottom:10px"><div class="card-header"><h3>🧪 API Tester</h3><span style="font-size:9px;color:#888">call any bridge endpoint from here</span></div><div class="card-body">'+
+    // ---------- 3. API TESTER (registry-driven) ----------
+    '<div class="card" style="margin-bottom:10px"><div class="card-header"><h3>🧪 API Tester</h3><span style="font-size:9px;color:#888">'+API_EPS.length+' bridge endpoints · registry-driven</span></div><div class="card-body">'+
       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'+
-        '<div class="form-group"><label class="form-label">Endpoint</label><select class="form-input" id="apiTestEp">'+
-          ['index','login','logout','bootstrap','sync','land_pipeline','land_sync','land_legal_checklist','land_legal_update','land_legal_load_standard','download_invoice','demo_confirm','settings_get','settings_set'].map(function(e){return '<option value="'+e+'">'+e+'</option>';}).join('')+
-        '</select></div>'+
+        '<div class="form-group"><label class="form-label">Endpoint</label><select class="form-input" id="apiTestEp" onchange="apiTestOnEpChange()"></select></div>'+
         '<div class="form-group"><label class="form-label">Method</label><select class="form-input" id="apiTestMethod"><option>GET</option><option>POST</option></select></div>'+
-        '<div class="form-group"><label class="form-label">Query / name (optional)</label><input class="form-input" id="apiTestQ" placeholder="name=LA-00021&amp;invoice=ACC-SINV-2026-00002"/></div>'+
+        '<div class="form-group"><label class="form-label">Query params (optional)</label><input class="form-input" id="apiTestQ" placeholder="name=LA-00021&amp;invoice=ACC-SINV-2026-00002"/></div>'+
       '</div>'+
-      '<div class="form-group" style="margin-bottom:8px"><label class="form-label">JSON body (POST)</label><textarea class="form-input" id="apiTestBody" rows="3" style="font-family:monospace;font-size:10px" placeholder="e.g. {&quot;name&quot;:&quot;LA-00021&quot;,&quot;items&quot;:[{&quot;check_item&quot;:&quot;CS Khatian&quot;,&quot;status&quot;:&quot;Verified&quot;}]}"></textarea></div>'+
+      '<div class="form-group" style="margin-bottom:8px"><label class="form-label">JSON body (POST)</label><textarea class="form-input" id="apiTestBody" rows="3" style="font-family:monospace;font-size:10px" placeholder="{&quot;name&quot;:&quot;LA-00021&quot;,&quot;items&quot;:[]}"></textarea></div>'+
       '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+
         '<button class="action-btn primary" onclick="apiTestSend()" style="padding:4px 14px;font-size:10px">▶ Send Request</button>'+
         '<button class="action-btn secondary" onclick="apiTestQuick(\'index\')" style="padding:3px 10px;font-size:9px">⚡ Index</button>'+
         '<button class="action-btn secondary" onclick="apiTestQuick(\'pipeline\')" style="padding:3px 10px;font-size:9px">⚡ Land Pipeline</button>'+
-        '<button class="action-btn secondary" onclick="apiTestQuick(\'legal\')" style="padding:3px 10px;font-size:9px">⚡ Legal Checklist (LA-00021)</button>'+
+        '<button class="action-btn secondary" onclick="apiTestQuick(\'legal\')" style="padding:3px 10px;font-size:9px">⚡ Legal (LA-00021)</button>'+
+        '<button class="action-btn secondary" onclick="apiTestQuick(\'settings\')" style="padding:3px 10px;font-size:9px">⚡ Settings</button>'+
         '<button class="action-btn secondary" onclick="apiTestQuick(\'login\')" style="padding:3px 10px;font-size:9px">⚡ Login</button>'+
       '</div>'+
       '<div id="apiTestResult" style="font-size:9px;line-height:1.5;white-space:pre-wrap;word-break:break-all;background:#0d1117;color:#c9d1d9;border-radius:6px;padding:8px;max-height:220px;overflow:auto;font-family:monospace">Ready — pick an endpoint and press Send.</div>'+
     '</div></div>';
+    // populate the registry dropdown after innerHTML is set
+    setTimeout(function(){ apiTestEpOptions(); },0);
   }
 el.innerHTML='<div class="fade-in settings-wrap" style="display:flex;gap:8px;height:100%;flex:1"><div class="settings-nav" style="width:180px;min-width:180px;background:#fff;border:1px solid #e8e8e8;border-radius:6px;padding:6px;display:flex;flex-direction:column;overflow-y:auto"><div class="settings-nav-title" style="font-size:12px;font-weight:700;color:#222;margin-bottom:6px;padding:0 4px">Settings</div>'+sidebar+'<div class="settings-nav-actions" style="margin-top:auto;padding-top:6px;border-top:1px solid #f0f0f0"><button onclick="showToast(\'All settings saved!\',\'success\')" style="width:100%;padding:5px 0;background:#2F80ED;color:#fff;border:none;border-radius:6px;font-size:10px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save</button><button onclick="resetAllAppData()" style="width:100%;padding:4px 0;background:transparent;color:#c62828;border:1px solid #f5c6cb;border-radius:6px;font-size:9px;font-weight:500;cursor:pointer;margin-top:3px">↺ Reset All Data</button></div></div><div class="settings-content" style="flex:1;overflow-y:auto">'+mc+'<div class="content-footer" style="margin-top:8px"><div class="breadcrumb">Settings <span>›</span> '+settingsTab+'</div></div></div></div>';
 }
@@ -12802,7 +12961,7 @@ function printReport(){
     h+=t.outerHTML;
     rows+=t.querySelectorAll('tbody tr').length;
   });
-  h+='<div class="pr-foot"><span>Total Records: '+rows+'</span><span>REM ERP v2.0</span><span>Generated: '+dateStr+'</span></div>';
+  h+='<div class="pr-foot"><span>Total Records: '+rows+'</span><span>REM ERP v2.1</span><span>Generated: '+dateStr+'</span></div>';
   pr.innerHTML=h;
   pr.style.display='block';
   setTimeout(function(){
