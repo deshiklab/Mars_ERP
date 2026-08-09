@@ -947,8 +947,17 @@
       <input class="form-input" id="lg_email" type="email" placeholder="you@mars.com" autocomplete="username" style="padding:10px 12px"></div>
     <div class="form-group" style="text-align:left"><label class="form-label">Password</label>
       <input class="form-input" id="lg_pass" type="password" placeholder="••••••••" autocomplete="current-password" style="padding:10px 12px"></div>
+    <div style="font-size:9px;color:#999;margin-bottom:8px;text-align:left">Server: <span id="lg_server">…</span></div>
     <div id="lg_err" style="font-size:10px;color:#e53935;min-height:14px;margin:2px 0 8px"></div>
     <button class="action-btn primary" onclick="loginGateSignIn()" id="lg_btn" style="width:100%;padding:11px;font-size:13px">🔐 Sign In</button>
+    <script>/* Enter submits the gate form */
+      try{
+        ['lg_email','lg_pass'].forEach(function(id){
+          var el=document.getElementById(id);
+          if(el)el.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); loginGateSignIn(); } });
+        });
+      }catch(e){}
+    </script>
     <div style="font-size:10px;color:#999;margin-top:16px">New customer?
       <a href="javascript:void(0)" onclick="loginGateSignup()" style="color:#2f80ed;font-weight:600">Create an account</a>
     </div>
@@ -1456,19 +1465,23 @@ function _pwaRoleFor(roles){
 function loginGateVisible(){ return document.getElementById('loginGate').style.display!=='none'; }
 function showLoginGate(){
   document.getElementById('loginGate').style.display='flex';
+  var ls=document.getElementById('lg_server');
+  if(ls)ls.textContent=apiBaseUrl();
 }
 function hideLoginGate(){
   document.getElementById('loginGate').style.display='none';
 }
 function loginGateError(msg){
   var e=document.getElementById('lg_err'); if(e)e.textContent=msg||'';
-  var b=document.getElementById('lg_btn'); if(b)b.disabled=false;
+  var b=document.getElementById('lg_btn');
+  if(b){ b.disabled=false; b.textContent='🔐 Sign In'; }
 }
 function loginGateSignIn(){
   var em=(document.getElementById('lg_email')||{}).value||'';
   var pw=(document.getElementById('lg_pass')||{}).value||'';
   if(!em||!pw){loginGateError('Enter your email and password');return;}
   var btn=document.getElementById('lg_btn'); if(btn)btn.disabled=true;
+  if(btn)btn.textContent='⏳ Signing in…';
   API.url=apiBaseUrl();
   API.login(em,pw).then(function(r){
     if(r.status===200&&r.ok&&r.data&&r.data.token){
@@ -1491,8 +1504,10 @@ function loginGateSignIn(){
       setTimeout(function(){var i=document.getElementById('f_otp');if(i){i.focus();}},120);
       window._otpCtx={em:em,pw:pw,tmpId:tmpId,fromGate:true};
     }else{
-      loginGateError((r.data&&r.data.error)||'Login failed');
+      loginGateError((r.data&&(r.data.error||r.data.exception))||'Login failed — check server URL');
     }
+  }).catch(function(e){
+    loginGateError('Connection error: '+(e&&e.message?e.message:'could not reach server'));
   });
 }
 function loginGateSignup(){
