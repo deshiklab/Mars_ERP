@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { GROUPS, groupForPath, moduleForPath } from '@/shell/groups'
@@ -7,6 +7,7 @@ import type { ShellGroup, ShellModule } from '@/shell/groups'
 import { i18n, _t, theme } from '@/i18n'
 import NotificationsPanel from '@/components/NotificationsPanel.vue'
 import RecentTray from '@/components/RecentTray.vue'
+import CommandPalette from '@/components/CommandPalette.vue'
 import GlobalSearch from '@/components/GlobalSearch.vue'
 import QuickAdd from '@/components/QuickAdd.vue'
 import SidebarFlyout from '@/components/SidebarFlyout.vue'
@@ -16,6 +17,7 @@ const router = useRouter()
 const route = useRoute()
 
 theme.init()
+const paletteRef = ref<InstanceType<typeof CommandPalette> | null>(null)
 const notifOpen = ref(false)
 const recentOpen = ref(false)
 const activeGroupId = ref('executive')
@@ -74,6 +76,18 @@ watch(
     }
   },
   { immediate: true }
+)
+
+// open the command palette via deep-link ?palette=1 (after mount —
+// the ref is null during setup, and the initial query doesn't change)
+onMounted(() => {
+  if (route.query.palette === '1') paletteRef.value?.openPalette()
+})
+watch(
+  () => route.query.palette,
+  (v) => {
+    if (v === '1') paletteRef.value?.openPalette()
+  }
 )
 
 const activeGroup = computed(() => GROUPS.find((g) => g.id === activeGroupId.value) ?? GROUPS[0])
@@ -164,7 +178,7 @@ function exportCsv() {
         </div>
 
         <div class="top-actions" style="display: flex; align-items: center; gap: 2px; position: relative">
-          <button class="rem-icon-btn" title="Keyboard Shortcuts">⌨</button>
+          <button class="rem-icon-btn" title="Command Palette (Ctrl+K)" @click="paletteRef?.openPalette()">⌨</button>
           <QuickAdd />
           <button class="rem-icon-btn" title="Print Report">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 15px; height: 15px">
@@ -244,7 +258,9 @@ function exportCsv() {
         </div>
       </div>
     </div>
-      <!-- Notifications + Recent panels -->
+      <!-- Command palette -->
+    <CommandPalette ref="paletteRef" />
+    <!-- Notifications + Recent panels -->
     <NotificationsPanel :open="notifOpen" @close="notifOpen = false" />
     <RecentTray :open="recentOpen" @close="recentOpen = false" />
   </div>

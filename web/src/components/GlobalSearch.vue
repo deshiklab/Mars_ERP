@@ -53,11 +53,6 @@ const results = computed(() => {
 })
 
 function onKeydown(e: KeyboardEvent) {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-    e.preventDefault()
-    open.value = true
-    nextTick(() => inputRef.value?.focus())
-  }
   if (!open.value) return
   if (e.key === 'Escape') {
     open.value = false
