@@ -1260,7 +1260,7 @@ function apiEpFind(name){ for(var i=0;i<API_EPS.length;i++){ if(API_EPS[i].n===n
 
 // ═══ API — unified connection layer ═══
 const API = {
-  PWA_VERSION: '2.1.0',
+  PWA_VERSION: '3.1.1',
   url: localStorage.getItem('rem_api_url') || apiBaseUrl(),
   token: localStorage.getItem('rem_api_token') || '',
   connected: false,
@@ -1481,9 +1481,10 @@ function loginGateSignIn(){
         '<div style="font-size:30px;margin-bottom:6px">🔐</div>'+
         '<div style="font-size:13px;font-weight:600;color:#222;margin-bottom:4px">Two-factor authentication</div>'+
         '<div style="font-size:10px;color:#888;margin-bottom:14px">Enter the 6-digit code from your '+esc(method)+' authenticator app.</div>'+
-        '<input id="f_otp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" '+
+        '<input id="f_otp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" oninput="otpAutoSubmit()" '+
         'style="width:150px;padding:9px 10px;font-size:18px;letter-spacing:6px;text-align:center;border:1px solid #e0e0e0;border-radius:8px;outline:none" placeholder="••••••">'+
         '<div id="otpErr" style="font-size:10px;color:#e53935;margin-top:8px;min-height:12px"></div>'+
+        '<div id="otpHint" style="font-size:9px;color:#999;margin-top:4px">Codes refresh every 30s — if it fails, enter the new one.</div>'+
         '</div>';
       openModal('Verify 2FA Code',body,'<button class="drawer-btn secondary" onclick="closeDrawer()">Cancel</button>'+
         '<button class="drawer-btn primary" onclick="submitOtp()" id="otpSubmitBtn">Verify</button>');
@@ -1544,7 +1545,15 @@ function _onPwaLogin(d){
   }
   hideLoginGate();
   showToast('Welcome, '+(d.full_name||d.user||'')+' ('+role+')','success');
+  try{ switchModule('dashboard'); }catch(e){}
   renderModule();
+}
+function otpAutoSubmit(){
+  var el=document.getElementById('f_otp');
+  if(el&&el.value&&el.value.replace(/\D/g,'').length===6){
+    var btn=document.getElementById('otpSubmitBtn');
+    if(btn&&!btn.disabled){ btn.disabled=true; submitOtp(); }
+  }
 }
 // extend submitOtp to also serve the login gate flow
 var _submitOtpOrig=submitOtp;
@@ -1567,7 +1576,7 @@ submitOtp=function(){
       }
     }else{
       var btn=document.getElementById('otpSubmitBtn'); if(btn)btn.disabled=false;
-      if(err)err.textContent=(r2.data&&r2.data.error)||'Verification failed — try again';
+      if(err)err.textContent=(r2.data&&r2.data.error)||'Verification failed — try again (codes refresh every 30s)';
       var i=document.getElementById('f_otp'); if(i){i.value='';i.focus();}
     }
   });
@@ -1584,8 +1593,11 @@ setTimeout(function(){
   API.call('bootstrap').then(function(r){
     if(r.ok){
       API.connected=true;
-      // valid stored session → skip the login gate
-      setTimeout(function(){ hideLoginGate(); }, 100);
+      // valid stored session → skip the login gate and go to the dashboard
+      setTimeout(function(){
+        hideLoginGate();
+        try{ switchModule('dashboard'); }catch(e){}
+      }, 100);
       API.lastSync=(r.data.meta||{}).server_time||null;
       if(API.lastSync)localStorage.setItem('rem_last_sync',API.lastSync);
       API._serverSettings=(r.data.meta||{}).settings||null;
@@ -1640,9 +1652,10 @@ function syncConnect(){
         '<div style="font-size:30px;margin-bottom:6px">🔐</div>'+
         '<div style="font-size:13px;font-weight:600;color:#222;margin-bottom:4px">Two-factor authentication</div>'+
         '<div style="font-size:10px;color:#888;margin-bottom:14px">Enter the 6-digit code from your '+esc(method)+' authenticator app.</div>'+
-        '<input id="f_otp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" '+
+        '<input id="f_otp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" oninput="otpAutoSubmit()" '+
         'style="width:150px;padding:9px 10px;font-size:18px;letter-spacing:6px;text-align:center;border:1px solid #e0e0e0;border-radius:8px;outline:none" placeholder="••••••">'+
         '<div id="otpErr" style="font-size:10px;color:#e53935;margin-top:8px;min-height:12px"></div>'+
+        '<div id="otpHint" style="font-size:9px;color:#999;margin-top:4px">Codes refresh every 30s — if it fails, enter the new one.</div>'+
         '</div>';
       openModal('Verify 2FA Code',body,'<button class="drawer-btn secondary" onclick="closeDrawer()">Cancel</button>'+
         '<button class="drawer-btn primary" onclick="submitOtp()" id="otpSubmitBtn">Verify</button>');
