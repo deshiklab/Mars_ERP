@@ -1185,6 +1185,12 @@ const API_EPS = [
   {n:'loans_pipeline', m:'GET', grp:'plots', d:'Loans (REM Loan)'},
   {n:'loans_sync', m:'POST', grp:'plots', d:'Upsert loans', b:'{"loans":[]}'},
   {n:'party_ledger_pipeline', m:'GET', grp:'plots', d:'Party balances (receivables/payables)'},
+  // — CRM improvement: activities / brokers / complaints —
+  {n:'lead_activity_add', m:'POST', grp:'crm', d:'Append lead activity', b:'{"name":"LD-...","activity":{"type":"Call","text":"..."}}'},
+  {n:'brokers_pipeline', m:'GET', grp:'crm', d:'Brokers (REM Broker)'},
+  {n:'brokers_sync', m:'POST', grp:'crm', d:'Upsert brokers', b:'{"brokers":[]}'},
+  {n:'complaints_pipeline', m:'GET', grp:'crm', d:'Complaints (native Issue)'},
+  {n:'complaints_sync', m:'POST', grp:'crm', d:'Upsert complaints', b:'{"complaints":[]}'},
   // — Projects & Tasks —
   {n:'projects_pipeline', m:'GET', grp:'projects', d:'Projects'},
   {n:'projects_sync', m:'POST', grp:'projects', d:'Upsert projects', b:'{"projects":[]}'},
@@ -1611,7 +1617,7 @@ function leadsPullFromERP(){
 function leadsPushToERP(){
   if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
   showToast('Pushing leads to ERPNext…','info');
-  var payload=mockLeads.map(function(l){ return {id:l.id,name:l.name,email:l.email,phone:l.phone,territory:l.territory,property:l.property,status:l.status,type:l.type,source:l.source,value:l.value||''}; });
+  var payload=mockLeads.map(function(l){ return {id:l.id,name:l.name,email:l.email,phone:l.phone,territory:l.territory,property:l.property,status:l.status,type:l.type,source:l.source,value:l.value||'',priority:l.priority||'',owner:l.owner||'',nextFollowUp:l.nextFollowUp&&l.nextFollowUp!=='—'?l.nextFollowUp:'',paymentStatus:l.paymentStatus||'',facingDir:l.facingDir||'',floorPref:l.floorPref||'',flatType:l.flatType||'',sizeSqFt:l.sizeSqFt||'',paymentPlan:l.paymentPlan||'',brokerId:l.brokerId||'',activities:l.activities||[]}; });
   API._req('POST','.leads_sync',{leads:payload}).then(function(r){
     if(r.status===200){ showToast('Pushed to ERPNext: '+r.data.created+' created, '+r.data.updated+' updated','success'); }
     else showToast((r.data&&r.data.error)||'Lead push failed','error');
@@ -4473,6 +4479,25 @@ function renderCRMKanban(){
   }).join('')}</div>`;
 }
 
+
+function brokersPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  API.call('brokers_pipeline').then(function(r){
+    if(r.ok && Array.isArray(r.data.brokers)){
+      var n=0;
+      r.data.brokers.forEach(function(x){
+        var mapped={}; Object.assign(mapped,x);
+        var ex=mockBrokers.find(function(y){return String(y.id)===String(x.id);});
+        if(ex){ Object.assign(ex,mapped); } else { mockBrokers.push(mapped); }
+        n++;
+      });
+      DB.save('brokers');
+      showToast('Synced '+n+' brokers from ERPNext','success');
+      renderModule();
+    } else showToast((r.data&&r.data.error)||'brokers pull failed','error');
+  });
+}
+
 function renderBrokersList(pbro){
 return `<div class="card"><div class="card-header"><h3>Broker Directory</h3></div><div class="card-body" style="padding:0"><div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Phone</th><th>Tier</th><th>Region</th><th class="num">Referred</th><th class="num">Linked Leads</th><th class="num">Deals Closed</th><th class="num">Commission Paid</th><th>Status</th></tr></thead><tbody>${
   pbro.items.map(function(b){
@@ -4500,6 +4525,25 @@ function showBrokerDetail(id){
     '</div>',
     '<button class="drawer-btn secondary" onclick="closeModal()">✕ Close</button>'
   );
+}
+
+
+function complaintsPullFromERP(){
+  if(!API.connected){ showToast('Connect first (Settings → Server Sync)','error'); return; }
+  API.call('complaints_pipeline').then(function(r){
+    if(r.ok && Array.isArray(r.data.complaints)){
+      var n=0;
+      r.data.complaints.forEach(function(x){
+        var mapped={}; Object.assign(mapped,x);
+        var ex=mockComplaints.find(function(y){return String(y.id)===String(x.id);});
+        if(ex){ Object.assign(ex,mapped); } else { mockComplaints.push(mapped); }
+        n++;
+      });
+      DB.save('complaints');
+      showToast('Synced '+n+' complaints from ERPNext','success');
+      renderModule();
+    } else showToast((r.data&&r.data.error)||'complaints pull failed','error');
+  });
 }
 
 function renderComplaints(pcomp){
@@ -14221,6 +14265,16 @@ function addLeadActivity(id){
   document.getElementById('leadActText').value='';
   openLeadPanel(id,'activities');
   showToast('Activity logged!');
+  if(API.connected){
+    // server name: leads may carry ERP name as id (CRM-LEAD-...) or PWA id
+    var erpName=String(l.id).indexOf('CRM-LEAD')===0?l.id:l.erpName||null;
+    if(erpName){
+      API.call('lead_activity_add',{method:'POST',body:{name:erpName,activity:{type:type,user:API.user||'You',text:text.trim()}}}).then(function(r){
+        if(r.ok&&r.data&&r.data.activities){l.activities=r.data.activities;DB.save('leads');}
+        else showToast('Activity saved locally (ERP sync pending)','info');
+      });
+    } else { showToast('Activity saved locally — sync lead to ERP to persist','info'); }
+  }
 }
 function addLeadProposal(id){
   const l=mockLeads.find(x=>x.id===id);if(!l)return;

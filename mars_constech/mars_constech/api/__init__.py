@@ -529,25 +529,110 @@ def land_legal_load_standard(name=None):
 
 LEAD_FUNNEL = ["New Inquiry", "Site Visit", "Negotiation", "Booking", "Downpayment", "Installments", "Converted", "Lost"]
 
-def _lead_to_pwa(lead):
-	"""Map a native Lead doctype record to the PWA lead field contract."""
-	return {
-		"id": lead.custom_rem_ref or ("LD-" + str(lead.name)),
-		"name": lead.lead_name or "",
-		"territory": lead.territory or "",
-		"phone": lead.phone or "",
-		"email": lead.email_id or "",
-		"property": lead.custom_rem_property or "",
-		"status": lead.custom_rem_status or "New Inquiry",
-		"priority": "Medium",
-		"type": lead.type or "Local",
-		"source": lead.source or "",
-		"value": _fmt_bdt(lead.custom_rem_value or 0),
-		"owner": lead.lead_owner or "",
-		"lastContact": "",
-		"nextFollowUp": "",
-		"notes": "",
-	}
+def _lead_to_pwa(r):
+    """Native Lead row/dict → PWA lead contract (full field map)."""
+    d = r.as_dict() if not isinstance(r, dict) else r
+    acts = []
+    try:
+        for a in frappe.get_all("REM Lead Activity", filters={"parent": d.get("name")},
+                                fields=["activity_type", "activity_user", "activity_date", "activity_text"],
+                                order_by="activity_date desc", limit_page_length=50):
+            acts.append({"type": a.activity_type or "Note", "user": a.activity_user or "",
+                         "date": _fmt_relative_dt(a.activity_date), "text": a.activity_text or ""})
+    except Exception:
+        pass
+    score = _lead_score(d, acts)
+    return {
+        "id": d.get("custom_rem_ref") or d.get("name"),
+        "name": d.get("lead_name") or d.get("first_name") or "",
+        "territory": d.get("territory") or "",
+        "phone": d.get("phone") or d.get("mobile_no") or "",
+        "email": d.get("email_id") or "",
+        "property": d.get("custom_rem_property") or "",
+        "status": d.get("custom_rem_status") or "New Inquiry",
+        "priority": d.get("custom_rem_priority") or "Medium",
+        "type": d.get("lead_type") or d.get("type") or "Local",
+        "source": d.get("source") or "",
+        "value": _fmt_bdt(d.get("custom_rem_value") or 0),
+        "lastContact": _fmt_relative_dt(d.get("custom_rem_last_contact")),
+        "owner": d.get("lead_owner") or "",
+        "nextFollowUp": _fmt_followup(d.get("custom_rem_next_follow_up")),
+        "paymentStatus": d.get("custom_rem_payment_status") or "Up to Date",
+        "facingDir": d.get("custom_rem_facing_dir") or "",
+        "floorPref": d.get("custom_rem_floor_pref") or "",
+        "flatType": d.get("custom_rem_flat_type") or "",
+        "sizeSqFt": d.get("custom_rem_size_sqft") or "",
+        "paymentPlan": d.get("custom_rem_payment_plan") or "",
+        "brokerId": d.get("custom_rem_broker_ref") or "",
+        "score": score,
+        "activities": acts,
+        "notes": d.get("notes") or "",
+    }
+
+
+def _lead_score(d, acts=None):
+    """Server-side lead scoring mirroring the PWA calcLeadScore()."""
+    status = d.get("custom_rem_status") or ""
+    if status == "Lost":
+        return max(5, 50 - min(len(acts or []) * 5, 45))
+    if status == "Junk":
+        return 0
+    s = 0
+    pr = d.get("custom_rem_priority") or "Medium"
+    s += {"High": 25, "Medium": 15, "Low": 5}.get(pr, 15)
+    val = d.get("custom_rem_value") or 0
+    if val >= 50000000: s += 30
+    elif val >= 20000000: s += 25
+    elif val >= 10000000: s += 20
+    elif val >= 5000000: s += 15
+    elif val >= 1000000: s += 10
+    else: s += 3
+    stage = {"Installments": 30, "Downpayment": 28, "Booking": 25, "Negotiation": 20,
+             "Site Visit": 15, "Contacted": 10, "New Inquiry": 5, "Possession": 35,
+             "Handover": 38}
+    s += stage.get(status, 5)
+    if (d.get("lead_type") or d.get("type")) == "NRB":
+        s += 5
+    s += min(len(acts or []) * 2, 10)
+    return min(max(s, 0), 100)
+
+
+def _fmt_relative_dt(dt):
+    """Datetime → PWA-style relative string ('2h ago', '3d ago')."""
+    if not dt:
+        return ""
+    try:
+        from frappe.utils import now_datetime
+        delta = now_datetime() - dt
+        secs = delta.total_seconds()
+        if secs < 3600:
+            return f"{max(int(secs // 60), 1)}min ago"
+        if secs < 86400:
+            return f"{int(secs // 3600)}h ago"
+        if secs < 604800:
+            return f"{int(secs // 86400)}d ago"
+        return str(dt)[:10]
+    except Exception:
+        return str(dt)[:16]
+
+
+def _fmt_followup(dt):
+    """Datetime → PWA follow-up style ('Today, 3:00 PM' / date)."""
+    if not dt:
+        return "—"
+    try:
+        from frappe.utils import now_datetime
+        today = now_datetime().date()
+        d = dt.date()
+        tm = dt.strftime("%-I:%M %p")
+        if d == today:
+            return "Today" + (", " + tm if dt.strftime("%H:%M") != "00:00" else "")
+        if (d - today).days == 1:
+            return "Tomorrow" + (", " + tm if dt.strftime("%H:%M") != "00:00" else "")
+        return str(d)
+    except Exception:
+        return str(dt)[:16]
+
 
 
 @frappe.whitelist()
@@ -556,8 +641,12 @@ def leads_pipeline():
 	rows = frappe.get_all(
 		"Lead",
 		fields=["name", "lead_name", "custom_rem_ref", "custom_rem_status", "status",
-				"territory", "phone", "email_id", "custom_rem_property", "custom_rem_value",
-				"type", "source", "lead_owner"],
+				"territory", "phone", "mobile_no", "email_id", "custom_rem_property",
+				"custom_rem_value", "custom_rem_priority", "custom_rem_next_follow_up",
+				"custom_rem_last_contact", "custom_rem_flat_type", "custom_rem_facing_dir",
+				"custom_rem_floor_pref", "custom_rem_size_sqft", "custom_rem_payment_plan",
+				"custom_rem_payment_status", "custom_rem_broker_ref", "type", "source",
+				"lead_owner"],
 		order_by="creation desc",
 		limit_page_length=500,
 	)
@@ -599,6 +688,41 @@ def leads_sync(leads=None):
 			except Exception:
 				pass
 		doc.notes = str(item.get("notes") or "")
+		if item.get("priority"):
+			doc.custom_rem_priority = str(item.get("priority"))
+		if item.get("owner"):
+			doc.lead_owner = str(item.get("owner"))
+		if item.get("nextFollowUp") and item.get("nextFollowUp") != "—":
+			doc.custom_rem_next_follow_up = _parse_followup(item.get("nextFollowUp"))
+		if item.get("paymentStatus"):
+			doc.custom_rem_payment_status = str(item.get("paymentStatus"))
+		if item.get("facingDir"):
+			doc.custom_rem_facing_dir = str(item.get("facingDir"))
+		if item.get("floorPref"):
+			doc.custom_rem_floor_pref = str(item.get("floorPref"))
+		if item.get("flatType"):
+			doc.custom_rem_flat_type = str(item.get("flatType"))
+		if item.get("sizeSqFt"):
+			doc.custom_rem_size_sqft = str(item.get("sizeSqFt"))
+		if item.get("paymentPlan"):
+			doc.custom_rem_payment_plan = str(item.get("paymentPlan"))
+		if item.get("brokerId"):
+			doc.custom_rem_broker_ref = str(item.get("brokerId"))
+		# activities (upsert by text+type to stay idempotent)
+		if isinstance(item.get("activities"), list):
+			existing_acts = {str(a.activity_type) + "|" + str(a.activity_text)
+							 for a in frappe.get_all("REM Lead Activity", filters={"parent": doc.name},
+													 fields=["activity_type", "activity_text"])} if doc.name else set()
+			for act in item["activities"]:
+				key = str(act.get("type") or "Note") + "|" + str(act.get("text") or "")
+				if key in existing_acts:
+					continue
+				doc.append("custom_rem_lead_activities", {
+					"activity_type": act.get("type") or "Note",
+					"activity_user": act.get("user") or frappe.session.user,
+					"activity_date": act.get("date") or frappe.utils.now_datetime(),
+					"activity_text": (act.get("text") or "")[:500],
+				})
 		if existing:
 			doc.save()
 			updated += 1
@@ -607,6 +731,25 @@ def leads_sync(leads=None):
 			created += 1
 	frappe.db.commit()
 	return {"created": created, "updated": updated}
+
+
+def _parse_followup(s):
+    """PWA follow-up string ('Today, 3:00 PM' / '2026-08-10') → datetime."""
+    try:
+        from frappe.utils import now_datetime
+        s = str(s).strip()
+        today = now_datetime().date()
+        if s.lower().startswith("today"):
+            tm = s.split(",")[-1].strip() if "," in s else "09:00"
+            return frappe.utils.datetime.datetime.combine(today, frappe.utils.datetime.datetime.strptime(tm, "%I:%M %p").time())
+        if s.lower().startswith("tomorrow"):
+            tm = s.split(",")[-1].strip() if "," in s else "09:00"
+            return frappe.utils.datetime.datetime.combine(today + frappe.utils.datetime.timedelta(days=1),
+                                                          frappe.utils.datetime.datetime.strptime(tm, "%I:%M %p").time())
+        return frappe.utils.datetime.datetime.strptime(s[:16], "%Y-%m-%d %H:%M") if " " in s else frappe.utils.datetime.datetime.combine(
+            frappe.utils.datetime.datetime.strptime(s[:10], "%Y-%m-%d").date(), frappe.utils.datetime.datetime.min.time())
+    except Exception:
+        return None
 
 
 @frappe.whitelist()
@@ -1676,6 +1819,124 @@ def settings_set(settings=None):
 
 
 
+
+
+# ═══ CRM IMPROVEMENT (Lead activities / Brokers / Complaints) ═══
+@frappe.whitelist()
+def lead_activity_add(name=None, activity=None):
+    """Append an activity to a lead's log (Call/Meeting/Site Visit/WhatsApp/Email/Note)."""
+    if not name or not isinstance(activity, dict):
+        frappe.throw(_("name and activity required"), frappe.ValidationError)
+    doc = frappe.get_doc("Lead", name)
+    doc.append("custom_rem_lead_activities", {
+        "activity_type": activity.get("type") or "Note",
+        "activity_user": activity.get("user") or frappe.session.user,
+        "activity_date": activity.get("date") or frappe.utils.now_datetime(),
+        "activity_text": (activity.get("text") or "")[:500],
+    })
+    doc.save(ignore_permissions=True)
+    frappe.db.commit()
+    return _lead_to_pwa(doc)
+
+
+@frappe.whitelist()
+def brokers_pipeline():
+    """Brokers from REM Broker doctype (PWA broker card shape)."""
+    rows = frappe.get_all("REM Broker",
+        fields=["name", "broker_name", "phone", "tier", "commission_pct", "region",
+                "leads_referred", "deals_closed", "commission_paid", "status", "joined"],
+        order_by="creation desc", limit_page_length=500)
+    return {"count": len(rows), "brokers": [{
+        "id": r.name, "name": r.broker_name or "", "phone": r.phone or "",
+        "tier": r.tier or "Silver", "commissionPct": r.commission_pct or 0,
+        "region": r.region or "", "leadsReferred": r.leads_referred or 0,
+        "dealsClosed": r.deals_closed or 0, "commissionPaid": r.commission_paid or "",
+        "status": r.status or "Active", "joined": r.joined or "",
+    } for r in rows]}
+
+
+@frappe.whitelist()
+def brokers_sync(brokers=None):
+    """Upsert brokers (dedupe by name)."""
+    if not brokers or not isinstance(brokers, list):
+        frappe.throw(_("brokers must be a list"), frappe.ValidationError)
+    created = updated = 0
+    for b in brokers:
+        bname = b.get("name") or ""
+        name = frappe.db.get_value("REM Broker", {"broker_name": bname}, "name") if bname else None
+        doc = frappe.get_doc("REM Broker", name) if name else frappe.new_doc("REM Broker")
+        doc.broker_name = bname[:140]
+        if b.get("phone"): doc.phone = b.get("phone")
+        if b.get("tier"): doc.tier = b.get("tier")
+        if b.get("commissionPct") is not None: doc.commission_pct = b.get("commissionPct")
+        if b.get("region"): doc.region = b.get("region")
+        if b.get("leadsReferred") is not None: doc.leads_referred = b.get("leadsReferred")
+        if b.get("dealsClosed") is not None: doc.deals_closed = b.get("dealsClosed")
+        if b.get("commissionPaid"): doc.commission_paid = b.get("commissionPaid")
+        if b.get("status"): doc.status = b.get("status")
+        if b.get("joined"): doc.joined = b.get("joined")
+        doc.save(ignore_permissions=True)
+        if name: updated += 1
+        else: created += 1
+    frappe.db.commit()
+    return {"created": created, "updated": updated}
+
+
+@frappe.whitelist()
+def complaints_pipeline():
+    """Complaints from native Issue doctype (issue_type=Complaint)."""
+    rows = frappe.get_all("Issue",
+        filters={"issue_type": "Complaint"},
+        fields=["name", "subject", "customer_name", "status", "priority", "issue_type",
+                "description", "opening_date", "resolution_details", "custom_rem_project",
+                "custom_rem_unit", "custom_rem_assigned", "custom_rem_sla_days",
+                "custom_rem_resolved_date", "custom_rem_satisfaction", "custom_rem_owner"],
+        order_by="creation desc", limit_page_length=500)
+    return {"count": len(rows), "complaints": [{
+        "id": r.name, "client": r.customer_name or "", "project": r.custom_rem_project or "",
+        "unit": r.custom_rem_unit or "", "type": r.issue_type or "",
+        "desc": r.description or "", "priority": r.priority or "Medium",
+        "status": r.status or "Open", "assigned": r.custom_rem_assigned or "",
+        "filedDate": str(r.opening_date or "")[:10], "sla": r.custom_rem_sla_days or 0,
+        "resolvedDate": str(r.custom_rem_resolved_date or "")[:10] or None,
+        "satisfaction": r.custom_rem_satisfaction, "owner": r.custom_rem_owner or "",
+    } for r in rows]}
+
+
+@frappe.whitelist()
+def complaints_sync(complaints=None):
+    """Upsert complaints into native Issue (dedupe: subject + customer)."""
+    if not complaints or not isinstance(complaints, list):
+        frappe.throw(_("complaints must be a list"), frappe.ValidationError)
+    created = updated = 0
+    for c in complaints:
+        subj = c.get("desc") or c.get("subject") or ""
+        cust = c.get("client") or ""
+        name = frappe.db.get_value("Issue", {"subject": subj[:140], "customer_name": cust}, "name") if subj else None
+        doc = frappe.get_doc("Issue", name) if name else frappe.new_doc("Issue")
+        if not name:
+            doc.subject = subj[:140]
+            doc.description = subj
+            doc.customer_name = cust
+            doc.issue_type = "Complaint"
+            doc.opening_date = c.get("filedDate") or frappe.utils.today()
+        if c.get("priority"): doc.priority = c.get("priority")
+        if c.get("status"): doc.status = c.get("status")
+        if c.get("project"): doc.custom_rem_project = c.get("project")
+        if c.get("unit"): doc.custom_rem_unit = c.get("unit")
+        if c.get("assigned"): doc.custom_rem_assigned = c.get("assigned")
+        if c.get("sla") is not None: doc.custom_rem_sla_days = c.get("sla")
+        if c.get("resolvedDate"): doc.custom_rem_resolved_date = c.get("resolvedDate")
+        if c.get("satisfaction") is not None: doc.custom_rem_satisfaction = c.get("satisfaction")
+        if c.get("owner"): doc.custom_rem_owner = c.get("owner")
+        if c.get("desc") and name:
+            doc.description = c.get("desc")
+        doc.flags.ignore_mandatory = True
+        doc.save(ignore_permissions=True)
+        if name: updated += 1
+        else: created += 1
+    frappe.db.commit()
+    return {"created": created, "updated": updated}
 
 # ═══ SWEEP 2 BRIDGES (Handover / VO / Labor / Investment / Loan / Party Ledger) ═══
 @frappe.whitelist()
@@ -2985,6 +3246,11 @@ def index():
         "loans_pipeline",
         "loans_sync",
         "party_ledger_pipeline",
+        "lead_activity_add",
+        "brokers_pipeline",
+        "brokers_sync",
+        "complaints_pipeline",
+        "complaints_sync",
         "download_invoice",
         "demo_confirm",
         "settings_get",

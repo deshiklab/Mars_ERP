@@ -1,45 +1,27 @@
-#!/usr/bin/env python3
-"""Create REM custom fields on Lead directly (same pattern as mk-acqref.py)."""
-import frappe
+import frappe, json
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
-fields = {
-    "Lead": [
-        {
-            "fieldname": "custom_rem_status",
-            "fieldtype": "Select",
-            "label": "REM Status",
-            "options": "\nNew Inquiry\nSite Visit\nNegotiation\nBooking\nDownpayment\nInstallments\nConverted\nLost",
-            "default": "New Inquiry",
-            "insert_after": "status",
-            "description": "REM PWA sales funnel status",
-        },
-        {
-            "fieldname": "custom_rem_ref",
-            "fieldtype": "Data",
-            "label": "REM Ref",
-            "insert_after": "custom_rem_status",
-            "description": "PWA-side lead id (LD-xxx) for dedupe",
-        },
-        {
-            "fieldname": "custom_rem_value",
-            "fieldtype": "Currency",
-            "label": "REM Expected Value",
-            "insert_after": "custom_rem_ref",
-            "description": "Expected deal value in BDT",
-        },
-        {
-            "fieldname": "custom_rem_property",
-            "fieldtype": "Data",
-            "label": "REM Property Interest",
-            "insert_after": "custom_rem_value",
-            "description": "Project / unit the lead is interested in",
-        },
-    ]
-}
 
-create_custom_fields(fields, ignore_validate=True)
-frappe.db.commit()
-
-rows = frappe.get_all("Custom Field", filters={"dt": "Lead", "fieldname": ["like", "custom_rem%"]}, fields=["fieldname", "fieldtype"])
-print("Lead custom fields:", [(r.fieldname, r.fieldtype) for r in rows])
+def mk_lead_cf():
+    fields = {
+        "Lead": [
+            {"fieldname": "custom_rem_priority", "fieldtype": "Select", "label": "Priority",
+             "options": "Low\nMedium\nHigh", "default": "Medium"},
+            {"fieldname": "custom_rem_next_follow_up", "fieldtype": "Datetime", "label": "Next Follow-up"},
+            {"fieldname": "custom_rem_last_contact", "fieldtype": "Datetime", "label": "Last Contact"},
+            {"fieldname": "custom_rem_flat_type", "fieldtype": "Data", "label": "Flat Type"},
+            {"fieldname": "custom_rem_facing_dir", "fieldtype": "Data", "label": "Facing Direction"},
+            {"fieldname": "custom_rem_floor_pref", "fieldtype": "Data", "label": "Floor Preference"},
+            {"fieldname": "custom_rem_size_sqft", "fieldtype": "Data", "label": "Size (sqft)"},
+            {"fieldname": "custom_rem_payment_plan", "fieldtype": "Data", "label": "Payment Plan"},
+            {"fieldname": "custom_rem_payment_status", "fieldtype": "Select", "label": "Payment Status",
+             "options": "Up to Date\nPending\nOverdue", "default": "Up to Date"},
+            {"fieldname": "custom_rem_broker_ref", "fieldtype": "Data", "label": "Broker Ref"},
+            {"fieldname": "custom_rem_lead_score", "fieldtype": "Int", "label": "Lead Score",
+             "read_only": 1, "default": 0},
+            {"fieldname": "custom_rem_lead_activities", "fieldtype": "Table", "label": "Activity Log",
+             "options": "REM Lead Activity"},
+        ]
+    }
+    create_custom_fields(fields)
+    print("lead custom fields created")
