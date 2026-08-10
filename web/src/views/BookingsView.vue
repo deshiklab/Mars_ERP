@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
 import BookingDetailDrawer from '@/components/BookingDetailDrawer.vue'
@@ -10,6 +12,17 @@ import type { Booking } from '@/api/types'
 const route = useRoute()
 const data = useDataStore()
 const statusFilter = ref('')
+
+async function onStatusChange({ row, field, from, to }: { row: Record<string, unknown>; field: string; from: string; to: string }) {
+  const id = String((row as { id?: string }).id ?? (row as { name?: string }).name ?? '')
+  const r = await api.bookingUpdateStatus(id, to)
+  if (r.ok) {
+    showToast(`Booking status → ${to}`, 'success')
+  } else {
+    ;(row as Record<string, unknown>)[field] = from
+    showToast('Status update failed', 'error')
+  }
+}
 const detail = ref<Booking | null>(null)
 watch(
   () => route.query.bk,
@@ -25,13 +38,14 @@ onMounted(() => {  data.loadBookings()
   })
 })
 
-const statusOptions = ['Inquiry', 'Booked', 'Confirmed', 'Under Construction', 'Handed Over', 'Cancelled']
+const statusOptions = ['Pending Review', 'Pending Approval', 'Confirmed', 'Delivered', 'Cancelled']
 
 function statusStyle(status: string): { bg: string; fg: string } {
   const map: Record<string, [string, string]> = {
-    Inquiry: ['#f0f4ff', '#2f80ed'],
-    Booked: ['#fff8e1', '#ff8f00'],
+    'Pending Review': ['#f0f4ff', '#2f80ed'],
+    'Pending Approval': ['#fff8e1', '#ff8f00'],
     Confirmed: ['#e8f5e9', '#2e7d32'],
+    Delivered: ['#e0f2f1', '#00695c'],
     'Under Construction': ['#fff3e0', '#e65100'],
     'Handed Over': ['#e3f2fd', '#1565c0'],
     Cancelled: ['#ffebee', '#c62828']
@@ -142,7 +156,7 @@ async function setStatus(id: string, status: string) {
       :actions="actions"
       search-placeholder="Search bookings, clients…"
       @tab-change="onTabChange"
-    />
+     :status-options="statusOptions" @status-change="onStatusChange" />
 
     <!-- Booking detail drawer (component) -->
     <BookingDetailDrawer :booking="detail" @close="detail = null" @status="(st: string) => detail && setStatus(detail.id, st)" />

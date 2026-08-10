@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
 import KanbanBoard from '@/components/KanbanBoard.vue'
@@ -14,6 +16,17 @@ import { _t } from '@/i18n'
 const data = useDataStore()
 const route = useRoute()
 const statusFilter = ref('')
+
+async function onStatusChange({ row, field, from, to }: { row: Record<string, unknown>; field: string; from: string; to: string }) {
+  const id = String((row as { id?: string }).id ?? (row as { name?: string }).name ?? '') // id IS the doc name (name is the person's)
+  const r = await api.leadUpdateStatus(id, to)
+  if (r.ok) {
+    showToast(`Lead status → ${to}`, 'success')
+  } else {
+    ;(row as Record<string, unknown>)[field] = from
+    showToast('Status update failed', 'error')
+  }
+}
 const viewMode = ref<'table' | 'kanban'>(route.query.view === 'kanban' ? 'kanban' : 'table')
 const showAddDrawer = ref(false)
 const detailLead = ref<Lead | null>(null)
@@ -25,16 +38,18 @@ onMounted(() => {
   })
 })
 
-const statusOptions = ['New Inquiry', 'Contacted', 'Site Visit', 'Negotiation', 'Booking', 'Lost']
+const statusOptions = ['New Inquiry', 'Site Visit', 'Negotiation', 'Booking', 'Downpayment', 'Installments', 'Converted', 'Lost']
 const sources = ['Website', 'Facebook', 'Referral', 'Walk-in', 'Agent', 'Bikroy', 'NRB Direct', 'Cold Call']
 
 function statusStyle(status: string): { bg: string; fg: string } {
   const map: Record<string, [string, string]> = {
     'New Inquiry': ['#e3f2fd', '#1565c0'],
-    Contacted: ['#f0f4ff', '#2f80ed'],
     'Site Visit': ['#fff3e0', '#e65100'],
     Negotiation: ['#fff8e1', '#ff8f00'],
     Booking: ['#e8f5e9', '#2e7d32'],
+    Downpayment: ['#e0f2f1', '#00695c'],
+    Installments: ['#ede7f6', '#5e35b1'],
+    Converted: ['#e8f5e9', '#1b5e20'],
     Lost: ['#ffebee', '#c62828']
   }
   const [bg, fg] = map[status] ?? ['#f0f0f0', '#555']
@@ -213,7 +228,7 @@ async function saveLead() {
         :actions="actions"
         search-placeholder="Search leads, source, status…"
         @tab-change="onTabChange"
-      />
+       :status-options="statusOptions" @status-change="onStatusChange" />
 
       <!-- KANBAN VIEW -->
       <div v-else class="card" style="padding: 8px">

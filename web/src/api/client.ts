@@ -145,7 +145,8 @@ class ApiClient {
   }
 
   async leadUpdateStatus(id: string, status: string): Promise<ApiResult<{ ok: boolean }>> {
-    return this.request<{ ok: boolean }>('lead_update_status', { method: 'POST', body: { id, status } })
+    // server signature is lead_update_status(name, status) — the body key MUST be `name`
+    return this.request<{ ok: boolean }>('lead_update_status', { method: 'POST', body: { name: id, status } })
   }
 
   async bookingsPipeline(): Promise<ApiResult<PipelineResponse<Booking>>> {
@@ -153,7 +154,8 @@ class ApiClient {
   }
 
   async bookingUpdateStatus(id: string, status: string): Promise<ApiResult<{ ok: boolean }>> {
-    return this.request<{ ok: boolean }>('booking_update_status', { method: 'POST', body: { id, status } })
+    // server signature is booking_update_status(name, status)
+    return this.request<{ ok: boolean }>('booking_update_status', { method: 'POST', body: { name: id, status } })
   }
 
   async duesPipeline(): Promise<ApiResult<PipelineResponse<Due>>> {
