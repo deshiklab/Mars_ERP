@@ -106,7 +106,7 @@ export const GROUPS: ShellGroup[] = [
     mods: [
       { id: 'hr', label: 'HR', path: '/hr' },
       { id: 'documents', label: 'Documents Vault' },
-      { id: 'knowledge_base', label: 'Knowledge Base' },
+      { id: 'knowledge_base', label: 'Knowledge Base' , path: '/knowledge-base'},
       { id: 'stock', label: 'Stock & Procurement', path: '/stock' }
     ]
   },
@@ -116,7 +116,7 @@ export const GROUPS: ShellGroup[] = [
     svg: '<path d="M12 3v18"/><path d="M7 21h10"/><path d="M5 7h14"/><path d="M6 7l-3 5a3 3 0 0 0 6 0L6 7z"/><path d="M18 7l-3 5a3 3 0 0 0 6 0l-3-5z"/>',
     module: 'dashboard',
     mods: [
-      { id: 'compliance', label: 'Compliance' },
+      { id: 'compliance', label: 'Compliance' , path: '/compliance'},
       { id: 'legal_contracts', label: 'Legal Contracts' },
       { id: 'qc', label: 'QC & Inspection' }
     ]
@@ -156,7 +156,7 @@ export const GROUPS: ShellGroup[] = [
     module: 'dashboard',
     mods: [
       { id: 'whatsapp', label: 'WhatsApp Engine' },
-      { id: 'chat', label: 'Internal Chat' },
+      { id: 'chat', label: 'Internal Chat' , path: '/chat'},
       { id: 'ai_assistant', label: 'AI Copilot' }
     ]
   }

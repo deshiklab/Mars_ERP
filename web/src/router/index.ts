@@ -262,6 +262,54 @@ const router = createRouter({
       component: () => import('../views/CampaignsView.vue'),
       meta: { module: 'campaigns', title: 'Campaigns' }
     },
+    {
+      path: '/applicants',
+      name: 'applicants',
+      component: () => import('../views/ApplicantsView.vue'),
+      meta: { module: 'applicants', title: 'Job Applicants' }
+    },
+    {
+      path: '/knowledge-base',
+      name: 'knowledgebase',
+      component: () => import('../views/KnowledgeBaseView.vue'),
+      meta: { module: 'knowledge-base', title: 'Knowledge Base' }
+    },
+    {
+      path: '/bank-accounts',
+      name: 'bankaccounts',
+      component: () => import('../views/BankAccountsView.vue'),
+      meta: { module: 'bank-accounts', title: 'Bank Accounts' }
+    },
+    {
+      path: '/backups',
+      name: 'backups',
+      component: () => import('../views/BackupsView.vue'),
+      meta: { module: 'backups', title: 'Data Backup' }
+    },
+    {
+      path: '/compliance',
+      name: 'compliance',
+      component: () => import('../views/ComplianceView.vue'),
+      meta: { module: 'compliance', title: 'Compliance' }
+    },
+    {
+      path: '/legal-contracts',
+      name: 'legalcontracts',
+      component: () => import('../views/LegalContractsView.vue'),
+      meta: { module: 'legal-contracts', title: 'Legal Contracts' }
+    },
+    {
+      path: '/users',
+      name: 'users',
+      component: () => import('../views/UsersView.vue'),
+      meta: { module: 'users', title: 'User & Role Mgmt' }
+    },
+    {
+      path: '/chat',
+      name: 'chat',
+      component: () => import('../views/ChatView.vue'),
+      meta: { module: 'chat', title: 'Team Chat' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })
