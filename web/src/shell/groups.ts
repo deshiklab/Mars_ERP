@@ -64,7 +64,7 @@ export const GROUPS: ShellGroup[] = [
     module: 'bookings',
     mods: [
       { id: 'bookings', label: 'Bookings', path: '/bookings' },
-      { id: 'customer_portal', label: 'Customer Portal' },
+      { id: 'customer_portal', label: 'Customer Portal' , path: '/portal'},
       { id: 'handover', label: 'Handover & Post-Sales' , path: '/handover'},
       { id: 'dues_recovery', label: 'Dues & Recovery', path: '/dues' },
       { id: 'ticketing', label: 'Ticketing & Issue' }

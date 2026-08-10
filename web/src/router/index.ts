@@ -508,6 +508,12 @@ const router = createRouter({
       component: () => import('../views/EmptyStateView.vue'),
       meta: { module: 'empty', title: 'Module' }
     },
+    {
+      path: '/portal',
+      name: 'portal',
+      component: () => import('../views/CustomerPortalView.vue'),
+      meta: { module: 'portal', title: 'Customer Portal' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })

@@ -11,6 +11,7 @@ import { showToast } from '@/toast'
 import NotificationsPanel from '@/components/NotificationsPanel.vue'
 import RecentTray from '@/components/RecentTray.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
+import ShortcutsModal from '@/components/ShortcutsModal.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
 import ProfilePanel from '@/components/ProfilePanel.vue'
 import GlobalSearch from '@/components/GlobalSearch.vue'
@@ -25,6 +26,7 @@ const route = useRoute()
 theme.init()
 const paletteRef = ref<InstanceType<typeof CommandPalette> | null>(null)
 const profileOpen = ref(false)
+const shortcutsOpen = ref(false)
 const notifOpen = ref(false)
 const syncingAll = ref(false)
 const lastSync = ref(0)
@@ -240,7 +242,7 @@ function exportCsv() {
         </div>
 
         <div class="top-actions" style="display: flex; align-items: center; gap: 2px; position: relative">
-          <button class="rem-icon-btn" title="Command Palette (Ctrl+K)" @click="paletteRef?.openPalette()">⌨</button>
+          <button class="rem-icon-btn" title="Keyboard Shortcuts (?)" @click="shortcutsOpen = true">⌨</button>
           <QuickAdd />
           <button class="rem-icon-btn" title="Print Report" @click="printReport">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 15px; height: 15px">
@@ -323,6 +325,7 @@ function exportCsv() {
     </div>
       <ToastContainer />
     <ProfilePanel :open="profileOpen" @close="profileOpen = false" />
+    <ShortcutsModal :open="shortcutsOpen" @close="shortcutsOpen = false" />
     <!-- Command palette -->
     <CommandPalette ref="paletteRef" />
     <!-- Notifications + Recent panels -->

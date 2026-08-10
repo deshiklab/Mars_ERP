@@ -1,16 +1,28 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
+import BookingDetailDrawer from '@/components/BookingDetailDrawer.vue'
 import type { TableAction, TableColumn, TableTab } from '@/components/DataTable.vue'
 import type { Booking } from '@/api/types'
 
+const route = useRoute()
 const data = useDataStore()
 const statusFilter = ref('')
 const detail = ref<Booking | null>(null)
+watch(
+  () => route.query.bk,
+  (v) => {
+    if (v === '1' && !detail.value && data.bookings.length) detail.value = data.bookings[0]
+  }
+)
 
-onMounted(() => {
-  data.loadBookings()
+
+onMounted(() => {  data.loadBookings()
+  .then(() => {
+    if (route.query.bk === '1' && data.bookings.length) detail.value = data.bookings[0]
+  })
 })
 
 const statusOptions = ['Inquiry', 'Booked', 'Confirmed', 'Under Construction', 'Handed Over', 'Cancelled']
@@ -132,53 +144,7 @@ async function setStatus(id: string, status: string) {
       @tab-change="onTabChange"
     />
 
-    <!-- Booking detail drawer -->
-    <div v-if="detail" class="drawer-overlay active" @click.self="detail = null">
-      <div class="drawer-sheet">
-        <div class="drawer-header">
-          <h3>{{ detail.id }} — {{ detail.client }}</h3>
-          <div class="drawer-close" @click="detail = null">✕</div>
-        </div>
-        <div class="drawer-body">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; font-size: 11px">
-            <div><span style="color: #888">Property:</span> <b>{{ detail.property }}</b></div>
-            <div><span style="color: #888">Unit:</span> <b>{{ detail.unit }}</b></div>
-            <div><span style="color: #888">Type:</span> {{ detail.type }}</div>
-            <div><span style="color: #888">Date:</span> {{ detail.date }}</div>
-            <div><span style="color: #888">Price:</span> {{ detail.price }}</div>
-            <div><span style="color: #888">Advance:</span> {{ detail.advance }}</div>
-            <div style="color: #2e7d32"><span style="color: #888">Paid:</span> <b>{{ bdt(detail.total_paid) }}</b></div>
-            <div style="color: #c62828"><span style="color: #888">Due:</span> <b>{{ bdt(detail.total_due) }}</b></div>
-          </div>
-
-          <h4 style="font-size: 12px; color: #333; margin: 14px 0 8px">Installment schedule</h4>
-          <div class="table-wrap">
-            <table class="rem-table">
-              <thead>
-                <tr><th>#</th><th>Date</th><th>Amount</th><th>Status</th></tr>
-              </thead>
-              <tbody>
-                <tr v-for="inst in detail.installments" :key="inst.no">
-                  <td>{{ inst.no }}</td>
-                  <td>{{ inst.date }}</td>
-                  <td>{{ bdt(inst.amount) }}</td>
-                  <td>
-                    <span class="pill" :style="inst.status === 'Paid' ? 'background:#e8f5e9;color:#2e7d32' : 'background:#fff3e0;color:#e65100'">
-                      {{ inst.status }}
-                    </span>
-                  </td>
-                </tr>
-                <tr v-if="!detail.installments || detail.installments.length === 0">
-                  <td colspan="4" style="text-align: center; color: #888; padding: 14px; font-size: 10px">No installments</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div class="drawer-footer">
-          <button class="drawer-btn" @click="detail = null">Close</button>
-        </div>
-      </div>
-    </div>
+    <!-- Booking detail drawer (component) -->
+    <BookingDetailDrawer :booking="detail" @close="detail = null" @status="(st: string) => detail && setStatus(detail.id, st)" />
   </div>
 </template>
