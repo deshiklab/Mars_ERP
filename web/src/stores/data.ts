@@ -220,11 +220,26 @@ export const useDataStore = defineStore('data', {
       this.duesLoading = false
     },
 
-    async updateDueStatus(id: string, status: string): Promise<boolean> {
-      const r = await api.duesUpdate(id, status)
+    async recordDueUpdate(
+      id: string,
+      fields: {
+        lastFollowUp?: string
+        notes?: string
+        promiseDate?: string
+        promiseAmount?: number
+      }
+    ): Promise<boolean> {
+      const r = await api.dueRecord(id, fields)
       if (r.ok) {
         const d = this.dues.find((x) => x.id === id)
-        if (d) d.status = status
+        if (d) {
+          if (fields.lastFollowUp !== undefined) d.lastFollowUp = fields.lastFollowUp
+          if (fields.notes !== undefined) (d as { notes?: string }).notes = fields.notes
+          if (fields.promiseDate !== undefined && fields.promiseAmount !== undefined) {
+            d.promises = d.promises || []
+            d.promises.push({ date: fields.promiseDate, amount: fields.promiseAmount })
+          }
+        }
         return true
       }
       this.error = apiErrorText(r)

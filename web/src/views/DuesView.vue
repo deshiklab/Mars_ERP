@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { showToast } from '@/toast'
 import { useDataStore } from '@/stores/data'
+import { _t } from '@/i18n'
 import DataTable from '@/components/DataTable.vue'
 import DueDetailDrawer from '@/components/DueDetailDrawer.vue'
 import type { TableAction, TableColumn, TableTab } from '@/components/DataTable.vue'
@@ -125,17 +126,32 @@ function onTabChange(t: string) {
   tab.value = t
 }
 
+const aging = computed(() => {
+  const buckets = [
+    { label: '0–30 d', min: 0, max: 30, color: '#2e7d32', n: 0, amt: 0 },
+    { label: '31–60 d', min: 31, max: 60, color: '#ff8f00', n: 0, amt: 0 },
+    { label: '61–90 d', min: 61, max: 90, color: '#e65100', n: 0, amt: 0 },
+    { label: '90+ d', min: 91, max: 1e9, color: '#c62828', n: 0, amt: 0 },
+  ]
+  data.dues.forEach((d) => {
+    const days = Number(d.daysOverdue) || 0
+    const b = buckets.find((x) => days >= x.min && days <= x.max)
+    if (b) {
+      b.n += 1
+      b.amt += Number(d.due) || 0
+    }
+  })
+  const total = Math.max(buckets.reduce((s, b) => s + b.amt, 0), 1)
+  return { buckets, total }
+})
+
 const actions = computed<TableAction[]>(() => [
   { label: 'View Details', icon: '👁', onClick: (r) => (detailDue.value = r as unknown as Due) },
-  { label: 'Mark Current', icon: '🟢', onClick: (r) => setStatus((r as unknown as Due).id, 'Current') },
-  { label: 'Mark Overdue', icon: '🟠', onClick: (r) => setStatus((r as unknown as Due).id, 'Overdue') },
-  { label: 'Mark Critical', icon: '🔴', onClick: (r) => setStatus((r as unknown as Due).id, 'Critical') },
-  { label: 'Mark Paid', icon: '✅', onClick: (r) => setStatus((r as unknown as Due).id, 'Paid') }
+  { label: 'Mark Current', icon: '🟢', onClick: (r) => onDueStatus('Current') },
+  { label: 'Mark Overdue', icon: '🟠', onClick: (r) => onDueStatus('Overdue') },
+  { label: 'Mark Critical', icon: '🔴', onClick: (r) => onDueStatus('Critical') },
+  { label: 'Mark Paid', icon: '✅', onClick: (r) => onDueStatus('Paid') }
 ])
-
-async function setStatus(id: string, status: string) {
-  await data.updateDueStatus(id, status)
-}
 
 function onDueStatus(st: string) {
   if (st === 'Paid') {
@@ -154,6 +170,21 @@ function onDueStatus(st: string) {
     </div>
 
     <p v-if="data.error" style="font-size: 11px; color: #c62828; margin: 6px 0">{{ data.error }}</p>
+    <!-- AGING STRIP -->
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px">
+      <div v-for="b in aging.buckets" :key="b.label" style="flex: 1; min-width: 130px; background: #fff; border: 1px solid #e8eef5; border-radius: 8px; padding: 8px 10px">
+        <div style="display: flex; align-items: center; gap: 6px">
+          <span :style="{ width: '8px', height: '8px', borderRadius: '4px', background: b.color }"></span>
+          <span style="font-size: 9px; color: #666">{{ b.label }}</span>
+        </div>
+        <div style="font-size: 13px; font-weight: 700; margin-top: 2px">{{ b.n }} <span style="font-size: 8px; font-weight: 400; color: #999">{{ _t('accounts') }}</span></div>
+        <div style="font-size: 9px; color: #555">{{ bdt(b.amt) }}</div>
+        <div style="height: 4px; border-radius: 2px; background: #f0f3f7; margin-top: 5px; overflow: hidden">
+          <div :style="{ width: (b.amt / aging.total) * 100 + '%', background: b.color, height: '100%' }"></div>
+        </div>
+      </div>
+    </div>
+
     <p v-if="data.duesLoading" style="font-size: 11px; color: #888; padding: 16px">Loading dues…</p>
 
     <DataTable
@@ -171,6 +202,7 @@ function onDueStatus(st: string) {
       :due="detailDue"
       @close="detailDue = null"
       @status="onDueStatus"
+      @updated="data.loadDues()"
     />
 
 </template>

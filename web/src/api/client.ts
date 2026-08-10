@@ -166,9 +166,23 @@ class ApiClient {
     return this.request<PipelineResponse<Due>>('dues_pipeline')
   }
 
-  async duesUpdate(id: string, status: string, paid?: number): Promise<ApiResult<{ ok: boolean }>> {
-    const body: Record<string, unknown> = { id, status }
-    if (paid !== undefined) body.paid = paid
+  /** dues_update — record a follow-up / promise on a booking (server params: last_follow_up, notes, promise_date, promise_amount, promise_kept). */
+  async dueRecord(
+    id: string,
+    fields: {
+      lastFollowUp?: string
+      notes?: string
+      promiseDate?: string
+      promiseAmount?: number
+      promiseKept?: { date: string; amount: number; kept: boolean }
+    }
+  ): Promise<ApiResult<{ ok: boolean }>> {
+    const body: Record<string, unknown> = { id }
+    if (fields.lastFollowUp !== undefined) body.last_follow_up = fields.lastFollowUp
+    if (fields.notes !== undefined) body.notes = fields.notes
+    if (fields.promiseDate !== undefined) body.promise_date = fields.promiseDate
+    if (fields.promiseAmount !== undefined) body.promise_amount = fields.promiseAmount
+    if (fields.promiseKept) body.promise_kept = fields.promiseKept
     return this.request<{ ok: boolean }>('dues_update', { method: 'POST', body })
   }
 
