@@ -436,6 +436,66 @@ const router = createRouter({
       component: () => import('../views/CustomerDocsView.vue'),
       meta: { module: 'customer-docs', title: 'Customer Documents' }
     },
+    {
+      path: '/credit-notes',
+      name: 'creditnotes',
+      component: () => import('../views/CreditNotesView.vue'),
+      meta: { module: 'credit-notes', title: 'Credit Notes' }
+    },
+    {
+      path: '/recon',
+      name: 'recon',
+      component: () => import('../views/ReconItemsView.vue'),
+      meta: { module: 'recon', title: 'Reconciliation' }
+    },
+    {
+      path: '/transfers',
+      name: 'transfers',
+      component: () => import('../views/TransfersView.vue'),
+      meta: { module: 'transfers', title: 'Transfers' }
+    },
+    {
+      path: '/loan-contracts',
+      name: 'loancontracts',
+      component: () => import('../views/LoanContractsView.vue'),
+      meta: { module: 'loan-contracts', title: 'Loan Contracts' }
+    },
+    {
+      path: '/whatsapp-templates',
+      name: 'whatsapptemplates',
+      component: () => import('../views/WhatsAppTemplatesView.vue'),
+      meta: { module: 'whatsapp-templates', title: 'WhatsApp Templates' }
+    },
+    {
+      path: '/task-comments',
+      name: 'taskcomments',
+      component: () => import('../views/TaskCommentsView.vue'),
+      meta: { module: 'task-comments', title: 'Task Comments' }
+    },
+    {
+      path: '/employee-payroll',
+      name: 'employeepayroll',
+      component: () => import('../views/EmployeePayrollView.vue'),
+      meta: { module: 'employee-payroll', title: 'Employee Payroll' }
+    },
+    {
+      path: '/settings-activity',
+      name: 'settingsactivity',
+      component: () => import('../views/SettingsActivityView.vue'),
+      meta: { module: 'settings-activity', title: 'Settings Activity' }
+    },
+    {
+      path: '/system-docs',
+      name: 'systemdocs',
+      component: () => import('../views/SystemDocsView.vue'),
+      meta: { module: 'system-docs', title: 'System Manual' }
+    },
+    {
+      path: '/qc-reports',
+      name: 'qcreports',
+      component: () => import('../views/QcReportsView.vue'),
+      meta: { module: 'qc-reports', title: 'QC Reports' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })

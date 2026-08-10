@@ -144,7 +144,7 @@ export const GROUPS: ShellGroup[] = [
       { id: 'permissions', label: 'Permissions' },
       { id: 'settings', label: 'Settings' , path: '/settings'},
       { id: 'license', label: 'License & SLA' },
-      { id: 'system_docs', label: 'System Manual' },
+      { id: 'system_docs', label: 'System Manual' , path: '/system-docs'},
       { id: 'backup_restore', label: 'Backup & Restore' },
       { id: 'csv_import', label: 'CSV Import' }
     ]
