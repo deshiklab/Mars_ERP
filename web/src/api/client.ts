@@ -158,6 +158,10 @@ class ApiClient {
     return this.request<{ ok: boolean }>('booking_update_status', { method: 'POST', body: { name: id, status } })
   }
 
+  async plotUpdateStatus(name: string, status: string, bookingRef?: string): Promise<ApiResult<{ ok: boolean }>> {
+    return this.request<{ ok: boolean }>('plot_update_status', { method: 'POST', body: bookingRef ? { name, status, booking_ref: bookingRef } : { name, status } })
+  }
+
   async duesPipeline(): Promise<ApiResult<PipelineResponse<Due>>> {
     return this.request<PipelineResponse<Due>>('dues_pipeline')
   }

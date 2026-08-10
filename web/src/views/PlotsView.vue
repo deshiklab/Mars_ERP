@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
@@ -8,6 +10,20 @@ import type { TableColumn } from '@/components/DataTable.vue'
 
 const data = useDataStore()
 const detailRec = ref<Record<string, unknown> | null>(null)
+
+const statusOptions = ['Available', 'Reserved', 'Sold', 'Not Acquired']
+const stageMap: Record<string, string> = { Available: 'available', Reserved: 'reserved', Sold: 'sold', 'Not Acquired': 'not_acquired' }
+
+async function onStatusChange({ row, field, from, to }: { row: Record<string, unknown>; field: string; from: string; to: string }) {
+  const id = String((row as { id?: string }).id ?? '')
+  const r = await api.plotUpdateStatus(id, stageMap[to] ?? to)
+  if (r.ok) {
+    showToast(`Plot status → ${to}`, 'success')
+  } else {
+    ;(row as Record<string, unknown>)[field] = from
+    showToast('Plot status update failed', 'error')
+  }
+}
 const detailList = ref<Record<string, unknown>[]>([])
 
 onMounted(() => {
@@ -35,6 +51,10 @@ function statusColor(status: string): { bg: string; fg: string } {
     Maintenance: ['#fff3e0', '#e65100'],
     'On Leave': ['#fff3e0', '#e65100'],
     Booked: ['#fff3e0', '#e65100'],
+    available: ['#e8f5e9', '#2e7d32'],
+    reserved: ['#fff8e1', '#ff8f00'],
+    sold: ['#ffebee', '#c62828'],
+    not_acquired: ['#f0f0f0', '#555'],
     'On Hold': ['#fff3e0', '#e65100'],
     Rejected: ['#ffebee', '#c62828'],
     Canceled: ['#ffebee', '#c62828']
@@ -49,8 +69,10 @@ function prioColor(p: string): string {
 
 const stats = computed(() => [
   { label: 'Plots', value: String(data.plots.length), color: '#2f80ed' },
-  { label: 'Available', value: String(data.plots.filter(p=>p.status==='Available').length), color: '#2e7d32' },
-  { label: 'Booked', value: String(data.plots.filter(p=>p.status!=='Available').length), color: '#e65100' }
+  { label: 'Available', value: String(data.plots.filter(p=>p.status==='available').length), color: '#2e7d32' },
+  { label: 'Reserved', value: String(data.plots.filter(p=>p.status==='reserved').length), color: '#ff8f00' },
+  { label: 'Sold', value: String(data.plots.filter(p=>p.status==='sold').length), color: '#c62828' },
+  { label: 'Total', value: String(data.plots.length), color: '#2f80ed' }
 ])
 
 const columns = computed<TableColumn<any>[]>(() => [
@@ -114,7 +136,7 @@ const actions = computed(() => [
       :rows="rows"
       :tabs="[{ id: 'all', label: 'All', count: rows.length }]"
       search-placeholder="Search plots…"
-    />
+     :status-options="statusOptions" @status-change="onStatusChange" />
   </div>
     <GenericDetailDrawer :record="detailRec" :title="'Plots'" @close="detailRec = null" :records="detailList" />
 </template>

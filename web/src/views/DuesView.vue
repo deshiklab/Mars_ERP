@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { showToast } from '@/toast'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
 import DueDetailDrawer from '@/components/DueDetailDrawer.vue'
@@ -135,6 +136,14 @@ const actions = computed<TableAction[]>(() => [
 async function setStatus(id: string, status: string) {
   await data.updateDueStatus(id, status)
 }
+
+function onDueStatus(st: string) {
+  if (st === 'Paid') {
+    showToast('Record the payment in Accounts & Finance (Payments) — the due bucket updates automatically', 'info')
+  } else {
+    showToast(`Bucket is auto-derived from payment age — ${st} is not set manually`, 'info')
+  }
+}
 </script>
 
 <template>
@@ -158,6 +167,10 @@ async function setStatus(id: string, status: string) {
     />
   </div>
     <!-- Due detail drawer -->
-    <DueDetailDrawer :due="detailDue" @close="detailDue = null" />
+    <DueDetailDrawer
+      :due="detailDue"
+      @close="detailDue = null"
+      @status="onDueStatus"
+    />
 
 </template>

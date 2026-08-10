@@ -14,23 +14,23 @@ function bg(t: string): string {
     <div
       v-for="t in toastState.toasts"
       :key="t.id"
-      style="
-        pointer-events: auto;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        background: #fff;
-        border: 1px solid #e0e0e0;
-        border-left: 4px solid v-bind('bg(t.type)');
-        border-radius: 8px;
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-        padding: 9px 14px;
-        font-size: 11px;
-        color: #333;
-        min-width: 220px;
-        max-width: 360px;
-        animation: toastIn 0.18s ease-out;
-      "
+      :style="{
+        pointerEvents: 'auto',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        background: '#fff',
+        border: '1px solid #e0e0e0',
+        borderLeft: '4px solid ' + bg(t.type),
+        borderRadius: '8px',
+        boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
+        padding: '9px 14px',
+        fontSize: '11px',
+        color: '#333',
+        minWidth: '220px',
+        maxWidth: '360px',
+        animation: 'toastIn 0.18s ease-out'
+      }"
     >
       <span style="font-size: 14px">{{ t.type === 'success' ? '✅' : t.type === 'error' ? '⚠️' : 'ℹ️' }}</span>
       <span style="flex: 1">{{ t.msg }}</span>
