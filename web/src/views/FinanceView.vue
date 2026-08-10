@@ -2,11 +2,13 @@
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
+import InvoiceDetailDrawer from '@/components/InvoiceDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
 import type { TableColumn } from '@/components/DataTable.vue'
 import type { CoaAccount, Invoice, Payment } from '@/api/types'
 
 const data = useDataStore()
+const detailInv = ref<Invoice | null>(null)
 const tab = ref('invoices')
 
 onMounted(() => {
@@ -142,4 +144,5 @@ const finStats = computed(() => [
     <DataTable v-else-if="tab === 'payments'" :columns="payCols" :rows="data.payments" search-placeholder="Search payments, references…" />
     <DataTable v-else :columns="coaCols" :rows="data.coa" search-placeholder="Search accounts…" />
   </div>
+    <InvoiceDetailDrawer :invoice="detailInv" @close="detailInv = null" />
 </template>

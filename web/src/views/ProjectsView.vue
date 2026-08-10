@@ -1,16 +1,29 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { api } from '@/api/client'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
+import ProjectDetailDrawer from '@/components/ProjectDetailDrawer.vue'
 import type { TableAction, TableColumn, TableTab } from '@/components/DataTable.vue'
 import type { Project } from '@/api/types'
 
+const route = useRoute()
 const data = useDataStore()
+const detailProj = ref<Project | null>(null)
+
 const tab = ref('all')
 const detail = ref<Project | null>(null)
 
-onMounted(() => {
+onMounted(async () => {
   data.loadProjects()
+  if (route.query.pj === '1') {
+    const r = await api.call<{ collections: Record<string, unknown> }>('bootstrap')
+    if (r.ok && r.data) {
+      const arr = (r.data.collections.projects as any[]) ?? []
+      if (arr.length) detailProj.value = arr[0] as unknown as Project
+    }
+  }
 })
 
 const statuses = ['In Progress', 'Planning', 'Completed', 'On Hold']
@@ -89,6 +102,7 @@ function onTabChange(t: string) {
 }
 
 const actions = computed<TableAction[]>(() => [
+  { label: 'View Details', icon: '🏗', onClick: (r) => (detailProj.value = r as unknown as Project) },
   { label: 'View Details', icon: '👁', onClick: (r) => (detail.value = r as unknown as Project) },
   { label: 'Open Acquisition', icon: '📋', onClick: (r) => (detail.value = r as unknown as Project) }
 ])
@@ -153,4 +167,5 @@ const actions = computed<TableAction[]>(() => [
       </div>
     </div>
   </div>
+    <ProjectDetailDrawer :project="detailProj" @close="detailProj = null" />
 </template>

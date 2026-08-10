@@ -41,6 +41,32 @@ const searchIndex = computed<Hit[]>(() => {
   data.projects.forEach((p) =>
     idx.push({ module: 'Projects', title: p.name, sub: `${p.type} · ${p.status}`, path: '/projects', icon: '🏗️' })
   )
+  data.invoices.forEach((i) =>
+    idx.push({ module: 'Invoices', title: i.id, sub: `${i.client} · ${i.status}`, path: '/finance', icon: '🧾' })
+  )
+  data.payments.forEach((pmt) => {
+    const pany = pmt as unknown as { customer?: string; client?: string }
+    idx.push({ module: 'Payments', title: pmt.id, sub: `${pany.customer || pany.client || ''} · ${pmt.date}`, path: '/transactions', icon: '💳' })
+  })
+  data.inventory.forEach((i) =>
+    idx.push({ module: 'Stock', title: i.item, sub: `${i.category || ''} · ${i.status}`, path: '/stock', icon: '📦' })
+  )
+  data.contractors.forEach((c) =>
+    idx.push({ module: 'Contractors', title: c.name, sub: `${c.specialty || ''} · ${c.status}`, path: '/contractors', icon: '🛠' })
+  )
+  data.tickets.forEach((t) =>
+    idx.push({ module: 'Support Tickets', title: t.subject, sub: `${t.id} · ${t.status}`, path: '/support-tickets', icon: '🎫' })
+  )
+  data.handover.forEach((h) => {
+    const hany = h as unknown as { client?: string; customer?: string }
+    idx.push({ module: 'Handover', title: String((h as unknown as { id?: string }).id ?? ''), sub: `${hany.client || hany.customer || ''} · ${(h as unknown as { status?: string }).status || ''}`, path: '/handover', icon: '🔑' })
+  })
+  data.labor.forEach((l) =>
+    idx.push({ module: 'Labor', title: l.name, sub: `${(l as any).role || (l as any).category || ''} · ${l.status || ''}`, path: '/labor', icon: '👷' })
+  )
+  data.equipment.forEach((e) =>
+    idx.push({ module: 'Equipment', title: e.name, sub: `${e.type || ''} · ${e.status || ''}`, path: '/equipment', icon: '🚜' })
+  )
   return idx
 })
 
