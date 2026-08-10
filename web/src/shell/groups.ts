@@ -80,7 +80,7 @@ export const GROUPS: ShellGroup[] = [
       { id: 'variation_orders', label: 'Variation Orders' , path: '/variations'},
       { id: 'equipment', label: 'Equipment' , path: '/equipment'},
       { id: 'labor', label: 'Labor Mgmt' , path: '/labor'},
-      { id: 'designs', label: 'Design Mgmt' }
+      { id: 'designs', label: 'Design Mgmt' , path: '/designs'}
     ]
   },
   {
@@ -105,7 +105,7 @@ export const GROUPS: ShellGroup[] = [
     module: 'hr',
     mods: [
       { id: 'hr', label: 'HR', path: '/hr' },
-      { id: 'documents', label: 'Documents Vault' },
+      { id: 'documents', label: 'Documents Vault' , path: '/documents'},
       { id: 'knowledge_base', label: 'Knowledge Base' , path: '/knowledge-base'},
       { id: 'stock', label: 'Stock & Procurement', path: '/stock' }
     ]
@@ -118,7 +118,7 @@ export const GROUPS: ShellGroup[] = [
     mods: [
       { id: 'compliance', label: 'Compliance' , path: '/compliance'},
       { id: 'legal_contracts', label: 'Legal Contracts' },
-      { id: 'qc', label: 'QC & Inspection' }
+      { id: 'qc', label: 'QC & Inspection' , path: '/audits'}
     ]
   },
   {

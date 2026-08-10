@@ -310,6 +310,54 @@ const router = createRouter({
       component: () => import('../views/ChatView.vue'),
       meta: { module: 'chat', title: 'Team Chat' }
     },
+    {
+      path: '/audits',
+      name: 'audits',
+      component: () => import('../views/AuditsView.vue'),
+      meta: { module: 'audits', title: 'QC Audits' }
+    },
+    {
+      path: '/maintenance',
+      name: 'maintenance',
+      component: () => import('../views/MaintenanceView.vue'),
+      meta: { module: 'maintenance', title: 'Maintenance Log' }
+    },
+    {
+      path: '/snags',
+      name: 'snags',
+      component: () => import('../views/SnagsView.vue'),
+      meta: { module: 'snags', title: 'Snags & Handover' }
+    },
+    {
+      path: '/after-sales',
+      name: 'aftersales',
+      component: () => import('../views/AfterSalesView.vue'),
+      meta: { module: 'after-sales', title: 'After-Sales Service' }
+    },
+    {
+      path: '/certificates',
+      name: 'certificates',
+      component: () => import('../views/CertificatesView.vue'),
+      meta: { module: 'certificates', title: 'Certificates' }
+    },
+    {
+      path: '/documents',
+      name: 'documents',
+      component: () => import('../views/DocumentsView.vue'),
+      meta: { module: 'documents', title: 'Document Vault' }
+    },
+    {
+      path: '/designs',
+      name: 'designs',
+      component: () => import('../views/DesignsView.vue'),
+      meta: { module: 'designs', title: 'Designs' }
+    },
+    {
+      path: '/tax-entries',
+      name: 'taxentries',
+      component: () => import('../views/TaxEntriesView.vue'),
+      meta: { module: 'tax-entries', title: 'Tax Entries' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })
