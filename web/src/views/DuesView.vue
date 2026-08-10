@@ -164,7 +164,7 @@ function onDueStatus(st: string) {
       :actions="actions"
       search-placeholder="Search customers, projects…"
       @tab-change="onTabChange"
-    />
+     :status-editable="false" />
   </div>
     <!-- Due detail drawer -->
     <DueDetailDrawer

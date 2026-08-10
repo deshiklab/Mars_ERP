@@ -42,6 +42,8 @@ const props = withDefaults(
     actions?: TableAction[]
     searchPlaceholder?: string
     statusOptions?: string[]
+  /** Derived-status tables (e.g. dues bucket) can disable the inline status dropdown. */
+  statusEditable?: boolean
   }>(),
   {
     tabs: () => [],
@@ -119,7 +121,10 @@ const cellHtml = (row: any, col: TableColumn<any>): string => {
       return `<a class="dt-prop" style="color:#2f80ed;cursor:pointer;font-weight:500" title="${_t('View property')}">🏢 ${base}</a>`
     }
     if (STATUS_RE.test(col.key)) {
-      return `<span class="dt-status" data-key="${col.key}" style="cursor:pointer" title="${_t('Change status')}">${base} <span style="font-size:8px;color:#888">▾</span></span>`
+      if (props.statusEditable !== false) {
+        return `<span class="dt-status" data-key="${col.key}" style="cursor:pointer" title="${_t('Change status')}">${base} <span style="font-size:8px;color:#888">▾</span></span>`
+      }
+      return base
     }
   }
   const isName = NAME_RE.test(col.key) && raw.length > 0
@@ -307,7 +312,7 @@ function onRowClick(e: MouseEvent, r: Record<string, unknown>) {
     return
   }
   const st = t.closest('.dt-status') as HTMLElement | null
-  if (st) {
+  if (st && props.statusEditable !== false) {
     toggleStatusMenu(r, st.getAttribute('data-key') || '')
     return
   }

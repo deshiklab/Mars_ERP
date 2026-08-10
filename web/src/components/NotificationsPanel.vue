@@ -63,7 +63,9 @@ function filtered() {
   <div v-if="open" class="drawer-overlay active" style="justify-content: flex-start" @click.self="emit('close')">
     <div class="drawer-sheet" style="width: 380px; animation: none">
       <div class="drawer-header">
-        <h3>🔔 Notifications <span style="font-size: 9px; color: #888">{{ notifs.filter((n) => !n.read).length }} unread</span></h3>
+        <h3>🔔 Notifications <span style="font-size: 9px; color: #888">{{ notifs.filter((n) => !n.read).length }} unread</span>
+          <span v-if="notifs.some((n) => !n.read)" @click="notifs.forEach((n) => (n.read = true))" style="font-size: 9px; color: #2f80ed; cursor: pointer; margin-left: 8px">Mark all read</span>
+        </h3>
         <div class="drawer-close" @click="emit('close')">✕</div>
       </div>
 
@@ -85,6 +87,7 @@ function filtered() {
           :key="i"
           style="display: flex; align-items: flex-start; gap: 10px; padding: 9px 6px; border-bottom: 1px solid #f5f5f5; cursor: pointer"
           :style="!n.read ? 'background:#f7faff' : ''"
+          @click="n.read = true"
         >
           <span style="font-size: 16px; width: 24px; text-align: center">{{ notifIcons[n.type] ?? '🔔' }}</span>
           <div style="flex: 1; min-width: 0">
