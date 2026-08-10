@@ -358,6 +358,36 @@ const router = createRouter({
       component: () => import('../views/TaxEntriesView.vue'),
       meta: { module: 'tax-entries', title: 'Tax Entries' }
     },
+    {
+      path: '/entities',
+      name: 'entities',
+      component: () => import('../views/EntitiesView.vue'),
+      meta: { module: 'entities', title: 'Entities' }
+    },
+    {
+      path: '/opening-balances',
+      name: 'openingbalances',
+      component: () => import('../views/OpeningBalancesView.vue'),
+      meta: { module: 'opening-balances', title: 'Opening Balances' }
+    },
+    {
+      path: '/whatsapp',
+      name: 'whatsapp',
+      component: () => import('../views/WhatsAppView.vue'),
+      meta: { module: 'whatsapp', title: 'WhatsApp Engine' }
+    },
+    {
+      path: '/reminders',
+      name: 'reminders',
+      component: () => import('../views/ReminderLogView.vue'),
+      meta: { module: 'reminders', title: 'Reminder Log' }
+    },
+    {
+      path: '/budgets',
+      name: 'budgets',
+      component: () => import('../views/BudgetsView.vue'),
+      meta: { module: 'budgets', title: 'Project Budgets' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })
