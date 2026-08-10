@@ -160,6 +160,18 @@ const router = createRouter({
       component: () => import('../views/ReceiptsView.vue'),
       meta: { module: 'receipts', title: 'Goods Receipts' }
     },
+    {
+      path: '/brokers',
+      name: 'brokers',
+      component: () => import('../views/BrokersView.vue'),
+      meta: { module: 'brokers', title: 'Brokers' }
+    },
+    {
+      path: '/complaints',
+      name: 'complaints',
+      component: () => import('../views/ComplaintsView.vue'),
+      meta: { module: 'complaints', title: 'Complaints & Issues' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })

@@ -7,6 +7,8 @@
  * same-origin when served by Frappe, proxied by Vite in dev.
  */
 import type {
+  Broker,
+  Complaint,
   ApiError,
   Booking,
   BootstrapResponse,
@@ -255,6 +257,15 @@ class ApiClient {
 
   async receiptsPipeline(): Promise<ApiResult<PipelineResponse<Receipt>>> {
     return this.request<PipelineResponse<Receipt>>('receipts_pipeline')
+  }
+
+
+  async brokersPipeline(): Promise<ApiResult<PipelineResponse<Broker>>> {
+    return this.request<PipelineResponse<Broker>>('brokers_pipeline')
+  }
+
+  async complaintsPipeline(): Promise<ApiResult<PipelineResponse<Complaint>>> {
+    return this.request<PipelineResponse<Complaint>>('complaints_pipeline')
   }
 
   async sync(collection: string): Promise<ApiResult<{ rows: number }>> {

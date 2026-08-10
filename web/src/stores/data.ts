@@ -3,7 +3,7 @@
  */
 import { defineStore } from 'pinia'
 import { api, apiErrorText } from '@/api/client'
-import type { Approval, Attendance, BoqLine, Booking, CoaAccount, Contractor, Due, Employee, Equipment, FixedAsset, Handover, Investment, Invoice, Labor, Lead, LeaveReq, LedgerParty, Loan, Payment, Plot, Project, PurchaseOrder, Receipt, StockItem, Ticket, VariationOrder, WorkOrder } from '@/api/types'
+import type { Approval, Attendance, BoqLine, Booking, Broker, CoaAccount, Complaint, Contractor, Due, Employee, Equipment, FixedAsset, Handover, Investment, Invoice, Labor, Lead, LeaveReq, LedgerParty, Loan, Payment, Plot, Project, PurchaseOrder, Receipt, StockItem, Ticket, VariationOrder, WorkOrder } from '@/api/types'
 
 export interface DashboardStats {
   bookings: number
@@ -70,6 +70,10 @@ interface DataState {
   fixedAssetsLoading: boolean
     receipts: Receipt[]
   receiptsLoading: boolean
+  brokers: Broker[]
+  brokersLoading: boolean
+  complaints: Complaint[]
+  complaintsLoading: boolean
   error: string
 }
 
@@ -130,6 +134,10 @@ export const useDataStore = defineStore('data', {
     loansLoading: false,
     fixedAssetsLoading: false,
     receiptsLoading: false,
+    brokers: [],
+    brokersLoading: false,
+    complaints: [],
+    complaintsLoading: false,
     error: ''
   }),
 
@@ -452,6 +460,26 @@ export const useDataStore = defineStore('data', {
         this.receipts = Array.isArray(arr) ? (arr as Receipt[]) : []
       } else this.error = apiErrorText(r)
       this.receiptsLoading = false
+    },
+
+    async loadBrokers(): Promise<void> {
+      this.brokersLoading = true
+      const r = await api.brokersPipeline()
+      if (r.ok && r.data) {
+        const arr = r.data['brokers']
+        this.brokers = Array.isArray(arr) ? (arr as Broker[]) : []
+      } else this.error = apiErrorText(r)
+      this.brokersLoading = false
+    },
+
+    async loadComplaints(): Promise<void> {
+      this.complaintsLoading = true
+      const r = await api.complaintsPipeline()
+      if (r.ok && r.data) {
+        const arr = r.data['complaints']
+        this.complaints = Array.isArray(arr) ? (arr as Complaint[]) : []
+      } else this.error = apiErrorText(r)
+      this.complaintsLoading = false
     }
   }
 })

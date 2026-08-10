@@ -39,6 +39,8 @@ export const GROUPS: ShellGroup[] = [
       { id: 'crm', label: 'CRM & Leads', path: '/leads' },
       { id: 'proposals', label: 'Proposals' },
       { id: 'contacts', label: 'Contact Book' },
+      { id: 'brokers', label: 'Brokers', path: '/brokers' },
+      { id: 'complaints', label: 'Complaints', path: '/complaints' },
       { id: 'sales_marketing', label: 'Sales & Marketing' }
     ]
   },

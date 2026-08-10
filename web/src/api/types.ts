@@ -406,3 +406,34 @@ export interface Receipt {
   grn?: string
   status?: string
 }
+/** A broker. */
+export interface Broker {
+  id: string
+  name: string
+  phone?: string
+  region?: string
+  tier?: string
+  leadsReferred: number
+  dealsClosed: number
+  commissionPct?: number
+  commissionPaid?: number
+  joined?: string
+  status: string
+}
+
+/** A complaint. */
+export interface Complaint {
+  id: string
+  client: string
+  project?: string
+  unit?: string
+  type?: string
+  desc?: string
+  priority?: string
+  filedDate?: string
+  resolvedDate?: string
+  sla?: string
+  satisfaction?: string
+  assigned?: string
+  status: string
+}
