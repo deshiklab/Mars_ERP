@@ -6,10 +6,12 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
-export default defineConfig({
-  // Hosted on the Frappe bench at /files/rem-vue/ (sites/<site>/public/files/rem-vue).
-  // BASE_URL flows into the router history + the SW scope + all asset URLs.
-  base: '/files/rem-vue/',
+export default defineConfig(({ command }) => ({
+  // Production build is hosted on the Frappe bench at /files/rem-vue/
+  // (sites/<site>/public/files/rem-vue). Dev keeps the root so
+  // http://localhost:5173/ boots the app. BASE_URL flows into the
+  // router history + the SW scope + all asset URLs.
+  base: command === 'build' ? '/files/rem-vue/' : '/',
   plugins: [
     vue(),
     tailwindcss(),
@@ -119,4 +121,4 @@ export default defineConfig({
       }
     }
   }
-})
+}))

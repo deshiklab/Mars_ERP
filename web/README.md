@@ -17,7 +17,8 @@ same 78-endpoint Frappe bridge (`mars_constech.mars_constech.api`).
 src/
   main.ts            bootstrap + router + PWA registration
   App.vue            shell: sidebar, topbar, footer, global drawers
-  router/index.ts    95 routes (SPA history mode)
+  router/index.ts    95 routes (hash history — deep links never 404 on
+                     static hosts; /rem_vue#/leads form)
   shell/groups.ts    11 sidebar groups → module ids
   views/             91 view components (one per module)
   components/        21 shared components (DataTable, drawers, panels…)
