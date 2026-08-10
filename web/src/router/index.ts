@@ -496,6 +496,12 @@ const router = createRouter({
       component: () => import('../views/QcReportsView.vue'),
       meta: { module: 'qc-reports', title: 'QC Reports' }
     },
+    {
+      path: '/copilot',
+      name: 'copilot',
+      component: () => import('../views/AiCopilotView.vue'),
+      meta: { module: 'copilot', title: 'AI Copilot' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })

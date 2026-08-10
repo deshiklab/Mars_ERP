@@ -47,6 +47,21 @@ export interface Lead {
   last_contact: string
   owner?: string
   notes?: string
+  type?: string
+  territory?: string
+  property?: string
+  value?: string
+  paymentStatus?: string
+  facingDir?: string
+  floorPref?: string
+  flatType?: string
+  sizeSqFt?: string
+  paymentPlan?: string
+  brokerId?: string | null
+  installments?: { date: string; amount: string; status: string }[]
+  documents?: { name: string; type: string }[]
+  activities?: { type: string; user: string; date: string; text: string }[]
+  notesList?: { text: string; by: string; when: string }[]
 }
 
 /** A booking installment. */

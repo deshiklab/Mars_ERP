@@ -157,7 +157,7 @@ export const GROUPS: ShellGroup[] = [
     mods: [
       { id: 'whatsapp', label: 'WhatsApp Engine' , path: '/whatsapp'},
       { id: 'chat', label: 'Internal Chat' , path: '/chat'},
-      { id: 'ai_assistant', label: 'AI Copilot' }
+      { id: 'ai_assistant', label: 'AI Copilot' , path: '/copilot'}
     ]
   }
 ]

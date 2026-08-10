@@ -20,7 +20,9 @@ const detailLead = ref<Lead | null>(null)
 const newLead = ref({ name: '', email: '', phone: '', source: 'Website', priority: 'Medium' })
 
 onMounted(() => {
-  data.loadLeads()
+  data.loadLeads().then(() => {
+    if (route.query.lead === '1' && data.leads.length) detailLead.value = data.leads[0]
+  })
 })
 
 const statusOptions = ['New Inquiry', 'Contacted', 'Site Visit', 'Negotiation', 'Booking', 'Lost']
