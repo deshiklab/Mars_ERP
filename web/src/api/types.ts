@@ -222,3 +222,187 @@ export interface Contractor {
   rating?: number
   contracts?: number
 }
+
+/** A land/plot proposal. */
+export interface Plot {
+  id: string
+  plotNo?: string
+  location?: string
+  area?: string
+  price?: string
+  status: string
+}
+
+/** A financial approval. */
+export interface Approval {
+  id: string
+  title: string
+  type?: string
+  dept?: string
+  requestedBy?: string
+  amount: number
+  date?: string
+  status: string
+}
+
+/** A support ticket. */
+export interface Ticket {
+  id: string
+  subject: string
+  project?: string
+  type?: string
+  customer?: string
+  priority?: string
+  date?: string
+  status: string
+}
+
+/** A handover record. */
+export interface Handover {
+  id: string
+  customer: string
+  project?: string
+  unit?: string
+  type?: string
+  totalValue: number
+  paidAmount: number
+  status: string
+}
+
+/** A work order. */
+export interface WorkOrder {
+  id: string
+  title?: string
+  name?: string
+  project?: string
+  assignee?: string
+  assignedTo?: string
+  status: string
+}
+
+/** A labor/worker. */
+export interface Labor {
+  id: string
+  name: string
+  category?: string
+  site?: string
+  salary: number
+  rating?: number
+  status: string
+}
+
+/** Equipment. */
+export interface Equipment {
+  id: string
+  name: string
+  model?: string
+  type?: string
+  site?: string
+  operator?: string
+  hours?: number
+  fuelCost: number
+  status: string
+}
+
+/** A variation order. */
+export interface VariationOrder {
+  id: string
+  title: string
+  project?: string
+  originator?: string
+  impact?: string
+  date?: string
+  status: string
+}
+
+/** Leave request. */
+export interface LeaveReq {
+  id: string
+  employeeName: string
+  type?: string
+  from?: string
+  to?: string
+  days: number
+  reason?: string
+  status: string
+}
+
+/** Attendance record. */
+export interface Attendance {
+  id: string
+  employeeName: string
+  date?: string
+  inTime?: string
+  outTime?: string
+  shift?: string
+  status: string
+}
+
+/** Party ledger entry. */
+export interface LedgerParty {
+  name: string
+  type: string
+  out: number
+  dueDate?: string
+}
+
+/** BOQ line. */
+export interface BoqLine {
+  id: string
+  item: string
+  category?: string
+  project?: string
+  qty: number
+  rate: number
+  unit?: string
+  status: string
+}
+
+/** Investment. */
+export interface Investment {
+  id: string
+  investorName: string
+  project?: string
+  amount: number
+  rate: number
+  startDate?: string
+  tenureMonths?: number
+  status: string
+}
+
+/** Loan. */
+export interface Loan {
+  id: string
+  lender: string
+  type?: string
+  principal: number
+  outstanding: number
+  emi?: number
+  rate: number
+  status: string
+}
+
+/** Fixed asset. */
+export interface FixedAsset {
+  id: string
+  name: string
+  code?: string
+  category?: string
+  cost: number
+  location?: string
+  purchaseDate?: string
+  status: string
+}
+
+/** Goods receipt. */
+export interface Receipt {
+  id: string
+  item: string
+  qty: number
+  unit?: string
+  amount: number
+  date?: string
+  poRef?: string
+  grn?: string
+  status?: string
+}

@@ -64,6 +64,54 @@ const router = createRouter({
       component: () => import('../views/ContractorsView.vue'),
       meta: { module: 'contractors', title: 'Contractors' }
     },
+    {
+      path: '/plots',
+      name: 'plots',
+      component: () => import('../views/PlotsView.vue'),
+      meta: { module: 'plots', title: 'Plots' }
+    },
+    {
+      path: '/approvals',
+      name: 'approvals',
+      component: () => import('../views/ApprovalsView.vue'),
+      meta: { module: 'approvals', title: 'Financial Approvals' }
+    },
+    {
+      path: '/tickets',
+      name: 'tickets',
+      component: () => import('../views/TicketsView.vue'),
+      meta: { module: 'tickets', title: 'Ticketing & Issue' }
+    },
+    {
+      path: '/handover',
+      name: 'handover',
+      component: () => import('../views/HandoverView.vue'),
+      meta: { module: 'handover', title: 'Handover & Post-Sales' }
+    },
+    {
+      path: '/work-orders',
+      name: 'workorders',
+      component: () => import('../views/WorkOrdersView.vue'),
+      meta: { module: 'work-orders', title: 'Work Orders' }
+    },
+    {
+      path: '/labor',
+      name: 'labor',
+      component: () => import('../views/LaborView.vue'),
+      meta: { module: 'labor', title: 'Labor & Workforce' }
+    },
+    {
+      path: '/equipment',
+      name: 'equipment',
+      component: () => import('../views/EquipmentView.vue'),
+      meta: { module: 'equipment', title: 'Equipment & Machinery' }
+    },
+    {
+      path: '/variations',
+      name: 'variations',
+      component: () => import('../views/VariationOrdersView.vue'),
+      meta: { module: 'variations', title: 'Variation Orders' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })

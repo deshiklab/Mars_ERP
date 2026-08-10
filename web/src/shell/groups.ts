@@ -50,7 +50,7 @@ export const GROUPS: ShellGroup[] = [
     mods: [
       { id: 'land_mgmt', label: 'Project Acquisition' },
       { id: 'properties_units', label: 'Flats & Units' },
-      { id: 'plots', label: 'Plots & Blocks' },
+      { id: 'plots', label: 'Plots & Blocks' , path: '/plots'},
       { id: 'layout_builder', label: 'Layout & Unit Builder' },
       { id: 'projects', label: 'Projects', path: '/projects' }
     ]
@@ -63,7 +63,7 @@ export const GROUPS: ShellGroup[] = [
     mods: [
       { id: 'bookings', label: 'Bookings', path: '/bookings' },
       { id: 'customer_portal', label: 'Customer Portal' },
-      { id: 'handover', label: 'Handover & Post-Sales' },
+      { id: 'handover', label: 'Handover & Post-Sales' , path: '/handover'},
       { id: 'dues_recovery', label: 'Dues & Recovery', path: '/dues' },
       { id: 'ticketing', label: 'Ticketing & Issue' }
     ]
@@ -75,9 +75,9 @@ export const GROUPS: ShellGroup[] = [
     module: 'dashboard',
     mods: [
       { id: 'contractors', label: 'Contractors', path: '/contractors' },
-      { id: 'variation_orders', label: 'Variation Orders' },
-      { id: 'equipment', label: 'Equipment' },
-      { id: 'labor', label: 'Labor Mgmt' },
+      { id: 'variation_orders', label: 'Variation Orders' , path: '/variations'},
+      { id: 'equipment', label: 'Equipment' , path: '/equipment'},
+      { id: 'labor', label: 'Labor Mgmt' , path: '/labor'},
       { id: 'designs', label: 'Design Mgmt' }
     ]
   },
@@ -90,7 +90,7 @@ export const GROUPS: ShellGroup[] = [
       { id: 'finance', label: 'Finance', path: '/finance' },
       { id: 'party_ledger', label: 'Party Ledger' },
       { id: 'payment_heatmap', label: 'Payment Heatmap' },
-      { id: 'approvals', label: 'Financial Approvals' },
+      { id: 'approvals', label: 'Financial Approvals' , path: '/approvals'},
       { id: 'boq', label: 'BOQ & Cost Control' },
       { id: 'investment_loans', label: 'Investment & Loans' },
       { id: 'fixed_assets', label: 'Fixed Assets' }

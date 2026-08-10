@@ -21,7 +21,23 @@ import type {
   PipelineResponse,
   Project,
   PurchaseOrder,
-  StockItem
+  StockItem,
+  Plot,
+  Approval,
+  Ticket,
+  Handover,
+  WorkOrder,
+  Labor,
+  Equipment,
+  VariationOrder,
+  LeaveReq,
+  Attendance,
+  LedgerParty,
+  BoqLine,
+  Investment,
+  Loan,
+  FixedAsset,
+  Receipt
 } from './types'
 
 const BASE = '/api/method/mars_constech.mars_constech.api'
@@ -174,6 +190,71 @@ class ApiClient {
 
   async contractorsPipeline(): Promise<ApiResult<PipelineResponse<Contractor>>> {
     return this.request<PipelineResponse<Contractor>>('contractors_pipeline')
+  }
+
+
+  async plotsPipeline(): Promise<ApiResult<PipelineResponse<Plot>>> {
+    return this.request<PipelineResponse<Plot>>('plots_pipeline')
+  }
+
+  async approvalsPipeline(): Promise<ApiResult<PipelineResponse<Approval>>> {
+    return this.request<PipelineResponse<Approval>>('approvals_pipeline')
+  }
+
+  async ticketsPipeline(): Promise<ApiResult<PipelineResponse<Ticket>>> {
+    return this.request<PipelineResponse<Ticket>>('tickets_pipeline')
+  }
+
+  async handoverPipeline(): Promise<ApiResult<PipelineResponse<Handover>>> {
+    return this.request<PipelineResponse<Handover>>('handover_pipeline')
+  }
+
+  async work_ordersPipeline(): Promise<ApiResult<PipelineResponse<WorkOrder>>> {
+    return this.request<PipelineResponse<WorkOrder>>('work_orders_pipeline')
+  }
+
+  async laborPipeline(): Promise<ApiResult<PipelineResponse<Labor>>> {
+    return this.request<PipelineResponse<Labor>>('labor_pipeline')
+  }
+
+  async equipmentPipeline(): Promise<ApiResult<PipelineResponse<Equipment>>> {
+    return this.request<PipelineResponse<Equipment>>('equipment_pipeline')
+  }
+
+  async variation_ordersPipeline(): Promise<ApiResult<PipelineResponse<VariationOrder>>> {
+    return this.request<PipelineResponse<VariationOrder>>('variation_orders_pipeline')
+  }
+
+  async leavePipeline(): Promise<ApiResult<PipelineResponse<LeaveReq>>> {
+    return this.request<PipelineResponse<LeaveReq>>('leave_pipeline')
+  }
+
+  async attendancePipeline(): Promise<ApiResult<PipelineResponse<Attendance>>> {
+    return this.request<PipelineResponse<Attendance>>('attendance_pipeline')
+  }
+
+  async party_ledgerPipeline(): Promise<ApiResult<PipelineResponse<LedgerParty>>> {
+    return this.request<PipelineResponse<LedgerParty>>('party_ledger_pipeline')
+  }
+
+  async boqPipeline(): Promise<ApiResult<PipelineResponse<BoqLine>>> {
+    return this.request<PipelineResponse<BoqLine>>('boq_pipeline')
+  }
+
+  async investmentsPipeline(): Promise<ApiResult<PipelineResponse<Investment>>> {
+    return this.request<PipelineResponse<Investment>>('investments_pipeline')
+  }
+
+  async loansPipeline(): Promise<ApiResult<PipelineResponse<Loan>>> {
+    return this.request<PipelineResponse<Loan>>('loans_pipeline')
+  }
+
+  async fixed_assetsPipeline(): Promise<ApiResult<PipelineResponse<FixedAsset>>> {
+    return this.request<PipelineResponse<FixedAsset>>('fixed_assets_pipeline')
+  }
+
+  async receiptsPipeline(): Promise<ApiResult<PipelineResponse<Receipt>>> {
+    return this.request<PipelineResponse<Receipt>>('receipts_pipeline')
   }
 
   async sync(collection: string): Promise<ApiResult<{ rows: number }>> {

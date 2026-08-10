@@ -8,6 +8,7 @@ import { i18n, _t, theme } from '@/i18n'
 import NotificationsPanel from '@/components/NotificationsPanel.vue'
 import RecentTray from '@/components/RecentTray.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
+import ToastContainer from '@/components/ToastContainer.vue'
 import GlobalSearch from '@/components/GlobalSearch.vue'
 import QuickAdd from '@/components/QuickAdd.vue'
 import SidebarFlyout from '@/components/SidebarFlyout.vue'
@@ -258,7 +259,8 @@ function exportCsv() {
         </div>
       </div>
     </div>
-      <!-- Command palette -->
+      <ToastContainer />
+    <!-- Command palette -->
     <CommandPalette ref="paletteRef" />
     <!-- Notifications + Recent panels -->
     <NotificationsPanel :open="notifOpen" @close="notifOpen = false" />
