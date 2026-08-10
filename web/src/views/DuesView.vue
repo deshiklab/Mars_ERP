@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
+import DueDetailDrawer from '@/components/DueDetailDrawer.vue'
 import type { TableAction, TableColumn, TableTab } from '@/components/DataTable.vue'
 import type { Due } from '@/api/types'
 
+const route = useRoute()
 const data = useDataStore()
+const detailDue = ref<Due | null>(null)
 const tab = ref('all')
 
 onMounted(() => {
-  data.loadDues()
+  data.loadDues().then(() => {
+    if (route.query.due === '1' && data.dues.length) detailDue.value = data.dues[0]
+  })
 })
 
 const buckets = ['0-30 Days', '31-60 Days', '60+ Days']
@@ -119,6 +125,7 @@ function onTabChange(t: string) {
 }
 
 const actions = computed<TableAction[]>(() => [
+  { label: 'View Details', icon: '👁', onClick: (r) => (detailDue.value = r as unknown as Due) },
   { label: 'Mark Current', icon: '🟢', onClick: (r) => setStatus((r as unknown as Due).id, 'Current') },
   { label: 'Mark Overdue', icon: '🟠', onClick: (r) => setStatus((r as unknown as Due).id, 'Overdue') },
   { label: 'Mark Critical', icon: '🔴', onClick: (r) => setStatus((r as unknown as Due).id, 'Critical') },
@@ -150,4 +157,7 @@ async function setStatus(id: string, status: string) {
       @tab-change="onTabChange"
     />
   </div>
+    <!-- Due detail drawer -->
+    <DueDetailDrawer :due="detailDue" @close="detailDue = null" />
+
 </template>

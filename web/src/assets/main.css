@@ -755,3 +755,12 @@ html.dark .action-btn.primary {
   background: #3b82f6 !important;
   color: #fff !important;
 }
+
+/* sync button spin */
+.rem-icon-btn.spinning svg {
+  animation: remSpin 1s linear infinite;
+}
+@keyframes remSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

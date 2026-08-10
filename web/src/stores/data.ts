@@ -480,6 +480,17 @@ export const useDataStore = defineStore('data', {
         this.complaints = Array.isArray(arr) ? (arr as Complaint[]) : []
       } else this.error = apiErrorText(r)
       this.complaintsLoading = false
+    },
+
+    async loadCollection(collection: string): Promise<void> {
+      const r = await api.sync(collection)
+      if (r.ok && r.data) {
+        const d = r.data as unknown as Record<string, unknown>
+        const arr = d[collection]
+        if (Array.isArray(arr)) {
+          ;(this as unknown as Record<string, unknown>)[collection] = arr
+        }
+      } else this.error = apiErrorText(r)
     }
   }
 })

@@ -105,7 +105,11 @@ export interface Due {
   status: string
   bucket: string
   lastFollowUp?: string
-  promises?: string
+  promises?: {
+    date: string
+    amount: number
+    kept?: boolean
+  }[]
 }
 
 /** An employee record. */

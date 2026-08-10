@@ -6,6 +6,8 @@ import { useDataStore } from '@/stores/data'
 import { GROUPS, groupForPath, moduleForPath } from '@/shell/groups'
 import type { ShellGroup, ShellModule } from '@/shell/groups'
 import { i18n, _t, theme } from '@/i18n'
+import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import NotificationsPanel from '@/components/NotificationsPanel.vue'
 import RecentTray from '@/components/RecentTray.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
@@ -24,6 +26,42 @@ theme.init()
 const paletteRef = ref<InstanceType<typeof CommandPalette> | null>(null)
 const profileOpen = ref(false)
 const notifOpen = ref(false)
+const syncingAll = ref(false)
+const lastSync = ref(0)
+const unreadCount = ref(0)
+
+async function globalSyncAll(force = false) {
+  if (syncingAll.value) {
+    showToast('Sync already in progress…', 'info')
+    return
+  }
+  const now = Date.now()
+  if (!force && now - lastSync.value < 60000) {
+    showToast('Everything is up to date (synced <1min ago). Shift+click to force.', 'success')
+    return
+  }
+  syncingAll.value = true
+  showToast('Syncing modules from ERPNext…', 'info')
+  try {
+    const eps = ['leads', 'bookings', 'dues', 'employees', 'projects', 'inventory', 'pos', 'invoices', 'payments', 'contractors', 'labor', 'equipment', 'attendance', 'leave']
+    await Promise.all(eps.map((e) => data.loadCollection(e).catch(() => null)))
+    lastSync.value = Date.now()
+    showToast('✅ Synced ' + eps.length + ' modules', 'success')
+  } catch {
+    showToast('Sync failed', 'error')
+  }
+  syncingAll.value = false
+}
+
+function loadUnread() {
+  api.call<{ collections: Record<string, unknown> }>('bootstrap').then((r) => {
+    if (r.ok && r.data) {
+      const all = (r.data.collections.notifications as { read?: boolean }[]) ?? []
+      unreadCount.value = all.filter((n) => !n.read).length
+    }
+  })
+}
+loadUnread()
 const recentOpen = ref(false)
 const activeGroupId = ref('executive')
 const activeModuleId = ref('dashboard')
@@ -217,13 +255,14 @@ function exportCsv() {
           <button class="rem-icon-btn" :title="theme.dark ? 'Light Mode' : 'Dark Mode'" @click="theme.toggle()">{{ theme.dark ? '☀️' : '🌙' }}</button>
           <button class="rem-icon-btn" title="Theme Palette">🎨</button>
           <button class="rem-icon-btn" title="Notifications" style="position: relative" @click="notifOpen = true">
+            <span v-if="unreadCount > 0" style="position: absolute; top: 0; right: 0; background: #c62828; color: #fff; border-radius: 8px; font-size: 7px; font-weight: 700; padding: 0 4px; line-height: 12px">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 15px; height: 15px">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
           </button>
           <button class="rem-icon-btn" title="Recent Items" style="position: relative; font-size: 15px; line-height: 1" @click="recentOpen = !recentOpen">🕘</button>
           <button class="rem-icon-btn" title="More" style="font-weight: 700">⋯</button>
-          <button class="rem-icon-btn" title="Sync all with server (Shift+click = force full refresh)" style="color: #2f80ed">
+          <button class="rem-icon-btn" title="Sync all with server (Shift+click = force full refresh)" style="color: #2f80ed" :class="{ spinning: syncingAll }" @click="globalSyncAll($event.shiftKey)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width: 15px; height: 15px">
               <path d="M23 4v6h-6" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
             </svg>
