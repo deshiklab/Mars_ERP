@@ -1,7 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+/**
+ * LoginView — MARS gate mirroring the HTML PWA:
+ * password stage (with server URL + version ping lg_ver), 2FA stage,
+ * signup stage (name/email/pass/phone → bridge signup → auto sign-in).
+ */
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { api } from '@/api/client'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -11,6 +17,30 @@ const password = ref('')
 const otp = ref('')
 const showOtp = ref(false)
 const otpError = ref('')
+const showSignup = ref(false)
+const svcVer = ref('')
+const svcReady = ref(false)
+
+/* signup fields */
+const suName = ref('')
+const suEmail = ref('')
+const suPass = ref('')
+const suPhone = ref('')
+const suError = ref('')
+const suBusy = ref(false)
+
+onMounted(async () => {
+  // version ping — mirrors the HTML lg_ver (guest health check)
+  try {
+    const r = await api.call<{ pwa_version?: string }>('index')
+    if (r.ok && r.data) {
+      svcVer.value = String(r.data.pwa_version ?? '')
+      svcReady.value = true
+    }
+  } catch {
+    svcVer.value = 'offline'
+  }
+})
 
 async function onSignIn() {
   if (!email.value || !password.value) {
@@ -41,6 +71,44 @@ function cancelOtp() {
   auth.phase = 'guest'
   auth.error = ''
   otp.value = ''
+}
+
+function toggleSignup() {
+  showSignup.value = !showSignup.value
+  suError.value = ''
+}
+
+async function onSignup() {
+  if (!suName.value || !suEmail.value || !suPass.value) {
+    suError.value = 'Name, email and password are required'
+    return
+  }
+  if (suPass.value.length < 8) {
+    suError.value = 'Password must be at least 8 characters'
+    return
+  }
+  suBusy.value = true
+  suError.value = ''
+  try {
+    const r = await api.call<{ ok?: boolean }>('signup', {
+      method: 'POST',
+      body: { name: suName.value, email: suEmail.value, password: suPass.value, phone: suPhone.value || null }
+    })
+    if (r.ok && r.data && r.data.ok) {
+      showSignup.value = false
+      email.value = suEmail.value
+      password.value = suPass.value
+      suName.value = suPass.value = suPhone.value = ''
+      await auth.signIn(email.value, password.value)
+      if (auth.needsOtp) showOtp.value = true
+      if (auth.authenticated) router.push('/')
+    } else {
+      suError.value = 'Signup failed — check the details and try again'
+    }
+  } catch {
+    suError.value = 'Could not reach the server'
+  }
+  suBusy.value = false
 }
 </script>
 
@@ -74,7 +142,7 @@ function cancelOtp() {
       <div style="font-size: 11px; color: #888; margin: 3px 0 20px">REM ERP — Secure Sign In</div>
 
       <!-- Password stage -->
-      <form v-if="!showOtp" @submit.prevent="onSignIn">
+      <form v-if="!showOtp && !showSignup" @submit.prevent="onSignIn">
         <div class="form-group" style="text-align: left">
           <label class="form-label">Email</label>
           <input v-model="email" type="email" class="form-input" placeholder="you@mars.com" autocomplete="username" style="padding: 10px 12px" />
@@ -85,9 +153,15 @@ function cancelOtp() {
         </div>
 
         <p v-if="auth.error" style="font-size: 10px; color: #e53935; min-height: 14px; margin: 2px 0 8px">{{ auth.error }}</p>
-        <p v-else style="font-size: 10px; color: #999; min-height: 14px; margin: 2px 0 8px; text-align: left">
+        <div v-else style="font-size: 9px; color: #999; margin-bottom: 8px; text-align: left">
           Server: /api/method/mars_constech.mars_constech.api
-        </p>
+        </div>
+        <div style="font-size: 9px; color: #e65100; margin-bottom: 6px; text-align: left; min-height: 12px">
+          <template v-if="svcVer">
+            <span v-if="svcReady">🟢 Server ready · PWA v{{ svcVer }}</span>
+            <span v-else>🟠 Server offline</span>
+          </template>
+        </div>
 
         <button
           type="submit"
@@ -109,9 +183,51 @@ function cancelOtp() {
 
         <div style="font-size: 10px; color: #999; margin-top: 16px">
           New customer?
-          <a href="javascript:void(0)" style="color: #2f80ed; font-weight: 600">Create an account</a>
+          <a href="javascript:void(0)" style="color: #2f80ed; font-weight: 600" @click="toggleSignup">Create an account</a>
         </div>
         <div style="font-size: 9px; color: #bbb; margin-top: 10px">2FA protected · sessions expire in 8h</div>
+      </form>
+
+      <!-- Signup stage -->
+      <form v-else-if="showSignup" @submit.prevent="onSignup">
+        <div style="font-size: 13px; font-weight: 600; color: #222; margin-bottom: 14px">Create your account</div>
+        <div class="form-group" style="text-align: left">
+          <label class="form-label">Full name</label>
+          <input v-model="suName" type="text" class="form-input" placeholder="Your name" style="padding: 10px 12px" />
+        </div>
+        <div class="form-group" style="text-align: left">
+          <label class="form-label">Email</label>
+          <input v-model="suEmail" type="email" class="form-input" placeholder="you@mars.com" style="padding: 10px 12px" />
+        </div>
+        <div class="form-group" style="text-align: left">
+          <label class="form-label">Phone</label>
+          <input v-model="suPhone" type="tel" class="form-input" placeholder="+880 1XXX XXXXXX" style="padding: 10px 12px" />
+        </div>
+        <div class="form-group" style="text-align: left">
+          <label class="form-label">Password (min 8 chars)</label>
+          <input v-model="suPass" type="password" class="form-input" placeholder="••••••••" style="padding: 10px 12px" />
+        </div>
+
+        <p v-if="suError" style="font-size: 10px; color: #e53935; margin: 2px 0 8px">{{ suError }}</p>
+
+        <button
+          type="submit"
+          :disabled="suBusy"
+          style="
+            width: 100%;
+            padding: 11px;
+            font-size: 13px;
+            background: #2f80ed;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+          "
+        >
+          {{ suBusy ? '⏳ Creating account…' : '📝 Create Account' }}
+        </button>
+        <button type="button" class="action-btn" style="width: 100%; margin-top: 6px" @click="toggleSignup">← Back to Sign In</button>
       </form>
 
       <!-- OTP stage -->

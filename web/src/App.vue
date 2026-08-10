@@ -31,6 +31,27 @@ const notifOpen = ref(false)
 const syncingAll = ref(false)
 const lastSync = ref(0)
 const unreadCount = ref(0)
+const endpointCount = ref(0)
+const svcStatus = ref('')
+async function loadSvcMeta() {
+  // version from bootstrap meta; endpoint count from the authed index
+  const b = await api.call<{ meta?: { pwa_version?: string } }>('bootstrap')
+  if (b.ok && b.data?.meta?.pwa_version) svcStatus.value = String(b.data.meta.pwa_version)
+  // index is guest-whitelisted (no sid) — fetch the authed count explicitly
+  try {
+    const token = localStorage.getItem('rem_api_token') || ''
+    const res = await fetch('/api/method/mars_constech.mars_constech.api.index?sid=' + encodeURIComponent(token), { credentials: 'omit' })
+    const j = (await res.json()) as { message?: { endpoints?: unknown[]; pwa_version?: string } }
+    const idx = j.message
+    if (idx) {
+      endpointCount.value = Array.isArray(idx.endpoints) ? idx.endpoints.length : 0
+      if (!svcStatus.value) svcStatus.value = String(idx.pwa_version ?? '')
+    }
+  } catch {
+    /* footer keeps defaults */
+  }
+}
+loadSvcMeta()
 
 async function globalSyncAll(force = false) {
   if (syncingAll.value) {
@@ -318,6 +339,10 @@ onMounted(() => {
         class="app-footer"
         style="height: 28px; min-height: 28px; background: #fff; border-top: 1px solid #e8e8e8; display: flex; align-items: center; padding: 0 12px; font-size: 10px; color: #888; justify-content: space-between; position: sticky; bottom: 0; z-index: 20"
       >
+        <div style="display: flex; align-items: center; gap: 6px">
+          <span style="font-size: 9px; color: #2f80ed; font-weight: 600">API: {{ endpointCount }} endpoints</span>
+          <span v-if="svcStatus" style="font-size: 9px; color: #888">· v{{ svcStatus }}</span>
+        </div>
         <div class="breadcrumb" style="display: flex; align-items: center; gap: 4px">
           <span class="crumb-part" style="cursor: pointer; color: #2f80ed; font-weight: 600" @click="router.push('/')">REM ERP</span>
           <span class="crumb-sep">›</span>
