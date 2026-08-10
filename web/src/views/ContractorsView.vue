@@ -9,6 +9,7 @@ import type { Contractor } from '@/api/types'
 
 const data = useDataStore()
 const detailRec = ref<Record<string, unknown> | null>(null)
+const detailList = ref<Record<string, unknown>[]>([])
 
 onMounted(() => {
   data.loadContractors()
@@ -57,7 +58,7 @@ const stats = computed(() => [
   { label: 'On Hold', value: String(data.contractors.filter((c) => (c.status || '').toLowerCase() === 'on hold').length), color: '#e65100' }
 ])
 const actions = computed(() => [
-  { label: 'View Details', icon: '👁', onClick: (r: unknown) => (detailRec.value = r as Record<string, unknown>) }
+  { label: 'View Details', icon: '👁', onClick: (r: unknown) => { detailRec.value = r as Record<string, unknown>; detailList.value = data.contractors as Record<string, unknown>[] } }
 ])
 </script>
 
@@ -82,5 +83,5 @@ const actions = computed(() => [
       search-placeholder="Search contractors…"
     />
   </div>
-    <GenericDetailDrawer :record="detailRec" :title="'Contractors'" @close="detailRec = null" />
+    <GenericDetailDrawer :record="detailRec" :title="'Contractors'" @close="detailRec = null" :records="detailList" />
 </template>

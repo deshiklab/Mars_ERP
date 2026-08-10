@@ -11,6 +11,7 @@ import type { PurchaseOrder, StockItem } from '@/api/types'
 const route = useRoute()
 const data = useDataStore()
 const detailRec = ref<Record<string, unknown> | null>(null)
+const detailList = ref<Record<string, unknown>[]>([])
 const tab = ref('inventory')
 
 onMounted(() => {
@@ -111,7 +112,7 @@ const invStats = computed(() => [
   { label: 'Purchase Orders', value: String(data.pos.length), color: '#1565c0' }
 ])
 const actions = computed(() => [
-  { label: 'View Details', icon: '👁', onClick: (r: unknown) => (detailRec.value = r as Record<string, unknown>) }
+  { label: 'View Details', icon: '👁', onClick: (r: unknown) => { detailRec.value = r as Record<string, unknown>; detailList.value = data.inventory as Record<string, unknown>[] } }
 ])
 </script>
 
@@ -150,5 +151,5 @@ const actions = computed(() => [
       <button class="action-btn" :style="{ border: 'none', borderRadius: 0, borderLeft: '1px solid #e0e0e0', background: tab === 'pos' ? '#f0f4ff' : '#fff', color: '#2f80ed' }" @click="tab = 'pos'">📄 Purchase Orders</button>
     </div>
   </div>
-    <GenericDetailDrawer :record="detailRec" :title="'Stock & Procurement'" @close="detailRec = null" />
+    <GenericDetailDrawer :record="detailRec" :title="'Stock & Procurement'" @close="detailRec = null" :records="detailList" />
 </template>

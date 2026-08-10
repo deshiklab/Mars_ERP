@@ -8,6 +8,7 @@ import type { TableColumn } from '@/components/DataTable.vue'
 
 const data = useDataStore()
 const detailRec = ref<Record<string, unknown> | null>(null)
+const detailList = ref<Record<string, unknown>[]>([])
 
 onMounted(() => {
   data.loadBoq()
@@ -77,7 +78,7 @@ const columns = computed<TableColumn<any>[]>(() => [
 
 const rows = computed(() => data.boq)
 const actions = computed(() => [
-  { label: 'View Details', icon: '👁', onClick: (r: unknown) => (detailRec.value = r as Record<string, unknown>) }
+  { label: 'View Details', icon: '👁', onClick: (r: unknown) => { detailRec.value = r as Record<string, unknown>; detailList.value = rows.value as Record<string, unknown>[] } }
 ])
 </script>
 
@@ -100,5 +101,5 @@ const actions = computed(() => [
       search-placeholder="Search BOQ items…"
     />
   </div>
-    <GenericDetailDrawer :record="detailRec" :title="'BOQ & Cost Control'" @close="detailRec = null" />
+    <GenericDetailDrawer :record="detailRec" :title="'BOQ & Cost Control'" @close="detailRec = null" :records="detailList" />
 </template>

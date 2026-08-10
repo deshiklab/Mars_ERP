@@ -59,6 +59,7 @@ function statusColor(status: string): { bg: string; fg: string } {
 
 const rows = computed(() => items.value)
 const detailRec = ref<Record<string, unknown> | null>(null)
+const detailList = ref<Record<string, unknown>[]>([])
 
 const stats = computed(() => [
   { label: 'Comments', value: String(rows.value.length), color: '#2f80ed' },
@@ -104,7 +105,7 @@ const columns = computed<TableColumn<any>[]>(() => [
     renderHtml: (x) => `<span style='font-size:10px;color:${(x.attachments?.length ?? 0) > 0 ? '#e65100' : '#888'}'>${x.attachments?.length ?? 0}</span>`
   },])
 const actions = computed(() => [
-  { label: 'View Details', icon: '👁', onClick: (r: unknown) => (detailRec.value = r as Record<string, unknown>) }
+  { label: 'View Details', icon: '👁', onClick: (r: unknown) => { detailRec.value = r as Record<string, unknown>; detailList.value = rows.value as Record<string, unknown>[] } }
 ])
 </script>
 
@@ -128,5 +129,5 @@ const actions = computed(() => [
       search-placeholder="Search comments…"
     />
   </div>
-    <GenericDetailDrawer :record="detailRec" :title="'Task Comments'" @close="detailRec = null" />
+    <GenericDetailDrawer :record="detailRec" :title="'Task Comments'" @close="detailRec = null" :records="detailList" />
 </template>
