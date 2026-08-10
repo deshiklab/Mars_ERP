@@ -2,10 +2,12 @@
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
+import EmployeeDetailDrawer from '@/components/EmployeeDetailDrawer.vue'
 import type { TableAction, TableColumn, TableTab } from '@/components/DataTable.vue'
 import type { Employee } from '@/api/types'
 
 const data = useDataStore()
+const detailEmp = ref<Employee | null>(null)
 const tab = ref('all')
 const detail = ref<Employee | null>(null)
 
@@ -97,6 +99,7 @@ function onTabChange(t: string) {
 }
 
 const actions = computed<TableAction[]>(() => [
+  { label: 'View Profile', icon: '👤', onClick: (r) => (detailEmp.value = r as unknown as Employee) },
   { label: 'View Profile', icon: '👁', onClick: (r) => (detail.value = r as unknown as Employee) },
   { label: 'View Contract', icon: '📄', onClick: (r) => (detail.value = r as unknown as Employee) },
   { label: 'Mark On Leave', icon: '🏖', onClick: (r) => (detail.value = r as unknown as Employee) }
@@ -165,4 +168,5 @@ const actions = computed<TableAction[]>(() => [
       </div>
     </div>
   </div>
+    <EmployeeDetailDrawer :employee="detailEmp" @close="detailEmp = null" />
 </template>

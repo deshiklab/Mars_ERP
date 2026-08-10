@@ -526,6 +526,12 @@ const router = createRouter({
       component: () => import('../views/PaymentHeatmapView.vue'),
       meta: { module: 'heatmap', title: 'Payment Heatmap' }
     },
+    {
+      path: '/sales-config',
+      name: 'salesconfig',
+      component: () => import('../views/SalesConfigView.vue'),
+      meta: { module: 'sales-config', title: 'Sales Config' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })
