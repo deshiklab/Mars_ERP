@@ -788,3 +788,29 @@ html.dark .action-btn.primary {
   .pill, .badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { background: #fff !important; }
 }
+
+/* ── MOBILE RESPONSIVE ── */
+@media (max-width: 768px) {
+  .rem-sidebar { width: 46px !important; min-width: 46px !important; flex: 0 0 46px !important; }
+  .rem-sidebar-label, .rem-sidebar-brand, .rem-sidebar-logo { display: none !important; }
+  .rem-sidebar-item { justify-content: center !important; }
+  .rem-sidebar-item span { font-size: 14px !important; }
+  .rem-sidebar-sep { margin: 4px 8px !important; }
+  .rem-topbar { padding: 0 6px !important; }
+  .top-nav { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .top-nav-item { white-space: nowrap !important; padding: 4px 8px !important; font-size: 10px !important; }
+  .top-actions { gap: 2px !important; }
+  .top-actions button, .top-actions [class*="icon"] { padding: 4px !important; }
+  .rem-content { padding: 8px !important; }
+  .stats-row { grid-template-columns: repeat(2, 1fr) !important; }
+  .stat-card { padding: 8px !important; }
+  .table-wrap { overflow-x: auto !important; }
+  .rem-table { font-size: 10px !important; }
+  .rem-table th, .rem-table td { padding: 4px 6px !important; }
+  .page-title { font-size: 15px !important; }
+  .view-tabs { overflow-x: auto !important; }
+  [style*="margin-left: auto"] { flex-wrap: wrap !important; justify-content: flex-end !important; }
+  [style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
+  [style*="grid-template-columns: 1.2fr 1fr"] { grid-template-columns: 1fr !important; }
+  .qa-tab { font-size: 9px !important; padding: 3px 8px !important; }
+}
