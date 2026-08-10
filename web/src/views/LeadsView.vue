@@ -144,12 +144,16 @@ const actions = computed<TableAction[]>(() => [
 ])
 
 /* ── kanban ── */
+// Columns MUST match the server LEAD_FUNNEL (lead_update_status validates):
+// New Inquiry, Site Visit, Negotiation, Booking, Downpayment, Installments, Converted, Lost
 const kanbanCols: KanbanColumn[] = [
-  { id: 'New Inquiry', label: 'New Inquiry', bg: '#e3f2fd', fg: '#1565c0', next: 'Contacted' },
-  { id: 'Contacted', label: 'Contacted', bg: '#f0f4ff', fg: '#2f80ed', next: 'Site Visit' },
+  { id: 'New Inquiry', label: 'New Inquiry', bg: '#e3f2fd', fg: '#1565c0', next: 'Site Visit' },
   { id: 'Site Visit', label: 'Site Visit', bg: '#fff3e0', fg: '#e65100', next: 'Negotiation' },
   { id: 'Negotiation', label: 'Negotiation', bg: '#fff8e1', fg: '#ff8f00', next: 'Booking' },
-  { id: 'Booking', label: 'Booking', bg: '#e8f5e9', fg: '#2e7d32' },
+  { id: 'Booking', label: 'Booking', bg: '#e8f5e9', fg: '#2e7d32', next: 'Downpayment' },
+  { id: 'Downpayment', label: 'Downpayment', bg: '#e0f2f1', fg: '#00695c', next: 'Installments' },
+  { id: 'Installments', label: 'Installments', bg: '#ede7f6', fg: '#4527a0', next: 'Converted' },
+  { id: 'Converted', label: 'Converted', bg: '#e8f5e9', fg: '#2e7d32' },
   { id: 'Lost', label: 'Lost', bg: '#ffebee', fg: '#c62828' }
 ]
 
