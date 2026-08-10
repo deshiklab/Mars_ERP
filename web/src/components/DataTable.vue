@@ -380,10 +380,10 @@ defineExpose({ refresh: () => (page.value = 1) })
     <div class="tbl-toolbar" style="display: flex; align-items: center; gap: 6px; border-bottom: 1px solid #e8e8e8; padding: 5px 10px; flex-wrap: wrap">
       <span class="tt-label" style="font-size: 10px; color: #888; font-weight: 600">{{ totalRows }} rows</span>
       <span style="flex: 1"></span>
-      <button class="tt-btn" @click="filterOpen = !filterOpen">🔍 Filter</button>
+      <button class="tt-btn" @click="filterOpen = !filterOpen">🔍 {{ _t('Filter') }}</button>
       <button class="tt-btn" @click="exportCsv">📥 CSV</button>
       <button class="tt-btn" @click="printTable">🖨 Print</button>
-      <button class="tt-btn" style="position: relative" @click="colMenuOpen = !colMenuOpen">👁 Columns</button>
+      <button class="tt-btn" style="position: relative" @click="colMenuOpen = !colMenuOpen">👁 {{ _t('Columns') }}</button>
     </div>
 
     <!-- FILTER PANEL -->
@@ -411,8 +411,8 @@ defineExpose({ refresh: () => (page.value = 1) })
         "
       >
         <option value="">Default</option>
-        <option v-for="(c, i) in columns" :key="i" :value="`${i}_asc`">{{ c.label }} ↑</option>
-        <option v-for="(c, i) in columns" :key="i" :value="`${i}_desc`">{{ c.label }} ↓</option>
+        <option v-for="(c, i) in columns" :key="i" :value="`${i}_asc`">{{ _t(c.label) }} ↑</option>
+        <option v-for="(c, i) in columns" :key="i" :value="`${i}_desc`">{{ _t(c.label) }} ↓</option>
       </select>
       <button class="fp-btn primary" style="padding: 3px 10px; font-size: 10px; border-radius: 4px; background: #2f80ed; color: #fff; border: none; cursor: pointer" @click="filterOpen = false">Apply</button>
       <button class="fp-btn secondary" style="padding: 3px 10px; font-size: 10px; border-radius: 4px; background: #fff; border: 1px solid #e0e0e0; cursor: pointer" @click="search = ''; sortKey = null">Clear</button>
@@ -423,7 +423,7 @@ defineExpose({ refresh: () => (page.value = 1) })
       <div style="font-size: 10px; font-weight: 600; color: #555; margin-bottom: 4px">Toggle Columns</div>
       <label v-for="(c, i) in columns" :key="i" style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: #333; padding: 2px 0; cursor: pointer">
         <input type="checkbox" :checked="!hiddenCols.has(i)" @change="toggleColumn(i, ($event.target as HTMLInputElement).checked)" />
-        {{ c.label }}
+        {{ _t(c.label) }}
       </label>
     </div>
 
@@ -442,7 +442,7 @@ defineExpose({ refresh: () => (page.value = 1) })
               :style="c.width ? `width:${c.width}` : ''"
               @click="onHeaderClick(i, c.sortable !== false)"
             >
-              {{ c.label }}
+              {{ _t(c.label) }}
               <span v-if="c.sortable !== false" class="s-arrow" :class="sortKey?.col === i ? sortKey.dir : ''">
                 {{ sortKey?.col === i ? (sortKey.dir === 'asc' ? '▲' : '▼') : '⇅' }}
               </span>
@@ -503,7 +503,7 @@ defineExpose({ refresh: () => (page.value = 1) })
           </tr>
           <tr v-if="pagedRows.length === 0">
             <td :colspan="columns.length + (actions.length ? 1 : 0)" style="text-align: center; color: #888; padding: 20px; font-size: 11px">
-              No rows found
+              {{ _t('No rows found') }}
             </td>
           </tr>
         </tbody>
@@ -513,7 +513,7 @@ defineExpose({ refresh: () => (page.value = 1) })
     <!-- PAGINATION + PAGE INFO -->
     <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-top: 1px solid #e8e8e8; font-size: 10px; color: #888">
       <div style="display: flex; align-items: center; gap: 6px">
-        <span>Rows per page:</span>
+        <span>{{ _t('Rows per page') }}:</span>
         <select class="form-input" style="width: auto; padding: 2px 6px" :value="pageSize" @change="pageSize = parseInt(($event.target as HTMLSelectElement).value); page = 1">
           <option v-for="n in pageSizeOptions" :key="n" :value="n">{{ n }}</option>
         </select>

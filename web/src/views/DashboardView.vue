@@ -21,6 +21,7 @@ onMounted(() => {
   data.loadBookings()
   data.loadLeads()
   data.loadDues()
+  data.loadPayments()
 })
 
 const stats = computed(() => {
@@ -31,6 +32,53 @@ const stats = computed(() => {
     { label: _t('Employees'), value: s ? String(s.employees) : '—', color: '', trend: '' },
     { label: _t('Dues'), value: s ? String(s.dues) : '—', color: '#c62828', trend: '' }
   ]
+})
+
+const thisWeek = computed(() => {
+  const now = Date.now()
+  const week = 7 * 86400000
+  const leadsNew = data.leads.filter((l) => {
+    const t = new Date(String((l as { dateContacted?: unknown }).dateContacted ?? '')).getTime()
+    return !isNaN(t) && now - t <= week
+  }).length
+  const payNew = data.payments.filter((p) => {
+    const t = new Date(String(p.date ?? '')).getTime()
+    return !isNaN(t) && now - t <= week
+  }).length
+  const payAmt = data.payments.filter((p) => {
+    const t = new Date(String(p.date ?? '')).getTime()
+    return !isNaN(t) && now - t <= week
+  }).reduce((s, p) => s + (Number(p.amount) || 0), 0)
+  const bkNew = data.bookings.filter((b) => {
+    const t = new Date(String((b as { date?: unknown }).date ?? '')).getTime()
+    return !isNaN(t) && now - t <= week
+  }).length
+  return { leadsNew, payNew, payAmt, bkNew }
+})
+
+const revenueTrend = computed(() => {
+  const map: Record<string, number> = {}
+  data.payments.forEach((p) => {
+    const d = String(p.date ?? '')
+    if (!d) return
+    const m = d.slice(0, 7)
+    map[m] = (map[m] || 0) + (Number(p.amount) || 0)
+  })
+  const months = Object.keys(map).sort()
+  const rows = months.slice(-6).map((m) => ({ month: m, amt: map[m] }))
+  const max = Math.max(...rows.map((r) => r.amt), 1)
+  const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const lab = (m: string) => { const [y, mo] = m.split('-'); return `${names[Number(mo) - 1] ?? mo} '${y.slice(2)}` }
+  return { rows, max, lab, total: rows.reduce((s, r) => s + r.amt, 0) }
+})
+
+const duePipeline = computed(() => {
+  const t = data.dues.length
+  const crit = data.dues.filter((d) => d.status === 'Critical').length
+  const over = data.dues.filter((d) => d.status === 'Overdue').length
+  const curr = data.dues.filter((d) => d.status === 'Current').length
+  const pct = (n: number) => (t ? Math.round((n / t) * 100) : 0)
+  return { t, crit, over, curr, pct }
 })
 
 const quick = computed(() =>
@@ -130,6 +178,54 @@ function printReport() {
         <div class="info">
           <div class="title">{{ q.title }}</div>
           <div class="count">{{ q.count }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- THIS-WEEK CHIPS -->
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px">
+      <div style="flex: 1; min-width: 120px; background: #f7faff; border: 1px solid #e3edff; border-radius: 8px; padding: 8px 10px; display: flex; align-items: center; gap: 8px">
+        <span style="font-size: 15px">🎯</span>
+        <div><div style="font-size: 14px; font-weight: 700; color: #1565c0">{{ thisWeek.leadsNew }}</div><div style="font-size: 8px; color: #888">{{ _t('New leads this week') }}</div></div>
+      </div>
+      <div style="flex: 1; min-width: 120px; background: #f7faff; border: 1px solid #e3edff; border-radius: 8px; padding: 8px 10px; display: flex; align-items: center; gap: 8px">
+        <span style="font-size: 15px">💵</span>
+        <div><div style="font-size: 14px; font-weight: 700; color: #2e7d32">{{ bdt(thisWeek.payAmt) }}</div><div style="font-size: 8px; color: #888">{{ thisWeek.payNew }} {{ _t('payments this week') }}</div></div>
+      </div>
+      <div style="flex: 1; min-width: 120px; background: #f7faff; border: 1px solid #e3edff; border-radius: 8px; padding: 8px 10px; display: flex; align-items: center; gap: 8px">
+        <span style="font-size: 15px">📄</span>
+        <div><div style="font-size: 14px; font-weight: 700; color: #2f80ed">{{ thisWeek.bkNew }}</div><div style="font-size: 8px; color: #888">{{ _t('new bookings this week') }}</div></div>
+      </div>
+    </div>
+
+    <!-- TREND + PIPELINE WIDGETS -->
+    <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 10px; margin-bottom: 10px">
+      <div class="card">
+        <div class="card-header"><h3>📈 {{ _t('Revenue Trend') }} <span style="font-size: 9px; font-weight: 400; color: #888">{{ _t('Collections') }}: {{ bdt(revenueTrend.total) }}</span></h3></div>
+        <div class="card-body" style="padding: 12px 10px 6px">
+          <div v-if="revenueTrend.rows.length" style="display: flex; align-items: flex-end; gap: 8px; height: 90px; padding: 0 4px">
+            <div v-for="r in revenueTrend.rows" :key="r.month" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%">
+              <div :style="{ width: '60%', height: Math.max((r.amt / revenueTrend.max) * 62, 3) + 'px', background: 'linear-gradient(180deg, #4d94f0, #2f80ed)', borderRadius: '3px 3px 0 0', minWidth: '10px' }" :title="bdt(r.amt)"></div>
+              <div style="font-size: 8px; color: #666; margin-top: 3px">{{ revenueTrend.lab(r.month) }}</div>
+            </div>
+          </div>
+          <div v-else style="text-align: center; color: #999; padding: 20px; font-size: 10px">{{ _t('No payments yet') }}</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>⏰ {{ _t('Due Pipeline') }}</h3></div>
+        <div class="card-body" style="padding: 10px">
+          <div style="display: flex; gap: 8px; margin-bottom: 8px">
+            <div style="flex: 1; text-align: center; padding: 6px; border-radius: 6px; background: #ffebee"><div style="font-size: 16px; font-weight: 700; color: #c62828">{{ duePipeline.crit }}</div><div style="font-size: 8px; color: #c62828">{{ _t('Critical') }}</div></div>
+            <div style="flex: 1; text-align: center; padding: 6px; border-radius: 6px; background: #fff3e0"><div style="font-size: 16px; font-weight: 700; color: #e65100">{{ duePipeline.over }}</div><div style="font-size: 8px; color: #e65100">{{ _t('Overdue') }}</div></div>
+            <div style="flex: 1; text-align: center; padding: 6px; border-radius: 6px; background: #e8f5e9"><div style="font-size: 16px; font-weight: 700; color: #2e7d32">{{ duePipeline.curr }}</div><div style="font-size: 8px; color: #2e7d32">{{ _t('Current') }}</div></div>
+          </div>
+          <div style="display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: #eee">
+            <div :style="{ width: duePipeline.pct(duePipeline.crit) + '%', background: '#c62828' }" :title="'Critical ' + duePipeline.crit"></div>
+            <div :style="{ width: duePipeline.pct(duePipeline.over) + '%', background: '#ff8f00' }" :title="'Overdue ' + duePipeline.over"></div>
+            <div :style="{ width: duePipeline.pct(duePipeline.curr) + '%', background: '#2e7d32' }" :title="'Current ' + duePipeline.curr"></div>
+          </div>
+          <div style="font-size: 8px; color: #888; margin-top: 5px; text-align: center">{{ duePipeline.t }} {{ _t('accounts tracked') }}</div>
         </div>
       </div>
     </div>
