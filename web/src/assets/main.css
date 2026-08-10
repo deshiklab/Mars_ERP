@@ -764,3 +764,27 @@ html.dark .action-btn.primary {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* ── PRINT: module-only output (hide shell chrome) ── */
+@media print {
+  @page { size: A4 landscape; margin: 8mm; }
+  .rem-sidebar, .rem-topbar, .app-footer, .toast-container,
+  .drawer-overlay, .quick-card, .card-header a, .card-header span[cursor],
+  .rem-icon-btn, .dt-edit-ic, .top-nav, .top-actions,
+  [class*="drawer"], [class*="modal"], [class*="toast"] {
+    display: none !important;
+  }
+  .rem-content, .view, .card, .stat-card, .rem-table {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #fff !important;
+  }
+  .rem-table th { background: #f0f4ff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .pill, .badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { background: #fff !important; }
+}

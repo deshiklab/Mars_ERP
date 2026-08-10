@@ -8,6 +8,7 @@
 import { computed, ref, watch } from 'vue'
 import router from '@/router'
 import { showToast } from '@/toast'
+import { _t } from '@/i18n'
 
 export interface TableColumn<T> {
   key: string
@@ -102,29 +103,29 @@ const cellHtml = (row: any, col: TableColumn<any>): string => {
   const raw = String(row[col.key] ?? '').trim()
   if (raw) {
     if (MONEY_RE.test(col.key)) {
-      return `<span class="dt-money" title="Click to copy" style="cursor: pointer">${base}</span>`
+      return `<span class="dt-money" title="${_t('Click to copy')}" style="cursor: pointer">${base}</span>`
     }
     if (PHONE_RE.test(col.key)) {
       const digits = raw.replace(/[^0-9+]/g, '')
-      return `<a href="tel:${digits}" class="dt-call" onclick="event.stopPropagation()" style="color:#2f80ed;text-decoration:none;font-weight:500" title="Call ${raw}">📞 ${base}</a>`
+      return `<a href="tel:${digits}" class="dt-call" onclick="event.stopPropagation()" style="color:#2f80ed;text-decoration:none;font-weight:500" title="${_t('Call')} ${raw}">📞 ${base}</a>`
     }
     if (EMAIL_RE.test(col.key)) {
-      return `<a href="mailto:${raw}" class="dt-mail" onclick="event.stopPropagation()" style="color:#2f80ed;text-decoration:none;font-weight:500" title="Email ${raw}">✉ ${base}</a>`
+      return `<a href="mailto:${raw}" class="dt-mail" onclick="event.stopPropagation()" style="color:#2f80ed;text-decoration:none;font-weight:500" title="${_t('Email')} ${raw}">✉ ${base}</a>`
     }
     if (INVOICE_RE.test(col.key)) {
-      return `<a class="dt-inv" style="color:#2f80ed;cursor:pointer;font-weight:600" title="View invoice">🧾 ${base}</a>`
+      return `<a class="dt-inv" style="color:#2f80ed;cursor:pointer;font-weight:600" title="${_t('View invoice')}">🧾 ${base}</a>`
     }
     if (PROP_RE.test(col.key)) {
-      return `<a class="dt-prop" style="color:#2f80ed;cursor:pointer;font-weight:500" title="View property">🏢 ${base}</a>`
+      return `<a class="dt-prop" style="color:#2f80ed;cursor:pointer;font-weight:500" title="${_t('View property')}">🏢 ${base}</a>`
     }
     if (STATUS_RE.test(col.key)) {
-      return `<span class="dt-status" data-key="${col.key}" style="cursor:pointer" title="Change status">${base} <span style="font-size:8px;color:#888">▾</span></span>`
+      return `<span class="dt-status" data-key="${col.key}" style="cursor:pointer" title="${_t('Change status')}">${base} <span style="font-size:8px;color:#888">▾</span></span>`
     }
   }
   const isName = NAME_RE.test(col.key) && raw.length > 0
   if (isName) {
     return `<span class="dt-name-link" style="color:#2f80ed;cursor:pointer;font-weight:500;border-bottom:1px dashed #b8d4f7" title="Click to view details">${base}</span>` +
-           `<span class="dt-edit-ic" data-field="${col.key}" title="Inline edit" style="display:inline-block;margin-left:6px;font-size:10px;color:#aaa;cursor:pointer;opacity:.55;transition:opacity .15s" onmouseover="this.style.opacity=1;this.style.color='#2f80ed'" onmouseout="this.style.opacity=.55;this.style.color='#aaa'">✎</span>`
+           `<span class="dt-edit-ic" data-field="${col.key}" title="${_t('Inline edit')}" style="display:inline-block;margin-left:6px;font-size:10px;color:#aaa;cursor:pointer;opacity:.55;transition:opacity .15s" onmouseover="this.style.opacity=1;this.style.color='#2f80ed'" onmouseout="this.style.opacity=.55;this.style.color='#aaa'">✎</span>`
   }
   return base
 }

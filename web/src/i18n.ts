@@ -129,7 +129,14 @@ const BN: Record<string, string> = {
   Employees: 'কর্মচারী',
   'HR & Employees': 'এইচআর ও কর্মচারী',
   'Sign Out': 'সাইন আউট',
-  'User Profile': 'ব্যবহারকারী প্রোফাইল'
+  'User Profile': 'ব্যবহারকারী প্রোফাইল',
+  Call: 'কল',
+  Email: 'ইমেইল',
+  'View invoice': 'ইনভয়েস দেখুন',
+  'View property': 'সম্পত্তি দেখুন',
+  'Change status': 'স্ট্যাটাস পরিবর্তন',
+  'Click to copy': 'কপি করতে ক্লিক করুন',
+  'Inline edit': 'ইনলাইন এডিট',
 }
 
 export const i18n = reactive({
