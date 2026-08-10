@@ -68,6 +68,7 @@ function switchGroup(g: ShellGroup) {
 function switchModule(m: ShellModule) {
   activeModuleId.value = m.id
   if (m.path) router.push(m.path)
+  else router.push('/empty/' + m.id)
 }
 
 watch(

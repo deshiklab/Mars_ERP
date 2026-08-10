@@ -502,6 +502,12 @@ const router = createRouter({
       component: () => import('../views/AiCopilotView.vue'),
       meta: { module: 'copilot', title: 'AI Copilot' }
     },
+    {
+      path: '/empty/:module',
+      name: 'empty',
+      component: () => import('../views/EmptyStateView.vue'),
+      meta: { module: 'empty', title: 'Module' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })
