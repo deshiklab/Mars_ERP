@@ -51,6 +51,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'tab-change', tab: string): void
   (e: 'action', action: TableAction, row: any): void
+  (e: 'update', payload: { row: Record<string, unknown>; field: string; value: unknown }): void
 }>()
 
 /* ── state ── */
@@ -81,8 +82,17 @@ const cellText = (row: any, col: TableColumn<any>): string => {
   return v
 }
 
-const cellHtml = (row: any, col: TableColumn<any>): string =>
-  col.renderHtml ? col.renderHtml(row) : cellText(row, col)
+const NAME_RE = /client|customer|customer_name|name|contact|assignee|owner|vendor|supplier|party|agent|broker|employee|lead|salesperson|referred_by/i
+
+const cellHtml = (row: any, col: TableColumn<any>): string => {
+  const base = col.renderHtml ? col.renderHtml(row) : cellText(row, col)
+  const isName = NAME_RE.test(col.key) && String(row[col.key] ?? '').trim().length > 0
+  if (isName) {
+    return `<span class="dt-name-link" style="color:#2f80ed;cursor:pointer;font-weight:500;border-bottom:1px dashed #b8d4f7" title="Click to view details">${base}</span>` +
+           `<span class="dt-edit-ic" data-field="${col.key}" title="Inline edit" style="display:inline-block;margin-left:6px;font-size:10px;color:#aaa;cursor:pointer;opacity:.55;transition:opacity .15s" onmouseover="this.style.opacity=1;this.style.color='#2f80ed'" onmouseout="this.style.opacity=.55;this.style.color='#aaa'">✎</span>`
+  }
+  return base
+}
 
 const filteredRows = computed(() => {
   let rows = props.rows
@@ -194,6 +204,50 @@ function rowAction(action: TableAction, row: Record<string, unknown>) {
   emit('action', action, row)
 }
 
+/* ── row click -> open details (HTML PWA parity) ── */
+const editing = ref<{ ri: number; field: string } | null>(null)
+const editVal = ref('')
+const editInput = ref<HTMLInputElement | null>(null)
+
+function openRow(r: Record<string, unknown>) {
+  const act = props.actions.find((a) => typeof a.onClick === 'function')
+  if (act) act.onClick(r)
+}
+
+function onRowClick(e: MouseEvent, r: Record<string, unknown>) {
+  const t = e.target as HTMLElement
+  if (t.closest('button')) return
+  const ic = t.closest('.dt-edit-ic') as HTMLElement | null
+  if (ic) {
+    const field = ic.getAttribute('data-field') || ''
+    startEdit(r, field)
+    return
+  }
+  // name-cell or any row click opens the record details (HTML PWA parity)
+  openRow(r)
+}
+
+function startEdit(r: Record<string, unknown>, field: string) {
+  const ri = pagedRows.value.indexOf(r)
+  if (ri < 0) return
+  editing.value = { ri, field }
+  editVal.value = String(r[field] ?? '')
+  setTimeout(() => editInput.value?.focus(), 30)
+}
+
+function commitEdit(r: Record<string, unknown>) {
+  if (!editing.value) return
+  const { field } = editing.value
+  const next = editVal.value
+  ;(r as Record<string, unknown>)[field] = next
+  emit('update', { row: r, field, value: next })
+  editing.value = null
+}
+
+function cancelEdit() {
+  editing.value = null
+}
+
 defineExpose({ refresh: () => (page.value = 1) })
 </script>
 
@@ -288,10 +342,25 @@ defineExpose({ refresh: () => (page.value = 1) })
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(r, ri) in pagedRows" :key="ri">
-            <td v-for="(c, i) in visibleColumns" :key="i" :class="{ hidden: hiddenCols.has(c.i) }" v-html="cellHtml(r, c.col)"></td>
+          <tr v-for="(r, ri) in pagedRows" :key="ri" style="cursor: pointer" @click="onRowClick($event, r)">
+            <td
+              v-for="(c, i) in visibleColumns"
+              :key="i"
+              :class="{ hidden: hiddenCols.has(c.i) }"
+            >
+              <input
+                v-if="editing && editing.ri === ri && editing.field === c.col.key"
+                ref="editInput"
+                v-model="editVal"
+                style="width: 100%; padding: 4px 6px; font-size: 11px; border: 1px solid #2f80ed; border-radius: 4px; outline: none"
+                @keydown.enter="commitEdit(r)"
+                @keydown.esc="cancelEdit"
+                @blur="commitEdit(r)"
+              />
+              <span v-else v-html="cellHtml(r, c.col)"></span>
+            </td>
             <td v-if="actions.length" style="position: relative">
-              <button class="rem-icon-btn" style="font-size: 13px" @click="actionMenuRow = actionMenuRow === ri ? null : ri">⋯</button>
+              <button class="rem-icon-btn" style="font-size: 13px" @click.stop="actionMenuRow = actionMenuRow === ri ? null : ri">⋯</button>
               <div
                 v-if="actionMenuRow === ri"
                 style="position: absolute; right: 0; top: 100%; z-index: 1001; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.12); min-width: 150px; padding: 4px"
@@ -302,7 +371,7 @@ defineExpose({ refresh: () => (page.value = 1) })
                   style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 11px; color: #333; cursor: pointer; border-radius: 5px"
                   @mouseover="($event.currentTarget as HTMLElement).style.background = '#f0f4ff'"
                   @mouseout="($event.currentTarget as HTMLElement).style.background = ''"
-                  @click="rowAction(a, r)"
+                  @click.stop="rowAction(a, r)"
                 >
                   {{ a.icon ?? '·' }} {{ a.label }}
                 </div>
