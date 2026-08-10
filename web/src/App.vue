@@ -186,6 +186,38 @@ function exportCsv() {
   a.click()
   URL.revokeObjectURL(a.href)
 }
+
+/* ── global keyboard shortcuts (mirrors HTML PWA) ── */
+let _gPending = false
+let _gTime = 0
+const _G_MAP: Record<string, string> = {
+  c: '/customers', b: '/bookings', p: '/flats', f: '/finance',
+  l: '/leads', h: '/employees', d: '/', s: '/stock', a: '/analytics'
+}
+function _isTypingTarget(e: KeyboardEvent): boolean {
+  const t = e.target as HTMLElement | null
+  return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)
+}
+onMounted(() => {
+  window.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      shortcutsOpen.value = false
+      return
+    }
+    if (_isTypingTarget(e)) return
+    if (e.key === '?') { e.preventDefault(); shortcutsOpen.value = true; return }
+    if (e.key === '/') { e.preventDefault(); paletteRef.value?.openPalette(); return }
+    if (e.key === 'g' || e.key === 'G') { _gPending = true; _gTime = Date.now(); e.preventDefault(); return }
+    if (_gPending) {
+      _gPending = false
+      if (Date.now() - _gTime <= 1000 && _G_MAP[e.key.toLowerCase()]) {
+        e.preventDefault()
+        router.push(_G_MAP[e.key.toLowerCase()])
+      }
+    }
+  })
+})
+
 </script>
 
 <template>

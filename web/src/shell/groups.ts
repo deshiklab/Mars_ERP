@@ -52,7 +52,7 @@ export const GROUPS: ShellGroup[] = [
     mods: [
       { id: 'land_mgmt', label: 'Project Acquisition' },
       { id: 'properties_units', label: 'Flats & Units' , path: '/properties'},
-      { id: 'plots', label: 'Plots & Blocks' , path: '/plots'},
+      { id: 'plots', label: 'Flats & Units' , path: '/flats'},
       { id: 'layout_builder', label: 'Layout & Unit Builder' },
       { id: 'projects', label: 'Projects', path: '/projects' }
     ]
@@ -91,7 +91,7 @@ export const GROUPS: ShellGroup[] = [
     mods: [
       { id: 'finance', label: 'Finance', path: '/finance' },
       { id: 'party_ledger', label: 'Party Ledger' , path: '/party-ledger'},
-      { id: 'payment_heatmap', label: 'Payment Heatmap' },
+      { id: 'payment_heatmap', label: 'Payment Heatmap' , path: '/heatmap'},
       { id: 'approvals', label: 'Financial Approvals' , path: '/approvals'},
       { id: 'boq', label: 'BOQ & Cost Control' , path: '/boq'},
       { id: 'investment_loans', label: 'Investment & Loans' },

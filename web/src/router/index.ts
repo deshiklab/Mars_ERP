@@ -514,6 +514,18 @@ const router = createRouter({
       component: () => import('../views/CustomerPortalView.vue'),
       meta: { module: 'portal', title: 'Customer Portal' }
     },
+    {
+      path: '/flats',
+      name: 'flats',
+      component: () => import('../views/FlatsView.vue'),
+      meta: { module: 'flats', title: 'Flats & Units' }
+    },
+    {
+      path: '/heatmap',
+      name: 'heatmap',
+      component: () => import('../views/PaymentHeatmapView.vue'),
+      meta: { module: 'heatmap', title: 'Payment Heatmap' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })
