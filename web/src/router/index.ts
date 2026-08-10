@@ -214,6 +214,54 @@ const router = createRouter({
       component: () => import('../views/AnalyticsView.vue'),
       meta: { module: 'analytics', title: 'Analytics' }
     },
+    {
+      path: '/proposals',
+      name: 'proposals',
+      component: () => import('../views/ProposalsView.vue'),
+      meta: { module: 'proposals', title: 'Proposals' }
+    },
+    {
+      path: '/reports',
+      name: 'reports',
+      component: () => import('../views/ReportsView.vue'),
+      meta: { module: 'reports', title: 'BI Reports' }
+    },
+    {
+      path: '/calendar',
+      name: 'calendar',
+      component: () => import('../views/CalendarView.vue'),
+      meta: { module: 'calendar', title: 'Calendar' }
+    },
+    {
+      path: '/announcements',
+      name: 'announcements',
+      component: () => import('../views/AnnouncementsView.vue'),
+      meta: { module: 'announcements', title: 'Announcements' }
+    },
+    {
+      path: '/payroll',
+      name: 'payroll',
+      component: () => import('../views/PayrollView.vue'),
+      meta: { module: 'payroll', title: 'Payroll' }
+    },
+    {
+      path: '/jobs',
+      name: 'jobs',
+      component: () => import('../views/JobOpeningsView.vue'),
+      meta: { module: 'jobs', title: 'Job Openings' }
+    },
+    {
+      path: '/audit-trail',
+      name: 'audittrail',
+      component: () => import('../views/AuditTrailView.vue'),
+      meta: { module: 'audit-trail', title: 'Audit Trail' }
+    },
+    {
+      path: '/campaigns',
+      name: 'campaigns',
+      component: () => import('../views/CampaignsView.vue'),
+      meta: { module: 'campaigns', title: 'Campaigns' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })

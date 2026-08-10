@@ -25,8 +25,8 @@ export const GROUPS: ShellGroup[] = [
     mods: [
       { id: 'dashboard', label: 'Dashboard', path: '/' },
       { id: 'analytics', label: 'Analytics' , path: '/analytics'},
-      { id: 'reports', label: 'Reports' },
-      { id: 'bi_reports', label: 'BI Reports' }
+      { id: 'reports', label: 'Reports' , path: '/reports'},
+      { id: 'bi_reports', label: 'BI Reports' , path: '/reports'}
     ]
   },
   {
@@ -37,7 +37,7 @@ export const GROUPS: ShellGroup[] = [
     mods: [
       { id: 'customers', label: 'Customers' , path: '/customers'},
       { id: 'crm', label: 'CRM & Leads', path: '/leads' },
-      { id: 'proposals', label: 'Proposals' },
+      { id: 'proposals', label: 'Proposals' , path: '/proposals'},
       { id: 'contacts', label: 'Contact Book' },
       { id: 'brokers', label: 'Brokers', path: '/brokers' },
       { id: 'complaints', label: 'Complaints', path: '/complaints' },
@@ -129,10 +129,10 @@ export const GROUPS: ShellGroup[] = [
     mods: [
       { id: 'tasks', label: 'Tasks' , path: '/tasks'},
       { id: 'workspace', label: 'Team Workspace' },
-      { id: 'calendar', label: 'Calendar' },
-      { id: 'announcements', label: 'Announcements' },
+      { id: 'calendar', label: 'Calendar' , path: '/calendar'},
+      { id: 'announcements', label: 'Announcements' , path: '/announcements'},
       { id: 'notifications_page', label: 'Notifications' },
-      { id: 'activity_log', label: 'Activity Log' }
+      { id: 'activity_log', label: 'Activity Log' , path: '/audit-trail'}
     ]
   },
   {
