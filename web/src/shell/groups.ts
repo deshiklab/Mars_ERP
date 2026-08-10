@@ -24,7 +24,7 @@ export const GROUPS: ShellGroup[] = [
     module: 'dashboard',
     mods: [
       { id: 'dashboard', label: 'Dashboard', path: '/' },
-      { id: 'analytics', label: 'Analytics' },
+      { id: 'analytics', label: 'Analytics' , path: '/analytics'},
       { id: 'reports', label: 'Reports' },
       { id: 'bi_reports', label: 'BI Reports' }
     ]
@@ -35,7 +35,7 @@ export const GROUPS: ShellGroup[] = [
     svg: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
     module: 'crm',
     mods: [
-      { id: 'customers', label: 'Customers' },
+      { id: 'customers', label: 'Customers' , path: '/customers'},
       { id: 'crm', label: 'CRM & Leads', path: '/leads' },
       { id: 'proposals', label: 'Proposals' },
       { id: 'contacts', label: 'Contact Book' },
@@ -127,7 +127,7 @@ export const GROUPS: ShellGroup[] = [
     svg: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
     module: 'dashboard',
     mods: [
-      { id: 'tasks', label: 'Tasks' },
+      { id: 'tasks', label: 'Tasks' , path: '/tasks'},
       { id: 'workspace', label: 'Team Workspace' },
       { id: 'calendar', label: 'Calendar' },
       { id: 'announcements', label: 'Announcements' },

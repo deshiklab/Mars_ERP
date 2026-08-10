@@ -184,6 +184,36 @@ const router = createRouter({
       component: () => import('../views/PropertiesView.vue'),
       meta: { module: 'properties', title: 'Properties & Units' }
     },
+    {
+      path: '/tasks',
+      name: 'tasks',
+      component: () => import('../views/TasksView.vue'),
+      meta: { module: 'tasks', title: 'Tasks' }
+    },
+    {
+      path: '/customers',
+      name: 'customers',
+      component: () => import('../views/CustomersView.vue'),
+      meta: { module: 'customers', title: 'Customers' }
+    },
+    {
+      path: '/transactions',
+      name: 'transactions',
+      component: () => import('../views/TransactionsView.vue'),
+      meta: { module: 'transactions', title: 'Cash Flow' }
+    },
+    {
+      path: '/suppliers',
+      name: 'suppliers',
+      component: () => import('../views/SuppliersView.vue'),
+      meta: { module: 'suppliers', title: 'Suppliers' }
+    },
+    {
+      path: '/analytics',
+      name: 'analytics',
+      component: () => import('../views/AnalyticsView.vue'),
+      meta: { module: 'analytics', title: 'Analytics' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useDataStore } from '@/stores/data'
 import { GROUPS, groupForPath, moduleForPath } from '@/shell/groups'
 import type { ShellGroup, ShellModule } from '@/shell/groups'
 import { i18n, _t, theme } from '@/i18n'
@@ -15,6 +16,7 @@ import QuickAdd from '@/components/QuickAdd.vue'
 import SidebarFlyout from '@/components/SidebarFlyout.vue'
 
 const auth = useAuthStore()
+const data = useDataStore()
 const router = useRouter()
 const route = useRoute()
 
@@ -117,11 +119,29 @@ async function signOut() {
   router.push('/login')
 }
 
+function printReport() {
+  window.print()
+}
+
 function exportCsv() {
-  const blob = new Blob([['module,rows\nleads,0'].join('\n')], { type: 'text/csv' })
+  const rows: string[][] = [['module', 'count']]
+  const sets: Record<string, unknown[]> = {
+    leads: data.leads,
+    bookings: data.bookings,
+    dues: data.dues,
+    employees: data.employees,
+    projects: data.projects,
+    inventory: data.inventory,
+    pos: data.pos,
+    invoices: data.invoices,
+    payments: data.payments
+  }
+  for (const [k, v] of Object.entries(sets)) rows.push([k, String(v.length)])
+  const csv = rows.map((r) => r.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
-  a.download = 'rem-erp-export.csv'
+  a.download = 'rem-erp-export-' + new Date().toISOString().slice(0, 10) + '.csv'
   a.click()
   URL.revokeObjectURL(a.href)
 }
@@ -183,7 +203,7 @@ function exportCsv() {
         <div class="top-actions" style="display: flex; align-items: center; gap: 2px; position: relative">
           <button class="rem-icon-btn" title="Command Palette (Ctrl+K)" @click="paletteRef?.openPalette()">⌨</button>
           <QuickAdd />
-          <button class="rem-icon-btn" title="Print Report">
+          <button class="rem-icon-btn" title="Print Report" @click="printReport">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 15px; height: 15px">
               <path d="M6 9V2h12v7" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><path d="M6 14h12v8H6z" />
             </svg>
