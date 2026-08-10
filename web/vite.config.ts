@@ -7,6 +7,9 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Hosted on the Frappe bench at /files/rem-vue/ (sites/<site>/public/files/rem-vue).
+  // BASE_URL flows into the router history + the SW scope + all asset URLs.
+  base: '/files/rem-vue/',
   plugins: [
     vue(),
     tailwindcss(),
