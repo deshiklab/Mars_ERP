@@ -1,14 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
+import BrokerDetailDrawer from '@/components/BrokerDetailDrawer.vue'
+import type { Broker } from '@/api/types'
 import StatsRow from '@/components/StatsRow.vue'
 import type { TableColumn } from '@/components/DataTable.vue'
 
+const route = useRoute()
 const data = useDataStore()
+const detailBroker = ref<Broker | null>(null)
 
-onMounted(() => {
-  data.loadBrokers()
+onMounted(() => {  data.loadBrokers()
+  .then(() => {
+    if (route.query.bk === '1' && data.brokers.length) detailBroker.value = data.brokers[0]
+  })
 })
 
 const esc = (s: string) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
@@ -116,4 +123,5 @@ const rows = computed(() => data.brokers)
       search-placeholder="Search brokers…"
     />
   </div>
+    <BrokerDetailDrawer :broker="detailBroker" @close="detailBroker = null" />
 </template>
