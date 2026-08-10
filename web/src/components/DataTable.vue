@@ -6,6 +6,7 @@
  */
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import router from '@/router'
 
 export interface TableColumn<T> {
   key: string
@@ -38,13 +39,15 @@ const props = withDefaults(
     defaultPageSize?: number
     actions?: TableAction[]
     searchPlaceholder?: string
+    statusOptions?: string[]
   }>(),
   {
     tabs: () => [],
     pageSizeOptions: () => [10, 25, 50, 100],
     defaultPageSize: 10,
     actions: () => [],
-    searchPlaceholder: 'Search…'
+    searchPlaceholder: 'Search…',
+    statusOptions: () => ['Active', 'Inactive', 'Pending', 'Approved', 'Rejected', 'Paid', 'Overdue', 'Completed', 'Cancelled', 'On Hold']
   }
 )
 
@@ -52,6 +55,8 @@ const emit = defineEmits<{
   (e: 'tab-change', tab: string): void
   (e: 'action', action: TableAction, row: any): void
   (e: 'update', payload: { row: Record<string, unknown>; field: string; value: unknown }): void
+  (e: 'link', payload: { type: string; value: string; row: Record<string, unknown> }): void
+  (e: 'status-change', payload: { row: Record<string, unknown>; field: string; from: string; to: string }): void
 }>()
 
 /* ── state ── */
@@ -84,9 +89,34 @@ const cellText = (row: any, col: TableColumn<any>): string => {
 
 const NAME_RE = /client|customer|customer_name|name|contact|assignee|owner|vendor|supplier|party|agent|broker|employee|lead|salesperson|referred_by/i
 
+const PHONE_RE = /phone|mobile|tel|contact|cell|whatsapp|hotline/i
+const EMAIL_RE = /email|mail/i
+const INVOICE_RE = /invoice|inv_no|invoice_id|bill/i
+const PROP_RE = /property|project_name|unit|plot|flat|project_id/i
+const STATUS_RE = /status|stage|bucket/i
+
 const cellHtml = (row: any, col: TableColumn<any>): string => {
   const base = col.renderHtml ? col.renderHtml(row) : cellText(row, col)
-  const isName = NAME_RE.test(col.key) && String(row[col.key] ?? '').trim().length > 0
+  const raw = String(row[col.key] ?? '').trim()
+  if (raw) {
+    if (PHONE_RE.test(col.key)) {
+      const digits = raw.replace(/[^0-9+]/g, '')
+      return `<a href="tel:${digits}" class="dt-call" onclick="event.stopPropagation()" style="color:#2f80ed;text-decoration:none;font-weight:500" title="Call ${raw}">📞 ${base}</a>`
+    }
+    if (EMAIL_RE.test(col.key)) {
+      return `<a href="mailto:${raw}" class="dt-mail" onclick="event.stopPropagation()" style="color:#2f80ed;text-decoration:none;font-weight:500" title="Email ${raw}">✉ ${base}</a>`
+    }
+    if (INVOICE_RE.test(col.key)) {
+      return `<a class="dt-inv" style="color:#2f80ed;cursor:pointer;font-weight:600" title="View invoice">🧾 ${base}</a>`
+    }
+    if (PROP_RE.test(col.key)) {
+      return `<a class="dt-prop" style="color:#2f80ed;cursor:pointer;font-weight:500" title="View property">🏢 ${base}</a>`
+    }
+    if (STATUS_RE.test(col.key)) {
+      return `<span class="dt-status" data-key="${col.key}" style="cursor:pointer" title="Change status">${base} <span style="font-size:8px;color:#888">▾</span></span>`
+    }
+  }
+  const isName = NAME_RE.test(col.key) && raw.length > 0
   if (isName) {
     return `<span class="dt-name-link" style="color:#2f80ed;cursor:pointer;font-weight:500;border-bottom:1px dashed #b8d4f7" title="Click to view details">${base}</span>` +
            `<span class="dt-edit-ic" data-field="${col.key}" title="Inline edit" style="display:inline-block;margin-left:6px;font-size:10px;color:#aaa;cursor:pointer;opacity:.55;transition:opacity .15s" onmouseover="this.style.opacity=1;this.style.color='#2f80ed'" onmouseout="this.style.opacity=.55;this.style.color='#aaa'">✎</span>`
@@ -217,10 +247,28 @@ function openRow(r: Record<string, unknown>) {
 function onRowClick(e: MouseEvent, r: Record<string, unknown>) {
   const t = e.target as HTMLElement
   if (t.closest('button')) return
+  const anchor = t.closest('a') as HTMLAnchorElement | null
+  if (anchor && anchor.hasAttribute('href')) return // native tel:/mailto: links
   const ic = t.closest('.dt-edit-ic') as HTMLElement | null
   if (ic) {
     const field = ic.getAttribute('data-field') || ''
     startEdit(r, field)
+    return
+  }
+  const inv = t.closest('.dt-inv') as HTMLElement | null
+  if (inv) {
+    openRow(r) // invoice number -> view the invoice record
+    return
+  }
+  const prop = t.closest('.dt-prop') as HTMLElement | null
+  if (prop) {
+    // 'Click to Property name will show the related property view'
+    router.push('/flats')
+    return
+  }
+  const st = t.closest('.dt-status') as HTMLElement | null
+  if (st) {
+    toggleStatusMenu(r, st.getAttribute('data-key') || '')
     return
   }
   // name-cell or any row click opens the record details (HTML PWA parity)
@@ -246,6 +294,22 @@ function commitEdit(r: Record<string, unknown>) {
 
 function cancelEdit() {
   editing.value = null
+}
+
+/* ── status dropdown ── */
+const statusMenu = ref<{ ri: number; key: string } | null>(null)
+
+function toggleStatusMenu(r: Record<string, unknown>, key: string) {
+  const ri = pagedRows.value.indexOf(r)
+  if (ri < 0) return
+  statusMenu.value = statusMenu.value && statusMenu.value.ri === ri && statusMenu.value.key === key ? null : { ri, key }
+}
+
+function setStatus(r: Record<string, unknown>, key: string, to: string) {
+  const from = String(r[key] ?? '')
+  ;(r as Record<string, unknown>)[key] = to
+  emit('status-change', { row: r, field: key, from, to })
+  statusMenu.value = null
 }
 
 defineExpose({ refresh: () => (page.value = 1) })
@@ -347,6 +411,7 @@ defineExpose({ refresh: () => (page.value = 1) })
               v-for="(c, i) in visibleColumns"
               :key="i"
               :class="{ hidden: hiddenCols.has(c.i) }"
+              style="position: relative"
             >
               <input
                 v-if="editing && editing.ri === ri && editing.field === c.col.key"
@@ -358,6 +423,19 @@ defineExpose({ refresh: () => (page.value = 1) })
                 @blur="commitEdit(r)"
               />
               <span v-else v-html="cellHtml(r, c.col)"></span>
+              <div
+                v-if="statusMenu && statusMenu.ri === ri && statusMenu.key === c.col.key"
+                style="position: absolute; top: 100%; left: 0; z-index: 1002; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.12); min-width: 130px; padding: 4px; max-height: 200px; overflow-y: auto"
+              >
+                <div
+                  v-for="opt in props.statusOptions"
+                  :key="opt"
+                  style="padding: 5px 9px; font-size: 10px; color: #333; cursor: pointer; border-radius: 5px"
+                  @mouseover="($event.currentTarget as HTMLElement).style.background = '#f0f4ff'"
+                  @mouseout="($event.currentTarget as HTMLElement).style.background = ''"
+                  @click.stop="setStatus(r, c.col.key, opt)"
+                >{{ opt }}</div>
+              </div>
             </td>
             <td v-if="actions.length" style="position: relative">
               <button class="rem-icon-btn" style="font-size: 13px" @click.stop="actionMenuRow = actionMenuRow === ri ? null : ri">⋯</button>
