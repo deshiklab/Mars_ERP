@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
 import DataTable from '@/components/DataTable.vue'
+import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
 import type { TableColumn } from '@/components/DataTable.vue'
 
@@ -67,6 +68,7 @@ function statusColor(status: string): { bg: string; fg: string } {
 }
 
 const rows = computed(() => items.value)
+const detailRec = ref<Record<string, unknown> | null>(null)
 
 const stats = computed(() => [
   { label: 'Budgets', value: String(rows.value.length), color: '#2f80ed' },
@@ -105,6 +107,9 @@ const columns = computed<TableColumn<any>[]>(() => [
     sortable: true,
     renderHtml: (x) => `<span style='font-size:10px;color:#555'>${esc(x.progress??'—')}%</span>`
   },])
+const actions = computed(() => [
+  { label: 'View Details', icon: '👁', onClick: (r: unknown) => (detailRec.value = r as Record<string, unknown>) }
+])
 </script>
 
 <template>
@@ -119,6 +124,7 @@ const columns = computed<TableColumn<any>[]>(() => [
     <p v-if="loading" style="font-size: 11px; color: #888; padding: 16px">Loading…</p>
 
     <DataTable
+      :actions="actions"
       v-else
       :columns="columns"
       :rows="rows"
@@ -126,4 +132,5 @@ const columns = computed<TableColumn<any>[]>(() => [
       search-placeholder="Search budgets…"
     />
   </div>
+    <GenericDetailDrawer :record="detailRec" :title="'Project Budgets'" @close="detailRec = null" />
 </template>

@@ -1,17 +1,24 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
+import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
 import type { TableColumn } from '@/components/DataTable.vue'
 import type { PurchaseOrder, StockItem } from '@/api/types'
 
+const route = useRoute()
 const data = useDataStore()
+const detailRec = ref<Record<string, unknown> | null>(null)
 const tab = ref('inventory')
 
 onMounted(() => {
   data.loadInventory()
   data.loadPos()
+  Promise.all([data.loadInventory(), data.loadPos()]).then(() => {
+    if (route.query.d === '1' && data.inventory.length) detailRec.value = data.inventory[0] as unknown as Record<string, unknown>
+  })
 })
 
 function statusStyle(status: string): { bg: string; fg: string } {
@@ -103,6 +110,9 @@ const invStats = computed(() => [
   { label: 'Low / Out', value: String(data.inventory.filter((i) => i.status !== 'Adequate').length), color: '#e65100' },
   { label: 'Purchase Orders', value: String(data.pos.length), color: '#1565c0' }
 ])
+const actions = computed(() => [
+  { label: 'View Details', icon: '👁', onClick: (r: unknown) => (detailRec.value = r as Record<string, unknown>) }
+])
 </script>
 
 <template>
@@ -118,6 +128,7 @@ const invStats = computed(() => [
 
     <div v-if="tab === 'inventory'">
       <DataTable
+      :actions="actions"
         :columns="invCols"
         :rows="data.inventory"
         :tabs="[{ id: 'all', label: 'All', count: data.inventory.length }]"
@@ -139,4 +150,5 @@ const invStats = computed(() => [
       <button class="action-btn" :style="{ border: 'none', borderRadius: 0, borderLeft: '1px solid #e0e0e0', background: tab === 'pos' ? '#f0f4ff' : '#fff', color: '#2f80ed' }" @click="tab = 'pos'">📄 Purchase Orders</button>
     </div>
   </div>
+    <GenericDetailDrawer :record="detailRec" :title="'Stock & Procurement'" @close="detailRec = null" />
 </template>

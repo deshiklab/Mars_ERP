@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
+import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
 import type { TableColumn } from '@/components/DataTable.vue'
 import type { Contractor } from '@/api/types'
 
 const data = useDataStore()
+const detailRec = ref<Record<string, unknown> | null>(null)
 
 onMounted(() => {
   data.loadContractors()
@@ -54,6 +56,9 @@ const stats = computed(() => [
   { label: 'Active', value: String(data.contractors.filter((c) => (c.status || '').toLowerCase() === 'active').length), color: '#2e7d32' },
   { label: 'On Hold', value: String(data.contractors.filter((c) => (c.status || '').toLowerCase() === 'on hold').length), color: '#e65100' }
 ])
+const actions = computed(() => [
+  { label: 'View Details', icon: '👁', onClick: (r: unknown) => (detailRec.value = r as Record<string, unknown>) }
+])
 </script>
 
 <template>
@@ -69,6 +74,7 @@ const stats = computed(() => [
     <p v-if="data.contractorsLoading" style="font-size: 11px; color: #888; padding: 16px">Loading contractors…</p>
 
     <DataTable
+      :actions="actions"
       v-else
       :columns="columns"
       :rows="data.contractors"
@@ -76,4 +82,5 @@ const stats = computed(() => [
       search-placeholder="Search contractors…"
     />
   </div>
+    <GenericDetailDrawer :record="detailRec" :title="'Contractors'" @close="detailRec = null" />
 </template>

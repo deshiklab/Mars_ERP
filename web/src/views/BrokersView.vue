@@ -103,6 +103,10 @@ const columns = computed<TableColumn<any>[]>(() => [
   },])
 
 const rows = computed(() => data.brokers)
+
+const actions = computed(() => [
+  { label: 'View Profile', icon: '🤝', onClick: (r: unknown) => (detailBroker.value = r as Broker) }
+])
 </script>
 
 <template>
@@ -117,6 +121,7 @@ const rows = computed(() => data.brokers)
     <p v-if="data.error" style="font-size: 11px; color: #c62828; margin: 6px 0">{{ data.error }}</p>
 
     <DataTable
+      :actions="actions"
       :columns="columns"
       :rows="rows"
       :tabs="[{ id: 'all', label: 'All', count: rows.length }]"

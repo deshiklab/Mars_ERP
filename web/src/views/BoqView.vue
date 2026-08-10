@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
+import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
 import type { TableColumn } from '@/components/DataTable.vue'
 
 const data = useDataStore()
+const detailRec = ref<Record<string, unknown> | null>(null)
 
 onMounted(() => {
   data.loadBoq()
@@ -74,6 +76,9 @@ const columns = computed<TableColumn<any>[]>(() => [
   },])
 
 const rows = computed(() => data.boq)
+const actions = computed(() => [
+  { label: 'View Details', icon: '👁', onClick: (r: unknown) => (detailRec.value = r as Record<string, unknown>) }
+])
 </script>
 
 <template>
@@ -88,10 +93,12 @@ const rows = computed(() => data.boq)
     <p v-if="data.error" style="font-size: 11px; color: #c62828; margin: 6px 0">{{ data.error }}</p>
 
     <DataTable
+      :actions="actions"
       :columns="columns"
       :rows="rows"
       :tabs="[{ id: 'all', label: 'All', count: rows.length }]"
       search-placeholder="Search BOQ items…"
     />
   </div>
+    <GenericDetailDrawer :record="detailRec" :title="'BOQ & Cost Control'" @close="detailRec = null" />
 </template>

@@ -84,6 +84,7 @@ const dueCols = computed<TableColumn<any>[]>(() => [
   { key: 'dueDate', label: 'Due Date', renderHtml: (x) => `<span style="font-size:10px;color:#555">${esc(x.dueDate || '—')}</span>` },
   { key: 'daysOverdue', label: 'Overdue', sortable: true, renderHtml: (x) => `<span style="font-size:10px;color:${x.daysOverdue > 0 ? '#c62828' : '#2e7d32'}">${x.daysOverdue > 0 ? x.daysOverdue + 'd' : '—'}</span>` }
 ])
+
 </script>
 
 <template>

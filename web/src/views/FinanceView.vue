@@ -120,6 +120,10 @@ const finStats = computed(() => [
   { label: 'Collected', value: bdt(data.payments.reduce((s, p) => s + (p.amount ?? 0), 0)), color: '#2e7d32' },
   { label: 'Accounts', value: String(data.coa.length), color: '#1565c0' }
 ])
+
+const invActions = computed(() => [
+  { label: 'View Items', icon: '🧾', onClick: (r: unknown) => (detailInv.value = r as Invoice) }
+])
 </script>
 
 <template>
@@ -140,7 +144,7 @@ const finStats = computed(() => [
       <button class="action-btn" :style="{ border: 'none', borderRadius: 0, borderLeft: '1px solid #e0e0e0', background: tab === 'coa' ? '#f0f4ff' : '#fff', color: '#2f80ed' }" @click="tab = 'coa'">📒 Chart of Accounts</button>
     </div>
 
-    <DataTable v-if="tab === 'invoices'" :columns="invCols" :rows="data.invoices" search-placeholder="Search invoices, clients…" />
+    <DataTable v-if="tab === 'invoices'" :columns="invCols" :rows="data.invoices" :actions="invActions" search-placeholder="Search invoices, clients…" />
     <DataTable v-else-if="tab === 'payments'" :columns="payCols" :rows="data.payments" search-placeholder="Search payments, references…" />
     <DataTable v-else :columns="coaCols" :rows="data.coa" search-placeholder="Search accounts…" />
   </div>
