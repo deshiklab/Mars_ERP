@@ -172,6 +172,18 @@ const router = createRouter({
       component: () => import('../views/ComplaintsView.vue'),
       meta: { module: 'complaints', title: 'Complaints & Issues' }
     },
+    {
+      path: '/settings',
+      name: 'settings',
+      component: () => import('../views/SettingsView.vue'),
+      meta: { module: 'settings', title: 'System Settings' }
+    },
+    {
+      path: '/properties',
+      name: 'properties',
+      component: () => import('../views/PropertiesView.vue'),
+      meta: { module: 'properties', title: 'Properties & Units' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })

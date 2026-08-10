@@ -51,7 +51,7 @@ export const GROUPS: ShellGroup[] = [
     module: 'projects',
     mods: [
       { id: 'land_mgmt', label: 'Project Acquisition' },
-      { id: 'properties_units', label: 'Flats & Units' },
+      { id: 'properties_units', label: 'Flats & Units' , path: '/properties'},
       { id: 'plots', label: 'Plots & Blocks' , path: '/plots'},
       { id: 'layout_builder', label: 'Layout & Unit Builder' },
       { id: 'projects', label: 'Projects', path: '/projects' }
@@ -142,7 +142,7 @@ export const GROUPS: ShellGroup[] = [
     module: 'dashboard',
     mods: [
       { id: 'permissions', label: 'Permissions' },
-      { id: 'settings', label: 'Settings' },
+      { id: 'settings', label: 'Settings' , path: '/settings'},
       { id: 'license', label: 'License & SLA' },
       { id: 'system_docs', label: 'System Manual' },
       { id: 'backup_restore', label: 'Backup & Restore' },
