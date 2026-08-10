@@ -7,6 +7,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import router from '@/router'
+import { showToast } from '@/toast'
 
 export interface TableColumn<T> {
   key: string
@@ -94,11 +95,15 @@ const EMAIL_RE = /email|mail/i
 const INVOICE_RE = /invoice|inv_no|invoice_id|bill/i
 const PROP_RE = /property|project_name|unit|plot|flat|project_id/i
 const STATUS_RE = /status|stage|bucket/i
+const MONEY_RE = /amount|price|value|total|paid|due|balance|advance|rate|cost|revenue|commission|budget|salary|fee/i
 
 const cellHtml = (row: any, col: TableColumn<any>): string => {
   const base = col.renderHtml ? col.renderHtml(row) : cellText(row, col)
   const raw = String(row[col.key] ?? '').trim()
   if (raw) {
+    if (MONEY_RE.test(col.key)) {
+      return `<span class="dt-money" title="Click to copy" style="cursor: pointer">${base}</span>`
+    }
     if (PHONE_RE.test(col.key)) {
       const digits = raw.replace(/[^0-9+]/g, '')
       return `<a href="tel:${digits}" class="dt-call" onclick="event.stopPropagation()" style="color:#2f80ed;text-decoration:none;font-weight:500" title="Call ${raw}">📞 ${base}</a>`
@@ -239,6 +244,35 @@ const editing = ref<{ ri: number; field: string } | null>(null)
 const editVal = ref('')
 const editInput = ref<HTMLInputElement | null>(null)
 
+function copyText(text: string) {
+  const done = (ok: boolean) => {
+    if (ok) showToast('Copied: ' + text.slice(0, 40), 'success')
+  }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => done(true)).catch(() => done(legacyCopy(text)))
+    } else {
+      done(legacyCopy(text))
+    }
+  } catch {
+    done(legacyCopy(text))
+  }
+}
+function legacyCopy(text: string): boolean {
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
+  }
+}
 function openRow(r: Record<string, unknown>) {
   const act = props.actions.find((a) => typeof a.onClick === 'function')
   if (act) act.onClick(r)
@@ -247,6 +281,11 @@ function openRow(r: Record<string, unknown>) {
 function onRowClick(e: MouseEvent, r: Record<string, unknown>) {
   const t = e.target as HTMLElement
   if (t.closest('button')) return
+  const mny = t.closest('.dt-money') as HTMLElement | null
+  if (mny) {
+    copyText((mny.textContent || '').trim())
+    return
+  }
   const anchor = t.closest('a') as HTMLAnchorElement | null
   if (anchor && anchor.hasAttribute('href')) return // native tel:/mailto: links
   const ic = t.closest('.dt-edit-ic') as HTMLElement | null

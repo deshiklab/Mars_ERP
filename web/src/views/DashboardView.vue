@@ -56,7 +56,8 @@ const myTasks = computed(() =>
     .map((l) => ({
       title: `Follow up: ${l.name}`,
       status: l.status,
-      priority: l.priority
+      priority: l.priority,
+      lead: l
     }))
 )
 
@@ -144,7 +145,8 @@ function printReport() {
         <div
           v-for="t in myTasks"
           :key="t.title"
-          style="display: flex; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px solid #f5f5f5; font-size: 11px"
+          style="display: flex; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px solid #f5f5f5; font-size: 11px; cursor: pointer"
+          @click="detailLead = t.lead"
         >
           <span style="width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0" :style="{ background: t.priority === 'High' ? '#e53935' : t.priority === 'Medium' ? '#ff9800' : '#999' }"></span>
           <span style="flex: 1; color: #333">{{ t.title }}</span>
