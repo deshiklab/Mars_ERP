@@ -9,6 +9,30 @@ import type { TableColumn } from '@/components/DataTable.vue'
 const data = useDataStore()
 const detailRec = ref<Record<string, unknown> | null>(null)
 const detailList = ref<Record<string, unknown>[]>([])
+const tab = ref('dashboard')
+
+const hnd = computed(() => data.handover)
+const hndStats = computed(() => {
+  const t = hnd.value.length
+  const done = hnd.value.filter((h) => h.status === 'Completed').length
+  const sched = hnd.value.filter((h) => h.status === 'Handover Scheduled').length
+  const insp = hnd.value.filter((h) => h.status === 'Inspection Pending').length
+  const ong = hnd.value.filter((h) => h.status === 'Construction Ongoing').length
+  const snags = hnd.value.reduce((s, h) => s + (Number((h as { snags?: unknown }).snags) || 0), 0)
+  const totalValue = hnd.value.reduce((s, h) => s + (Number(h.totalValue) || 0), 0)
+  const paid = hnd.value.reduce((s, h) => s + (Number(h.paidAmount) || 0), 0)
+  const pct = (n: number) => (t ? Math.round((n / t) * 100) : 0)
+  return {
+    t, done, sched, insp, ong, snags, totalValue, paid,
+    outstanding: totalValue - paid,
+    bars: [
+      { label: 'Completed', n: done, color: '#2e7d32' },
+      { label: 'Handover Scheduled', n: sched, color: '#ff8f00' },
+      { label: 'Inspection Pending', n: insp, color: '#c62828' },
+      { label: 'Construction Ongoing', n: ong, color: '#1565c0' }
+    ].map((b) => ({ ...b, pct: pct(b.n) }))
+  }
+})
 
 onMounted(() => {
   data.loadHandover()
@@ -102,19 +126,73 @@ const actions = computed(() => [
     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px">
       <span class="page-title">Handover & Post-Sales</span>
       <span class="page-subtitle">{{ data.handover.length }} records</span>
+    <div class="tabs" style="margin: 6px 0">
+      <div class="tab" :class="{ active: tab === 'dashboard' }" @click="tab = 'dashboard'">📊 Dashboard</div>
+      <div class="tab" :class="{ active: tab === 'pipeline' }" @click="tab = 'pipeline'">🏭 Handover Pipeline</div>
     </div>
 
-    <StatsRow :stats="stats" />
+    </div>
 
     <p v-if="data.error" style="font-size: 11px; color: #c62828; margin: 6px 0">{{ data.error }}</p>
 
-    <DataTable
+    
+    <template v-if="tab === 'dashboard'">
+      <StatsRow :stats="[
+        { label: 'Total Units', value: String(hndStats.t), color: '#1565c0' },
+        { label: 'Completed', value: String(hndStats.done), color: '#2e7d32' },
+        { label: 'Scheduled', value: String(hndStats.sched), color: hndStats.sched ? '#ff8f00' : '#999' },
+        { label: 'Inspection', value: String(hndStats.insp), color: hndStats.insp ? '#c62828' : '#999' },
+        { label: 'Open Snags', value: String(hndStats.snags), color: hndStats.snags ? '#c62828' : '#999' },
+        { label: 'Portfolio', value: bdt(hndStats.totalValue), color: '#7b1fa2' }
+      ]" />
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px">
+        <div class="card">
+          <div class="card-header"><h3>Pipeline Status Breakdown</h3></div>
+          <div class="card-body" style="padding: 8px">
+            <div v-for="b in hndStats.bars" :key="b.label" style="display: flex; align-items: center; gap: 6px; padding: 3px 0">
+              <div style="font-size: 9px; width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ b.label }}</div>
+              <div style="flex: 1; height: 8px; background: #e8e8e8; border-radius: 4px; overflow: hidden">
+                <div :style="{ height: '100%', width: b.pct + '%', background: b.color, borderRadius: '4px' }"></div>
+              </div>
+              <div style="font-size: 9px; font-weight: 600; width: 30px; text-align: right">{{ b.n }}</div>
+            </div>
+            <div v-if="hndStats.t === 0" style="text-align: center; color: #999; font-size: 10px; padding: 10px">No handover records yet</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Financial Summary</h3></div>
+          <div class="card-body" style="padding: 10px; text-align: center">
+            <div style="display: flex; justify-content: center; gap: 16px; margin-bottom: 8px">
+              <div style="text-align: center">
+                <div style="font-size: 18px; font-weight: 700; color: #2e7d32">{{ bdt(hndStats.totalValue) }}</div>
+                <div style="font-size: 8px; color: #888">Total Value</div>
+              </div>
+              <div style="text-align: center">
+                <div style="font-size: 18px; font-weight: 700; color: #1565c0">{{ bdt(hndStats.paid) }}</div>
+                <div style="font-size: 8px; color: #888">Collected</div>
+              </div>
+              <div style="text-align: center">
+                <div style="font-size: 18px; font-weight: 700; color: #e65100">{{ bdt(hndStats.outstanding) }}</div>
+                <div style="font-size: 8px; color: #888">Outstanding</div>
+              </div>
+            </div>
+            <div style="height: 8px; background: #e8e8e8; border-radius: 4px; overflow: hidden; margin: 0 20px">
+              <div :style="{ height: '100%', width: (hndStats.totalValue ? Math.round((hndStats.paid / hndStats.totalValue) * 100) : 0) + '%', background: '#2f80ed' }"></div>
+            </div>
+            <div style="font-size: 8px; color: #888; margin-top: 4px">Collection rate: {{ hndStats.totalValue ? Math.round((hndStats.paid / hndStats.totalValue) * 100) : 0 }}%</div>
+          </div>
+        </div>
+      </div>
+    </template>
+    <template v-if="tab === 'pipeline'">
+<DataTable
       :actions="actions"
       :columns="columns"
       :rows="rows"
       :tabs="[{ id: 'all', label: 'All', count: rows.length }]"
       search-placeholder="Search handovers…"
     />
+    </template>
   </div>
     <GenericDetailDrawer :record="detailRec" :title="'Handover & Post-Sales'" @close="detailRec = null" :records="detailList" />
 </template>
