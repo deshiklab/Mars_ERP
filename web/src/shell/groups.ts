@@ -141,12 +141,12 @@ export const GROUPS: ShellGroup[] = [
     svg: '<circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2"/>',
     module: 'dashboard',
     mods: [
-      { id: 'permissions', label: 'Permissions' },
+      { id: 'permissions', label: 'Permissions' , path: '/permissions'},
       { id: 'settings', label: 'Settings' , path: '/settings'},
-      { id: 'license', label: 'License & SLA' },
+      { id: 'license', label: 'License & SLA' , path: '/license'},
       { id: 'system_docs', label: 'System Manual' , path: '/system-docs'},
       { id: 'backup_restore', label: 'Backup & Restore' },
-      { id: 'csv_import', label: 'CSV Import' }
+      { id: 'csv_import', label: 'CSV Import' , path: '/csv-import'}
     ]
   },
   {

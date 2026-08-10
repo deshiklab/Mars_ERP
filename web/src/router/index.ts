@@ -532,6 +532,24 @@ const router = createRouter({
       component: () => import('../views/SalesConfigView.vue'),
       meta: { module: 'sales-config', title: 'Sales Config' }
     },
+    {
+      path: '/license',
+      name: 'license',
+      component: () => import('../views/LicenseView.vue'),
+      meta: { module: 'license', title: 'License & SLA' }
+    },
+    {
+      path: '/permissions',
+      name: 'permissions',
+      component: () => import('../views/PermissionsView.vue'),
+      meta: { module: 'permissions', title: 'Permissions' }
+    },
+    {
+      path: '/csv-import',
+      name: 'csvimport',
+      component: () => import('../views/CsvImportView.vue'),
+      meta: { module: 'csv-import', title: 'CSV Import' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })
