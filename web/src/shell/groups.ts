@@ -88,12 +88,12 @@ export const GROUPS: ShellGroup[] = [
     module: 'dues',
     mods: [
       { id: 'finance', label: 'Finance', path: '/finance' },
-      { id: 'party_ledger', label: 'Party Ledger' },
+      { id: 'party_ledger', label: 'Party Ledger' , path: '/party-ledger'},
       { id: 'payment_heatmap', label: 'Payment Heatmap' },
       { id: 'approvals', label: 'Financial Approvals' , path: '/approvals'},
-      { id: 'boq', label: 'BOQ & Cost Control' },
+      { id: 'boq', label: 'BOQ & Cost Control' , path: '/boq'},
       { id: 'investment_loans', label: 'Investment & Loans' },
-      { id: 'fixed_assets', label: 'Fixed Assets' }
+      { id: 'fixed_assets', label: 'Fixed Assets' , path: '/fixed-assets'}
     ]
   },
   {

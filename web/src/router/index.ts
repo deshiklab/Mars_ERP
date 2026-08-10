@@ -112,6 +112,54 @@ const router = createRouter({
       component: () => import('../views/VariationOrdersView.vue'),
       meta: { module: 'variations', title: 'Variation Orders' }
     },
+    {
+      path: '/attendance',
+      name: 'attendance',
+      component: () => import('../views/AttendanceView.vue'),
+      meta: { module: 'attendance', title: 'Attendance & Leave' }
+    },
+    {
+      path: '/leave',
+      name: 'leave',
+      component: () => import('../views/LeaveView.vue'),
+      meta: { module: 'leave', title: 'Leave Requests' }
+    },
+    {
+      path: '/party-ledger',
+      name: 'partyledger',
+      component: () => import('../views/PartyLedgerView.vue'),
+      meta: { module: 'party-ledger', title: 'Party Ledger' }
+    },
+    {
+      path: '/boq',
+      name: 'boq',
+      component: () => import('../views/BoqView.vue'),
+      meta: { module: 'boq', title: 'BOQ & Cost Control' }
+    },
+    {
+      path: '/investments',
+      name: 'investments',
+      component: () => import('../views/InvestmentsView.vue'),
+      meta: { module: 'investments', title: 'Investment & Loans' }
+    },
+    {
+      path: '/loans',
+      name: 'loans',
+      component: () => import('../views/LoansView.vue'),
+      meta: { module: 'loans', title: 'Loans' }
+    },
+    {
+      path: '/fixed-assets',
+      name: 'fixedassets',
+      component: () => import('../views/FixedAssetsView.vue'),
+      meta: { module: 'fixed-assets', title: 'Fixed Assets' }
+    },
+    {
+      path: '/receipts',
+      name: 'receipts',
+      component: () => import('../views/ReceiptsView.vue'),
+      meta: { module: 'receipts', title: 'Goods Receipts' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })

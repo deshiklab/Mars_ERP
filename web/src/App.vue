@@ -9,6 +9,7 @@ import NotificationsPanel from '@/components/NotificationsPanel.vue'
 import RecentTray from '@/components/RecentTray.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
+import ProfilePanel from '@/components/ProfilePanel.vue'
 import GlobalSearch from '@/components/GlobalSearch.vue'
 import QuickAdd from '@/components/QuickAdd.vue'
 import SidebarFlyout from '@/components/SidebarFlyout.vue'
@@ -19,6 +20,7 @@ const route = useRoute()
 
 theme.init()
 const paletteRef = ref<InstanceType<typeof CommandPalette> | null>(null)
+const profileOpen = ref(false)
 const notifOpen = ref(false)
 const recentOpen = ref(false)
 const activeGroupId = ref('executive')
@@ -206,7 +208,7 @@ function exportCsv() {
             </svg>
           </button>
           <button class="rem-icon-btn" title="Fullscreen" @click="toggleFullScreen">⛶</button>
-          <div class="rem-user-chip" style="margin-left: 4px" title="User Profile" @click="router.push('/login')">
+          <div class="rem-user-chip" style="margin-left: 4px" title="User Profile" @click="profileOpen = true">
             <span class="chip-avatar">{{ initials(auth.fullName || auth.user) }}</span>
           </div>
         </div>
@@ -253,13 +255,14 @@ function exportCsv() {
             id="footerRoleBtn"
             style="cursor: pointer; font-size: 10px; font-weight: 600; color: #2f80ed; padding: 1px 6px; border: 1px solid #d0d8e8; border-radius: 4px"
             title="User Profile"
-            @click="router.push('/login')"
+            @click="profileOpen = true"
           >{{ initials(auth.fullName || auth.user) }}</span>
           <button class="action-btn" style="padding: 1px 8px; font-size: 9px" @click="signOut">{{ _t('Sign Out') }}</button>
         </div>
       </div>
     </div>
       <ToastContainer />
+    <ProfilePanel :open="profileOpen" @close="profileOpen = false" />
     <!-- Command palette -->
     <CommandPalette ref="paletteRef" />
     <!-- Notifications + Recent panels -->

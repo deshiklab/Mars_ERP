@@ -399,7 +399,7 @@ export const useDataStore = defineStore('data', {
       } else this.error = apiErrorText(r)
       this.attendanceLoading = false
     },
-    async loadParty(): Promise<void> {
+    async loadPartyLedger(): Promise<void> {
       this.partyLedgerLoading = true
       const r = await api.party_ledgerPipeline()
       if (r.ok && r.data) {
@@ -435,7 +435,7 @@ export const useDataStore = defineStore('data', {
       } else this.error = apiErrorText(r)
       this.loansLoading = false
     },
-    async loadFixed(): Promise<void> {
+    async loadFixedAssets(): Promise<void> {
       this.fixedAssetsLoading = true
       const r = await api.fixed_assetsPipeline()
       if (r.ok && r.data) {
