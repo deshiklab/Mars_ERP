@@ -1,13 +1,20 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import { useAuthStore } from '@/stores/auth'
 import { _t } from '@/i18n'
+import BookingDetailDrawer from '@/components/BookingDetailDrawer.vue'
+import LeadDetailDrawer from '@/components/LeadDetailDrawer.vue'
+import DueDetailDrawer from '@/components/DueDetailDrawer.vue'
+import type { Booking, Lead, Due } from '@/api/types'
 
 const data = useDataStore()
 const auth = useAuthStore()
 const router = useRouter()
+const detailBooking = ref<Booking | null>(null)
+const detailLead = ref<Lead | null>(null)
+const detailDue = ref<Due | null>(null)
 
 onMounted(() => {
   data.loadDashboard()
@@ -158,9 +165,9 @@ function printReport() {
                 <tr><th>ID</th><th>Client</th><th>Property</th><th>Status</th></tr>
               </thead>
               <tbody>
-                <tr v-for="b in recentBookings" :key="b.id" style="cursor: pointer" @click="router.push('/bookings')">
-                  <td style="font-weight: 500">{{ b.id }}</td>
-                  <td>{{ b.client }}</td>
+                <tr v-for="b in recentBookings" :key="b.id" style="cursor: pointer" @click="detailBooking = b">
+                  <td style="font-weight: 500; color: #2f80ed">{{ b.id }}</td>
+                  <td style="color: #2f80ed">{{ b.client }}</td>
                   <td>{{ b.property }}</td>
                   <td>
                     <span class="pill" :style="{ background: statusColor(b.status) + '22', color: statusColor(b.status) }">{{ b.status }}</span>
@@ -185,8 +192,8 @@ function printReport() {
                 <tr><th>Name</th><th>Score</th><th>Status</th></tr>
               </thead>
               <tbody>
-                <tr v-for="l in hotLeads" :key="l.id" style="cursor: pointer" @click="router.push('/leads')">
-                  <td style="font-weight: 500">{{ l.name }}</td>
+                <tr v-for="l in hotLeads" :key="l.id" style="cursor: pointer" @click="detailLead = l">
+                  <td style="font-weight: 500; color: #2f80ed">{{ l.name }}</td>
                   <td>
                     <span class="pill" style="background: #eef3ff; color: #2f80ed">{{ l.score }}</span>
                   </td>
@@ -214,7 +221,8 @@ function printReport() {
         <div
           v-for="d in duesReminders"
           :key="d.id"
-          style="display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid #f5f5f5; font-size: 11px"
+          style="display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid #f5f5f5; font-size: 11px; cursor: pointer"
+          @click="detailDue = d"
         >
           <span style="font-size: 12px">{{ d.daysOverdue >= 60 ? '🔴' : d.daysOverdue >= 30 ? '🟠' : '🟡' }}</span>
           <span style="flex: 1; color: #333">{{ d.customer }} — {{ d.project }}</span>
@@ -236,4 +244,7 @@ function printReport() {
       </div>
     </div>
   </div>
+    <BookingDetailDrawer :booking="detailBooking" @close="detailBooking = null" />
+    <LeadDetailDrawer :lead="detailLead" @close="detailLead = null" />
+    <DueDetailDrawer :due="detailDue" @close="detailDue = null" />
 </template>
