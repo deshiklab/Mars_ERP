@@ -388,6 +388,54 @@ const router = createRouter({
       component: () => import('../views/BudgetsView.vue'),
       meta: { module: 'budgets', title: 'Project Budgets' }
     },
+    {
+      path: '/timesheets',
+      name: 'timesheets',
+      component: () => import('../views/TimesheetsView.vue'),
+      meta: { module: 'timesheets', title: 'Timesheets' }
+    },
+    {
+      path: '/contractor-payments',
+      name: 'contractorpayments',
+      component: () => import('../views/ContractorPaymentsView.vue'),
+      meta: { module: 'contractor-payments', title: 'Contractor Payments' }
+    },
+    {
+      path: '/qc-checklist',
+      name: 'qcchecklist',
+      component: () => import('../views/QcChecklistView.vue'),
+      meta: { module: 'qc-checklist', title: 'QC Checklist' }
+    },
+    {
+      path: '/sales-agents',
+      name: 'salesagents',
+      component: () => import('../views/SalesAgentsView.vue'),
+      meta: { module: 'sales-agents', title: 'Sales Agents' }
+    },
+    {
+      path: '/investors',
+      name: 'investors',
+      component: () => import('../views/InvestorsView.vue'),
+      meta: { module: 'investors', title: 'Investors' }
+    },
+    {
+      path: '/journals',
+      name: 'journals',
+      component: () => import('../views/JournalsView.vue'),
+      meta: { module: 'journals', title: 'Journal Entries' }
+    },
+    {
+      path: '/support-tickets',
+      name: 'supporttickets',
+      component: () => import('../views/SupportTicketsView.vue'),
+      meta: { module: 'support-tickets', title: 'Support Tickets' }
+    },
+    {
+      path: '/customer-docs',
+      name: 'customerdocs',
+      component: () => import('../views/CustomerDocsView.vue'),
+      meta: { module: 'customer-docs', title: 'Customer Documents' }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })
