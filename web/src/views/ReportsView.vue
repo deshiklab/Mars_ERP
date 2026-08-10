@@ -6,6 +6,8 @@ import StatsRow from '@/components/StatsRow.vue'
 import type { TableColumn } from '@/components/DataTable.vue'
 
 const items = ref<any[]>([])
+const payments = ref<any[]>([])
+const invoices = ref<any[]>([])
 const loading = ref(true)
 
 onMounted(async () => {
@@ -13,9 +15,42 @@ onMounted(async () => {
   if (r.ok && r.data) {
     const arr = r.data.collections['bi_reports']
     items.value = Array.isArray(arr) ? arr : []
+    payments.value = (r.data.collections.payments as any[]) ?? []
+    invoices.value = (r.data.collections.invoices as any[]) ?? []
   }
   loading.value = false
 })
+
+/** Monthly collections: group cleared/paid payments by YYYY-MM. */
+const monthly = computed(() => {
+  const map: Record<string, { month: string; amt: number; count: number }> = {}
+  payments.value.forEach((p) => {
+    if (!p?.date) return
+    const m = String(p.date).slice(0, 7)
+    if (!/^\d{4}-\d{2}$/.test(m)) return
+    map[m] = map[m] || { month: m, amt: 0, count: 0 }
+    if (p.status === 'Cleared' || p.status === 'Paid') {
+      map[m].amt += Number(p.amount) || 0
+      map[m].count++
+    }
+  })
+  const total = payments.value.reduce((s, p) => s + (Number(p.amount) || 0), 0)
+  return { rows: Object.values(map).sort((a, b) => a.month.localeCompare(b.month)), total }
+})
+
+const chartStats = computed(() => [
+  { label: '📄 Reports', value: String(items.value.length), color: '#2f80ed' },
+  { label: '💳 Collections', value: bdt(monthly.value.total), color: '#2e7d32' },
+  { label: '📅 Months', value: String(monthly.value.rows.length), color: '#1565c0' },
+  { label: '🧾 Invoices', value: String(invoices.value.length), color: '#e65100' }
+])
+
+const maxMonth = computed(() => Math.max(...monthly.value.rows.map((r) => r.amt), 1))
+const monthLabel = (m: string) => {
+  const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const [y, mo] = m.split('-')
+  return names[parseInt(mo, 10) - 1] + ' ' + y.slice(2)
+}
 
 const esc = (s: string) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
 const bdt = (n: number) => (n >= 10000000 ? `৳ ${(n / 10000000).toFixed(2)} Cr` : n >= 100000 ? `৳ ${(n / 100000).toFixed(1)} Lac` : `৳ ${n.toLocaleString()}`)
@@ -77,7 +112,11 @@ const columns = computed<TableColumn<any>[]>(() => [
     key: 'chart',
     label: 'Chart',
     sortable: false,
-    renderHtml: (x) => `<span style='font-size:10px;color:#555'>${esc(x.chart||'—')}</span>`
+    renderHtml: (x) => {
+      const c = x.chart
+      const name = typeof c === 'string' ? c : c && typeof c === 'object' ? (c.name || c.type || 'Chart') : '—'
+      return `<span style='font-size:10px;color:#555'>${esc(name)}</span>`
+    }
   },
   {
     key: 'period',
@@ -106,7 +145,25 @@ const columns = computed<TableColumn<any>[]>(() => [
       <span class="page-subtitle">{{ rows.length }} records</span>
     </div>
 
-    <StatsRow :stats="stats" />
+    <StatsRow :stats="chartStats" />
+
+      <!-- monthly collection chart -->
+      <div class="card" style="margin-bottom: 10px">
+        <div class="card-header"><h3>💳 Monthly Collections</h3></div>
+        <div class="card-body" style="padding: 12px">
+          <div v-if="monthly.rows.length" style="display: flex; align-items: flex-end; gap: 14px; min-height: 130px; padding: 6px 2px 0; overflow-x: auto">
+            <div v-for="r in monthly.rows" :key="r.month" style="display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0">
+              <span style="font-size: 9px; font-weight: 700; color: #2e7d32">{{ bdt(r.amt) }}</span>
+              <div :style="{ height: Math.max(6, (r.amt / maxMonth) * 90) + 'px', width: 42, background: 'linear-gradient(180deg, #2f80ed, #56ccf2)', borderRadius: '5px 5px 0 0' }" :title="r.month + ' · ' + bdt(r.amt)"></div>
+              <span style="font-size: 8px; color: #888">{{ monthLabel(r.month) }}</span>
+              <span style="font-size: 8px; color: #999">{{ r.count }} txns</span>
+            </div>
+          </div>
+          <div v-else style="text-align: center; padding: 20px; color: #999; font-size: 11px">No collection data for the chart.</div>
+        </div>
+      </div>
+
+      <StatsRow :stats="stats" />
 
     <p v-if="loading" style="font-size: 11px; color: #888; padding: 16px">Loading…</p>
 
