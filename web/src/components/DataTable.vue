@@ -188,6 +188,9 @@ function printTable() {
 /* ── row actions ── */
 function rowAction(action: TableAction, row: Record<string, unknown>) {
   actionMenuRow.value = null
+  // Views define actions with onClick (e.g. open a detail drawer) — the
+  // menu must EXECUTE it, not just emit (the emit was never consumed).
+  if (typeof action.onClick === 'function') action.onClick(row)
   emit('action', action, row)
 }
 
