@@ -194,6 +194,29 @@ function exportCSV(name: string, rows: Record<string, unknown>[]) {
           </div>
         </div>
       </div>
+      <div class="card" style="margin-top: 8px">
+        <div class="card-header"><h3>📋 BI Reports</h3></div>
+        <div class="card-body" style="padding: 0">
+          <div class="table-wrap">
+            <table class="rem-table">
+              <thead>
+                <tr><th>Report</th><th>Type</th><th>Category</th><th>Period</th><th>Status</th><th>Updated</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="it in items" :key="it.id">
+                  <td style="font-weight: 500">{{ it.name }}<div style="font-size: 9px; color: #888; font-weight: 400">{{ esc(it.desc || '') }}</div></td>
+                  <td>{{ it.type }}</td>
+                  <td><span class="pill" :style="{ background: (it.category === 'Finance' ? '#e8f5e9' : it.category === 'Sales' ? '#e3f2fd' : '#f3e5f5') + '55', color: it.category === 'Finance' ? '#2e7d32' : it.category === 'Sales' ? '#1565c0' : '#7b1fa2' }">{{ it.category }}</span></td>
+                  <td>{{ it.period }}</td>
+                  <td><span class="pill" :style="{ background: (it.status === 'Active' ? '#e8f5e9' : '#fff8e1') + '55', color: it.status === 'Active' ? '#2e7d32' : '#ff8f00' }">{{ it.status }}</span></td>
+                  <td>{{ esc(it.updated || '') }}</td>
+                </tr>
+                <tr v-if="!items.length"><td colspan="6" style="text-align: center; color: #999; padding: 20px">No BI reports</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </template>
 
     <!-- ═══ 2. PAYMENT COLLECTION ═══ -->
