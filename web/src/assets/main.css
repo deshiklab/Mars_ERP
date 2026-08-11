@@ -797,9 +797,11 @@ html.dark .action-btn.primary {
   .rem-sidebar-item span { font-size: 14px !important; }
   .rem-sidebar-sep { margin: 4px 8px !important; }
   .rem-topbar { padding: 0 6px !important; }
-  .top-nav { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .top-nav { overflow-x: auto !important; min-width: 0 !important; max-width: 100% !important; flex: 0 1 auto !important; -webkit-overflow-scrolling: touch; }
   .top-nav-item { white-space: nowrap !important; padding: 4px 8px !important; font-size: 10px !important; }
-  .top-actions { gap: 2px !important; }
+  .top-actions { gap: 2px !important; overflow-x: auto !important; flex: 0 0 auto !important; max-width: 48% !important; }
+  #searchWrap { flex: 1 1 auto !important; min-width: 0 !important; }
+  .rem-topbar input[type='text'], .rem-topbar input:not([type]) { flex: 1 1 auto !important; min-width: 0 !important; }
   .top-actions button, .top-actions [class*="icon"] { padding: 4px !important; }
   .rem-content { padding: 8px !important; }
   .stats-row { grid-template-columns: repeat(2, 1fr) !important; }
@@ -812,5 +814,10 @@ html.dark .action-btn.primary {
   [style*="margin-left: auto"] { flex-wrap: wrap !important; justify-content: flex-end !important; }
   [style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
   [style*="grid-template-columns: 1.2fr 1fr"] { grid-template-columns: 1fr !important; }
+  [style*="grid-template-columns: 1.5fr 1fr"] { grid-template-columns: 1fr !important; }
+  [style*="display: grid"] > div { min-width: 0 !important; }
   .qa-tab { font-size: 9px !important; padding: 3px 8px !important; }
+  .app-footer { flex-wrap: wrap !important; height: auto !important; min-height: auto !important; padding: 3px 8px !important; gap: 2px 10px !important; }
+  .app-footer .breadcrumb { width: 100% !important; order: 10 !important; overflow-x: auto !important; white-space: nowrap !important; }
+  .app-footer > div:last-child { flex: 1 1 auto !important; justify-content: flex-end !important; flex-wrap: wrap !important; }
 }
