@@ -4,13 +4,20 @@
  * Sales Pipeline (funnel + sources), Payment Collection (monthly chart),
  * Occupancy (units by status), Revenue vs Expense, Bulk Export.
  */
+import { useRoute, useRouter } from 'vue-router'
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
 import { useDataStore } from '@/stores/data'
 import { showToast } from '@/toast'
 
+const route = useRoute()
+const router = useRouter()
 const data = useDataStore()
-const tab = ref('pipeline')
+const tab = ref(String(route.query.tab ?? 'pipeline').toLowerCase())
+function setTab(t: string) {
+  tab.value = t
+  void router.replace({ query: { ...route.query, tab: t } })
+}
 const period = ref('all')
 
 const items = ref<any[]>([])
@@ -146,7 +153,7 @@ function exportCSV(name: string, rows: Record<string, unknown>[]) {
       <span v-for="t in [['pipeline', '📈 Sales Pipeline'], ['collection', '💰 Payment Collection'], ['occupancy', '🏢 Occupancy'], ['revenue', '📊 Revenue vs Expense'], ['export', '📤 Bulk Export']]" :key="t[0]"
         class="qa-tab" style="padding: 4px 12px; font-size: 10px; font-weight: 600; border-radius: 6px; cursor: pointer; margin-right: 4px"
         :style="tab === t[0] ? 'background: #2F80ED; color: #fff' : 'background: #f0f0f0; color: #666'"
-        @click="tab = t[0]">{{ t[1] }}</span>
+        @click="setTab(t[0])">{{ t[1] }}</span>
       <div style="flex: 1"></div>
       <select v-model="period" style="padding: 4px 8px; font-size: 10px; border: 1px solid #e0e0e0; border-radius: 6px; background: transparent">
         <option value="all">All Time</option>

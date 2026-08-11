@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useRoute, useRouter } from 'vue-router'
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
@@ -6,10 +7,16 @@ import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
 import type { TableColumn } from '@/components/DataTable.vue'
 
+const route = useRoute()
+const router = useRouter()
 const data = useDataStore()
 const detailRec = ref<Record<string, unknown> | null>(null)
 const detailList = ref<Record<string, unknown>[]>([])
-const tab = ref('dashboard')
+const tab = ref(String(route.query.tab ?? 'dashboard').toLowerCase())
+function setTab(t: string) {
+  tab.value = t
+  void router.replace({ query: { ...route.query, tab: t } })
+}
 
 const hnd = computed(() => data.handover)
 const hndStats = computed(() => {
@@ -127,8 +134,8 @@ const actions = computed(() => [
       <span class="page-title">Handover & Post-Sales</span>
       <span class="page-subtitle">{{ data.handover.length }} records</span>
     <div class="tabs" style="margin: 6px 0">
-      <div class="tab" :class="{ active: tab === 'dashboard' }" @click="tab = 'dashboard'">📊 Dashboard</div>
-      <div class="tab" :class="{ active: tab === 'pipeline' }" @click="tab = 'pipeline'">🏭 Handover Pipeline</div>
+      <div class="tab" :class="{ active: tab === 'dashboard' }" @click="setTab('dashboard')">📊 Dashboard</div>
+      <div class="tab" :class="{ active: tab === 'pipeline' }" @click="setTab('pipeline')">🏭 Handover Pipeline</div>
     </div>
 
     </div>

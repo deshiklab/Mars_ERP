@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
@@ -9,10 +9,11 @@ import type { TableAction, TableColumn, TableTab } from '@/components/DataTable.
 import type { Project } from '@/api/types'
 
 const route = useRoute()
+const router = useRouter()
 const data = useDataStore()
 const detailProj = ref<Project | null>(null)
 
-const tab = ref('all')
+const tab = ref(String(route.query.tab ?? 'all').toLowerCase())
 const detail = ref<Project | null>(null)
 
 onMounted(async () => {
@@ -98,6 +99,7 @@ const tabRows = computed(() => {
 })
 
 function onTabChange(t: string) {
+  void router.replace({ query: { ...route.query, tab: t } })
   tab.value = t
 }
 

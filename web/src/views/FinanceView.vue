@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
 import InvoiceDetailDrawer from '@/components/InvoiceDetailDrawer.vue'
@@ -7,9 +8,15 @@ import StatsRow from '@/components/StatsRow.vue'
 import type { TableColumn } from '@/components/DataTable.vue'
 import type { CoaAccount, Invoice, Payment } from '@/api/types'
 
+const route = useRoute()
+const router = useRouter()
 const data = useDataStore()
 const detailInv = ref<Invoice | null>(null)
-const tab = ref('invoices')
+const tab = ref(String(route.query.tab ?? 'invoices').toLowerCase())
+function setTab(t: string) {
+  tab.value = t
+  void router.replace({ query: { ...route.query, tab: t } })
+}
 
 onMounted(() => {
   data.loadInvoices()
@@ -139,9 +146,9 @@ const invActions = computed(() => [
 
     <!-- tabs -->
     <div style="display: flex; border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden; margin-bottom: 10px; width: fit-content">
-      <button class="action-btn" :style="{ border: 'none', borderRadius: 0, background: tab === 'invoices' ? '#f0f4ff' : '#fff', color: '#2f80ed' }" @click="tab = 'invoices'">🧾 Invoices</button>
-      <button class="action-btn" :style="{ border: 'none', borderRadius: 0, borderLeft: '1px solid #e0e0e0', background: tab === 'payments' ? '#f0f4ff' : '#fff', color: '#2f80ed' }" @click="tab = 'payments'">💳 Payments</button>
-      <button class="action-btn" :style="{ border: 'none', borderRadius: 0, borderLeft: '1px solid #e0e0e0', background: tab === 'coa' ? '#f0f4ff' : '#fff', color: '#2f80ed' }" @click="tab = 'coa'">📒 Chart of Accounts</button>
+      <button class="action-btn" :style="{ border: 'none', borderRadius: 0, background: tab === 'invoices' ? '#f0f4ff' : '#fff', color: '#2f80ed' }" @click="setTab('invoices')">🧾 Invoices</button>
+      <button class="action-btn" :style="{ border: 'none', borderRadius: 0, borderLeft: '1px solid #e0e0e0', background: tab === 'payments' ? '#f0f4ff' : '#fff', color: '#2f80ed' }" @click="setTab('payments')">💳 Payments</button>
+      <button class="action-btn" :style="{ border: 'none', borderRadius: 0, borderLeft: '1px solid #e0e0e0', background: tab === 'coa' ? '#f0f4ff' : '#fff', color: '#2f80ed' }" @click="setTab('coa')">📒 Chart of Accounts</button>
     </div>
 
     <DataTable v-if="tab === 'invoices'" :columns="invCols" :rows="data.invoices" :actions="invActions" search-placeholder="Search invoices, clients…" />

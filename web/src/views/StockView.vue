@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
@@ -9,10 +9,15 @@ import type { TableColumn } from '@/components/DataTable.vue'
 import type { PurchaseOrder, StockItem } from '@/api/types'
 
 const route = useRoute()
+const router = useRouter()
 const data = useDataStore()
 const detailRec = ref<Record<string, unknown> | null>(null)
 const detailList = ref<Record<string, unknown>[]>([])
-const tab = ref('inventory')
+const tab = ref(String(route.query.tab ?? 'inventory').toLowerCase())
+function setTab(t: string) {
+  tab.value = t
+  void router.replace({ query: { ...route.query, tab: t } })
+}
 
 onMounted(() => {
   data.loadInventory()
@@ -147,8 +152,8 @@ const actions = computed(() => [
 
     <!-- view toggle -->
     <div style="display: flex; border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden; margin-bottom: 10px; width: fit-content">
-      <button class="action-btn" :style="{ border: 'none', borderRadius: 0, background: tab === 'inventory' ? '#f0f4ff' : '#fff', color: '#2f80ed' }" @click="tab = 'inventory'">📦 Inventory</button>
-      <button class="action-btn" :style="{ border: 'none', borderRadius: 0, borderLeft: '1px solid #e0e0e0', background: tab === 'pos' ? '#f0f4ff' : '#fff', color: '#2f80ed' }" @click="tab = 'pos'">📄 Purchase Orders</button>
+      <button class="action-btn" :style="{ border: 'none', borderRadius: 0, background: tab === 'inventory' ? '#f0f4ff' : '#fff', color: '#2f80ed' }" @click="setTab('inventory')">📦 Inventory</button>
+      <button class="action-btn" :style="{ border: 'none', borderRadius: 0, borderLeft: '1px solid #e0e0e0', background: tab === 'pos' ? '#f0f4ff' : '#fff', color: '#2f80ed' }" @click="setTab('pos')">📄 Purchase Orders</button>
     </div>
   </div>
     <GenericDetailDrawer :record="detailRec" :title="'Stock & Procurement'" @close="detailRec = null" :records="detailList" />

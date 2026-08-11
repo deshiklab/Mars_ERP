@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import DataTable from '@/components/DataTable.vue'
 import EmployeeDetailDrawer from '@/components/EmployeeDetailDrawer.vue'
 import type { TableAction, TableColumn, TableTab } from '@/components/DataTable.vue'
 import type { Employee } from '@/api/types'
 
+const route = useRoute()
+const router = useRouter()
 const data = useDataStore()
 const detailEmp = ref<Employee | null>(null)
-const tab = ref('all')
+const tab = ref(String(route.query.tab ?? 'all').toLowerCase())
 const detail = ref<Employee | null>(null)
 
 onMounted(() => {
@@ -95,6 +98,7 @@ const tabRows = computed(() => {
 })
 
 function onTabChange(t: string) {
+  void router.replace({ query: { ...route.query, tab: t } })
   tab.value = t
 }
 
