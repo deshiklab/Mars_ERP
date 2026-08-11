@@ -1229,6 +1229,8 @@ def booking_invoice(name=None, amount=None):
 	finally:
 		frappe.set_user(frappe.session.user)
 	doc.sales_invoice = sinv.name
+	if doc.payment_entry and not frappe.db.exists("Payment Entry", doc.payment_entry):
+		doc.payment_entry = None
 	doc.save(ignore_permissions=True)
 	frappe.db.commit()
 	return {"invoice": sinv.name, "amount": amt, "customer": customer, "grand_total": sinv.grand_total}
