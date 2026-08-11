@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import { showToast } from '@/toast'
 import { useDataStore } from '@/stores/data'
@@ -15,6 +15,7 @@ import { _t } from '@/i18n'
 
 const data = useDataStore()
 const route = useRoute()
+const router = useRouter()
 const statusFilter = ref('')
 
 async function onStatusChange({ row, field, from, to }: { row: Record<string, unknown>; field: string; from: string; to: string }) {
@@ -28,6 +29,13 @@ async function onStatusChange({ row, field, from, to }: { row: Record<string, un
   }
 }
 const viewMode = ref<'table' | 'kanban'>(route.query.view === 'kanban' ? 'kanban' : 'table')
+function setView(m: 'table' | 'kanban') {
+  viewMode.value = m
+  const q = { ...route.query }
+  if (m === 'kanban') q.view = 'kanban'
+  else delete q.view
+  router.replace({ query: q })
+}
 const showAddDrawer = ref(false)
 const detailLead = ref<Lead | null>(null)
 const newLead = ref({ name: '', email: '', phone: '', source: 'Website', priority: 'Medium' })
@@ -204,12 +212,12 @@ async function saveLead() {
           <button
             class="action-btn"
             :style="{ border: 'none', borderRadius: 0, background: viewMode === 'table' ? '#f0f4ff' : '#fff', color: '#2f80ed' }"
-            @click="viewMode = 'table'"
+            @click="setView('table')"
           >☰ Table</button>
           <button
             class="action-btn"
             :style="{ border: 'none', borderRadius: 0, borderLeft: '1px solid #e0e0e0', background: viewMode === 'kanban' ? '#f0f4ff' : '#fff', color: '#2f80ed' }"
-            @click="viewMode = 'kanban'"
+            @click="setView('kanban')"
           >▤ Kanban</button>
         </div>
         <button class="action-btn primary" @click="openAddDrawer">+ Add Lead</button>
