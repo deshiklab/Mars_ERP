@@ -1171,6 +1171,10 @@ def _get_sales_item():
 	"""Default sellable item for the booked unit (create once if missing)."""
 	item = frappe.db.get_value("Item", {"item_name": "Booked Unit"})
 	if item:
+		itd = frappe.get_doc("Item", item)
+		if itd.get("is_fixed_asset"):
+			itd.is_fixed_asset = 0
+			itd.save(ignore_permissions=True)
 		return item
 	company = _get_company()
 	income_acct = frappe.db.get_value("Account", {"account_type": "Income", "company": company, "is_group": 0}, "name")
@@ -1193,7 +1197,11 @@ def booking_invoice(name=None, amount=None):
 	"""Create a native Sales Invoice for a booking (default: full deal value)."""
 	if not name:
 		frappe.throw(_("booking name required"), frappe.ValidationError)
-	doc = frappe.get_doc("REM Booking", name)
+	doc = (
+		frappe.get_doc("REM Booking", name)
+		if frappe.db.exists("REM Booking", name)
+		else frappe.get_doc("REM Booking", {"custom_booking_ref": name})
+	)
 	company = _get_company()
 	if not company:
 		frappe.throw(_("No default company configured — set Global Defaults"), frappe.ValidationError)
@@ -1209,7 +1217,7 @@ def booking_invoice(name=None, amount=None):
 		"company": company,
 		"due_date": frappe.utils.today(),
 		"debit_to": recv_acct or "",
-		"items": [{"item_code": item, "qty": 1, "rate": amt, "description": f"{doc.project_name or ''} {doc.unit or ''} — {doc.customer_name or ''}"}],
+		"items": [{"item_code": item, "qty": 1, "rate": amt, "is_fixed_asset": 0, "description": f"{doc.project_name or ''} {doc.unit or ''} — {doc.customer_name or ''}"}],
 	})
 	sinv.flags.ignore_permissions = True
 	sinv.flags.ignore_mandatory = True
@@ -1231,7 +1239,20 @@ def booking_payment(name=None, amount=None, mode_of_payment="Cash", reference_no
 	"""Record a Payment Entry against the booking's Sales Invoice."""
 	if not name:
 		frappe.throw(_("booking name required"), frappe.ValidationError)
-	doc = frappe.get_doc("REM Booking", name)
+	_prev = frappe.session.user
+	frappe.set_user("Administrator")
+	try:
+		return _booking_payment_impl(name, amount, mode_of_payment, reference_no)
+	finally:
+		frappe.set_user(_prev)
+
+
+def _booking_payment_impl(name=None, amount=None, mode_of_payment="Cash", reference_no=None):
+	doc = (
+		frappe.get_doc("REM Booking", name)
+		if frappe.db.exists("REM Booking", name)
+		else frappe.get_doc("REM Booking", {"custom_booking_ref": name})
+	)
 	sinv = doc.sales_invoice
 	if not sinv:
 		# auto-create invoice for the payment amount
@@ -1273,12 +1294,9 @@ def booking_payment(name=None, amount=None, mode_of_payment="Cash", reference_no
 	})
 	pe.flags.ignore_permissions = True
 	pe.flags.ignore_mandatory = True
-	frappe.set_user("Administrator")
-	try:
-		pe.insert()
-		pe.submit()
-	finally:
-		frappe.set_user(frappe.session.user)
+	pe.insert()
+	pe.submit()
+	doc.reload()
 	doc.payment_entry = pe.name
 	doc.save(ignore_permissions=True)
 	frappe.db.commit()

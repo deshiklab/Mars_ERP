@@ -45,6 +45,7 @@ import type {
 const BASE = '/api/method/mars_constech.mars_constech.api'
 
 export interface ApiResult<T = unknown> {
+  error?: string
   status: number
   ok: boolean
   data: T | null
@@ -101,7 +102,13 @@ class ApiClient {
         if (this.onUnauthorized) this.onUnauthorized()
       }
       const unwrapped = (data && typeof data.message !== 'undefined' ? data.message : data) as T
-      return { status: res.status, ok: res.status >= 200 && res.status < 300, data: unwrapped }
+      const errText = String((data as { exception?: string })?.exception ?? '')
+      return {
+        status: res.status,
+        ok: res.status >= 200 && res.status < 300,
+        data: unwrapped,
+        error: res.status >= 200 && res.status < 300 ? '' : (errText.split('\n').pop() || errText || 'request failed'),
+      }
     } catch (err) {
       if (timer) clearTimeout(timer)
       const msg = err instanceof Error ? err.message : 'network error'

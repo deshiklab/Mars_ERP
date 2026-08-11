@@ -6,6 +6,8 @@
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
+import { useDataStore } from '@/stores/data'
+import { showToast } from '@/toast'
 import type { Booking } from '@/api/types'
 
 const props = defineProps<{ booking: Booking | null }>()
@@ -74,6 +76,55 @@ function computed_installments(): { no: string; date: string; amount: number; st
 const paidCount = computed(() => installments.value.filter((i) => i.status === 'Paid').length)
 const paidAmt = computed(() => installments.value.filter((i) => i.status === 'Paid').reduce((s, i) => s + (i.amount || 0), 0))
 const totalAmt = computed(() => installments.value.reduce((s, i) => s + (i.amount || 0), 0))
+
+const data = useDataStore()
+const payAmt = ref('')
+const payMode = ref('Cash')
+const payRef = ref('')
+const payBusy = ref(false)
+const payErr = ref('')
+const bookingPayments = computed(() => {
+  const inv = (props.booking as unknown as { sales_invoice?: string; salesInvoice?: string }).sales_invoice ?? (props.booking as unknown as { sales_invoice?: string; salesInvoice?: string }).salesInvoice ?? ''
+  if (!inv) return []
+  return data.payments
+    .filter((p) => String((p as unknown as { invoiceId?: string }).invoiceId ?? '') === inv)
+    .map((p) => ({
+      id: String((p as unknown as { id?: string }).id ?? ''),
+      date: String((p as unknown as { date?: string }).date ?? '—'),
+      method: String((p as unknown as { method?: string }).method ?? (p as unknown as { mode_of_payment?: string }).mode_of_payment ?? 'Cash'),
+      amount: Number((p as unknown as { amount?: number }).amount) || 0,
+    }))
+})
+const recPaymentsTotal = computed(() => bookingPayments.value.reduce((s2, p) => s2 + (Number((p as unknown as { amount?: number }).amount) || 0), 0))
+async function recordPayment() {
+  const amt = Number(payAmt.value)
+  if (!amt || amt <= 0) {
+    payErr.value = 'Enter a valid amount'
+    return
+  }
+  payBusy.value = true
+  payErr.value = ''
+  try {
+    const r = await api.call<{ payment_entry?: string; amount?: number }>('booking_payment', {
+      name: props.booking?.id ?? '',
+      amount: amt,
+      mode_of_payment: payMode.value,
+      reference_no: payRef.value || undefined,
+    })
+    if (r.ok) {
+      payAmt.value = ''
+      payRef.value = ''
+      payBusy.value = false
+      showToast('Payment recorded — ' + (r.data?.payment_entry ?? 'PE-' + String(amt)), 'success')
+      await data.loadPayments()
+    } else {
+      payErr.value = 'Payment failed — ' + ((r as unknown as { error?: string }).error || 'server error')
+    }
+  } catch (e) {
+    payErr.value = 'Payment failed — ' + String(e)
+  }
+  payBusy.value = false
+}
 const pct = computed(() => (totalAmt.value ? Math.round((paidAmt.value / totalAmt.value) * 100) : 0))
 
 const today = new Date().toISOString().slice(0, 10)
@@ -117,6 +168,28 @@ function instStatus(i: { date: string; amount: number; status: string }): { labe
 
         <!-- payment schedule -->
         <div style="margin-top: 12px">
+          <h3 style="font-size: 11px; font-weight: 600; color: #555; margin-bottom: 6px">💰 Recorded Payments</h3>
+          <div v-if="bookingPayments.length" style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px">
+            <div v-for="p in bookingPayments" :key="p.id + '-' + p.amount" style="display: flex; align-items: center; justify-content: space-between; font-size: 11px">
+              <span style="color: #555">{{ p.date }} · {{ p.method }}</span>
+              <span style="font-weight: 700; color: #2e7d32">{{ bdt(p.amount) }}</span>
+            </div>
+          </div>
+          <div v-else style="font-size: 11px; color: #999; margin-bottom: 8px">No payments recorded against this booking yet.</div>
+          <div style="background: #fafafa; border: 1px solid #eee; border-radius: 8px; padding: 8px; margin-bottom: 10px">
+            <div style="font-size: 11px; font-weight: 700; color: #333; margin-bottom: 6px">📥 Record a payment</div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap">
+              <input v-model="payAmt" type="number" placeholder="Amount (৳)" style="flex: 1 1 90px; min-width: 0; padding: 5px 8px; font-size: 11px; border: 1px solid #ddd; border-radius: 6px" />
+              <select v-model="payMode" style="padding: 5px 6px; font-size: 11px; border: 1px solid #ddd; border-radius: 6px; background: #fff">
+                <option>Cash</option><option>Bank Transfer</option><option>bKash</option><option>Check</option>
+              </select>
+              <input v-model="payRef" placeholder="Ref no (optional)" style="flex: 1 1 120px; min-width: 0; padding: 5px 8px; font-size: 11px; border: 1px solid #ddd; border-radius: 6px" />
+            </div>
+            <div v-if="payErr" style="font-size: 10px; color: #c62828; margin-top: 4px">{{ payErr }}</div>
+            <button :disabled="payBusy" @click="recordPayment" style="margin-top: 6px; background: #2e7d32; color: #fff; border: none; border-radius: 6px; padding: 5px 14px; font-size: 11px; font-weight: 600; cursor: pointer; width: 100%">
+              {{ payBusy ? 'Recording…' : 'Record payment' }}
+            </button>
+          </div>
           <h3 style="font-size: 11px; font-weight: 600; color: #555; margin-bottom: 6px">Payment Schedule</h3>
           <div style="padding: 10px; background: #fff; border: 1px solid #e8e8e8; border-radius: 6px">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px">
