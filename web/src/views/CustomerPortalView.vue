@@ -9,12 +9,14 @@ import { useAuthStore } from '@/stores/auth'
 import DataTable from '@/components/DataTable.vue'
 import StatsRow from '@/components/StatsRow.vue'
 import type { TableColumn } from '@/components/DataTable.vue'
+import { showToast } from '@/toast'
 
 const auth = useAuthStore()
 const bookings = ref<any[]>([])
 const dues = ref<any[]>([])
 const tickets = ref<any[]>([])
 const payments = ref<any[]>([])
+const invoices = ref<any[]>([])
 const loading = ref(true)
 
 const me = computed(() => String(auth.user || '').toLowerCase())
@@ -29,6 +31,7 @@ const myBookings = computed(() => mine(bookings.value, 'client'))
 const myDues = computed(() => mine(dues.value, 'customer'))
 const myTickets = computed(() => mine(tickets.value, 'customer'))
 const myPayments = computed(() => mine(payments.value, 'client'))
+const myInvoices = computed(() => mine(invoices.value, 'client'))
 
 onMounted(async () => {
   const r = await api.call<{ collections: Record<string, unknown> }>('bootstrap')
@@ -37,6 +40,7 @@ onMounted(async () => {
     dues.value = (r.data.collections.dues as any[]) ?? []
     tickets.value = (r.data.collections.supportTickets as any[]) ?? []
     payments.value = (r.data.collections.payments as any[]) ?? []
+    invoices.value = (r.data.collections.invoices as any[]) ?? []
   }
   loading.value = false
 })
@@ -50,6 +54,21 @@ function statusColor(s: string): string {
     'Pending Review': '#e65100', Pending: '#e65100', Open: '#c62828', Overdue: '#c62828'
   }
   return map[s] ?? '#555'
+}
+
+async function payInvoice(inv: any) {
+  const r = await api.startPayment(inv.id)
+  if (!r.ok || !r.data?.redirect) {
+    showToast('⚠ Could not start payment' + ((r as { error?: string }).error ? ' — ' + (r as { error?: string }).error : ''))
+    return
+  }
+  showToast('↗ Opening the payment gateway…')
+  window.open(r.data.redirect, '_blank')
+  setTimeout(() => {
+    api.call<{ collections: Record<string, unknown> }>('bootstrap').then((rr) => {
+      if (rr.ok && rr.data) payments.value = (rr.data.collections.payments as any[]) ?? []
+    })
+  }, 8000)
 }
 
 const stats = computed(() => [
@@ -114,7 +133,23 @@ const dueCols = computed<TableColumn<any>[]>(() => [
       </div>
 
       <div class="card">
-        <div class="card-header"><h3>🎫 My Tickets</h3></div>
+        <div class="card-header"><h3>💳 My Invoices</h3></div>
+        <div v-if="!myInvoices.length" style="padding: 16px; text-align: center; color: #999; font-size: 11px">No invoices.</div>
+        <div v-else style="display: flex; flex-direction: column; gap: 8px; padding: 8px 0">
+          <div v-for="inv in myInvoices.slice(0, 8)" :key="inv.id"
+            style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid #f5f5f5">
+            <div style="flex: 1; min-width: 0">
+              <div style="font-size: 12px; font-weight: 600; color: #1f2937">{{ inv.id }}</div>
+              <div style="font-size: 10px; color: #94a3b8">{{ inv.project }}{{ inv.unit ? ' · ' + inv.unit : '' }} · due {{ inv.dueDate }}</div>
+            </div>
+            <div style="font-size: 11px; font-weight: 700; color: #1f2937">৳{{ Number(inv.amount || 0).toLocaleString() }}</div>
+            <span v-if="String(inv.status || '').toLowerCase() === 'paid'"
+              style="font-size: 10px; padding: 3px 8px; border-radius: 10px; background: #dcfce7; color: #166534; font-weight: 600">Paid</span>
+            <button v-else @click="payInvoice(inv)"
+              style="border: 0; background: #2f80ed; color: #fff; font-size: 11px; font-weight: 700; padding: 6px 12px; border-radius: 8px; cursor: pointer">Pay</button>
+          </div>
+        </div>
+        <div class="card-header" style="margin-top: 4px"><h3>🎫 My Tickets</h3></div>
         <div class="card-body" style="padding: 6px 10px">
           <div v-for="t in myTickets" :key="t.id" style="display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f5f5f5">
             <span style="font-size: 13px">🎫</span>

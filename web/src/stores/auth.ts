@@ -22,7 +22,7 @@ export const ROLE_MODULES: Record<PwaRole, string[]> = {
   'Sales Agent': ['dashboard', 'crm', 'bookings', 'dues', 'handover', 'tasks'],
   'Site Engineer': ['dashboard', 'projects', 'plots', 'contractors', 'qc', 'stock', 'tasks'],
   Finance: ['dashboard', 'finance', 'dues', 'approvals', 'bookings'],
-  Customer: ['dashboard', 'bookings', 'dues', 'ticketing']
+  Customer: ['dashboard', 'portal', 'bookings', 'dues', 'ticketing']
 }
 
 interface AuthState {

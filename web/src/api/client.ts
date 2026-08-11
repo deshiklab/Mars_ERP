@@ -137,6 +137,11 @@ class ApiClient {
     })
   }
 
+  /** Start a gateway payment for an invoice (bkash/nagad). */
+  async startPayment(invoiceName: string, gateway = 'bkash'): Promise<ApiResult<{ redirect?: string; payment_id?: string }>> {
+    return this.request<{ redirect?: string; payment_id?: string }>('pay_invoice', { method: 'POST', body: { invoice_name: invoiceName, gateway } })
+  }
+
   async logout(): Promise<void> {
     if (this.token) await this.request('logout')
     this.token = ''

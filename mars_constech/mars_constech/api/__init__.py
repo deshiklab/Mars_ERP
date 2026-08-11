@@ -60,12 +60,17 @@ def login(usr=None, pwd=None, email=None, password=None):
 			otp_secret = ""
 		if not otp_secret:
 			frappe.throw(_("2FA is not set up for this account"), frappe.AuthenticationError)
-		token = int(pyotp.TOTP(otp_secret).now())
 		tmp_id = frappe.generate_hash(length=8)
-		# cache_2fa_data persists form_dict.pwd into the challenge — set it
+		# cache the challenge WITHOUT a token: confirm_otp_token treats a
+		# cached _token as an HOTP counter and hotp.verify() fails (then
+		# login_manager.fail() throws 401 BEFORE the TOTP fallback runs).
+		# With no _token it skips straight to totp.verify() against the
+		# current 30s window.
 		frappe.form_dict["usr"] = user
 		frappe.form_dict["pwd"] = passwd
-		cache_2fa_data(user, token, otp_secret, tmp_id)
+		frappe.cache.set_value(tmp_id + "_usr", user)
+		frappe.cache.set_value(tmp_id + "_pwd", passwd)
+		frappe.cache.set_value(tmp_id + "_otp_secret", otp_secret)
 		_set_default(user + "_otplogin", "1", "__default")
 		frappe.db.commit()
 		return {
@@ -75,10 +80,16 @@ def login(usr=None, pwd=None, email=None, password=None):
 		}
 
 	if two_factor_is_enabled(user):
-		# stage 2: verify OTP then complete the login
-		if not confirm_otp_token(frappe.local.login_manager, otp=otp,
-								 tmp_id=frappe.form_dict.get("tmp_id")):
+		# stage 2: verify the TOTP directly. Frappe's confirm_otp_token is
+		# broken in this version: it reads the challenge via
+		# frappe.cache.get() — a RAW redis GET that misses the
+		# site-prefixed keys — so it ALWAYS raises ExpiredLoginException.
+		# get_value() resolves the prefix; valid_window=1 tolerates the
+		# 30s boundary between the challenge and the verify.
+		_otp_secret = frappe.cache.get_value(frappe.form_dict.get("tmp_id", "") + "_otp_secret")
+		if not _otp_secret or not pyotp.TOTP(_otp_secret).verify(otp, valid_window=1):
 			frappe.throw(_("Invalid OTP"), frappe.AuthenticationError)
+		frappe.cache.delete_value(frappe.form_dict.get("tmp_id", "") + "_otp_secret")
 
 	frappe.local.login_manager.post_login()
 	frappe.form_dict.pop("pwd", None)
