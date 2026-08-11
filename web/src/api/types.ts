@@ -265,6 +265,17 @@ export interface Approval {
 }
 
 /** A support ticket. */
+/** A task record (bootstrap collections.tasks). */
+export interface Task {
+  id: number | string
+  title: string
+  status: string
+  priority?: string
+  project?: string
+  assignee?: string
+  deadline?: string
+}
+
 export interface Ticket {
   id: string
   subject: string

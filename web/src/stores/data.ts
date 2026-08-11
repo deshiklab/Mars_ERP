@@ -3,7 +3,7 @@
  */
 import { defineStore } from 'pinia'
 import { api, apiErrorText } from '@/api/client'
-import type { Approval, Attendance, BoqLine, Booking, Broker, CoaAccount, Complaint, Contractor, Due, Employee, Equipment, FixedAsset, Handover, Investment, Invoice, Labor, Lead, LeaveReq, LedgerParty, Loan, Payment, Plot, Project, PurchaseOrder, Receipt, StockItem, Ticket, VariationOrder, WorkOrder } from '@/api/types'
+import type { Approval, Attendance, BoqLine, Booking, Broker, CoaAccount, Complaint, Contractor, Due, Employee, Equipment, FixedAsset, Handover, Investment, Invoice, Labor, Lead, LeaveReq, LedgerParty, Loan, Payment, Plot, Project, PurchaseOrder, Receipt, StockItem, Task, Ticket, VariationOrder, WorkOrder } from '@/api/types'
 
 export interface DashboardStats {
   bookings: number
@@ -37,6 +37,7 @@ interface DataState {
   coa: CoaAccount[]
   coaLoading: boolean
   contractors: Contractor[]
+  tasks: Task[]
   contractorsLoading: boolean
     plots: Plot[]
   plotsLoading: boolean
@@ -101,6 +102,7 @@ export const useDataStore = defineStore('data', {
     coa: [],
     coaLoading: false,
     contractors: [],
+    tasks: [],
     contractorsLoading: false,
     plots: [],
     approvals: [],
@@ -157,6 +159,9 @@ export const useDataStore = defineStore('data', {
         serverTime: r.data.meta.server_time,
         pwaVersion: r.data.meta.pwa_version
       }
+      // bootstrap carries collections that have no pipeline endpoint (tasks,
+      // calendar_events, notifications, …) — assign them for the widgets
+      if (Array.isArray(c['tasks'])) this.tasks = c['tasks'] as Task[]
     },
 
     async loadLeads(): Promise<void> {

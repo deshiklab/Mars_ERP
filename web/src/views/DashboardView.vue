@@ -98,15 +98,10 @@ function gotoQuick(q: { path: string }) {
 /* ── widgets ── */
 /** My Tasks — top 5 non-done (derived from leads needing follow-up for now). */
 const myTasks = computed(() =>
-  data.leads
-    .filter((l) => l.status === 'New Inquiry' || l.status === 'Site Visit')
+  [...data.tasks]
+    .filter((t) => t.status !== 'Done' && t.status !== 'Completed')
+    .sort((a, b) => (a.priority === 'High' ? 0 : 1) - (b.priority === 'High' ? 0 : 1))
     .slice(0, 5)
-    .map((l) => ({
-      title: `Follow up: ${l.name}`,
-      status: l.status,
-      priority: l.priority,
-      lead: l
-    }))
 )
 
 const recentBookings = computed(() => data.bookings.slice(0, 5))
@@ -234,7 +229,7 @@ function printReport() {
     <div class="card" style="margin-bottom: 10px">
       <div class="card-header">
         <h3>📋 {{ _t('My Tasks') }} <span style="font-size: 9px; font-weight: 400; color: #888; margin-left: 6px">{{ myTasks.length }} pending</span></h3>
-        <span style="font-size: 10px; color: #2f80ed; cursor: pointer" @click="router.push('/leads')">{{ _t('View All') }} →</span>
+        <span style="font-size: 10px; color: #2f80ed; cursor: pointer" @click="router.push('/tasks')">{{ _t('View All') }} →</span>
       </div>
       <div class="card-body" style="padding: 6px 10px">
         <div v-if="myTasks.length === 0" style="padding: 10px; text-align: center; color: #999; font-size: 11px">All tasks completed! 🎉</div>
@@ -242,7 +237,7 @@ function printReport() {
           v-for="t in myTasks"
           :key="t.title"
           style="display: flex; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px solid #f5f5f5; font-size: 11px; cursor: pointer"
-          @click="detailLead = t.lead"
+          @click="router.push('/tasks')"
         >
           <span style="width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0" :style="{ background: t.priority === 'High' ? '#e53935' : t.priority === 'Medium' ? '#ff9800' : '#999' }"></span>
           <span style="flex: 1; color: #333">{{ t.title }}</span>
