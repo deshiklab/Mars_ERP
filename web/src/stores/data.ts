@@ -497,15 +497,16 @@ export const useDataStore = defineStore('data', {
       this.complaintsLoading = false
     },
 
+    /** Dispatch to the collection's real loader — the sync endpoint is a PUSH
+     *  (upsert), NOT a fetch; posting { [collection]: [] } returned rows: 0 and
+     *  the global sync button was a silent no-op. */
     async loadCollection(collection: string): Promise<void> {
-      const r = await api.sync(collection)
-      if (r.ok && r.data) {
-        const d = r.data as unknown as Record<string, unknown>
-        const arr = d[collection]
-        if (Array.isArray(arr)) {
-          ;(this as unknown as Record<string, unknown>)[collection] = arr
-        }
-      } else this.error = apiErrorText(r)
+      const m = (this as unknown as Record<string, unknown>)[
+        'load' + collection.charAt(0).toUpperCase() + collection.slice(1)
+      ]
+      if (typeof m === 'function') {
+        await (m as () => Promise<void>).call(this)
+      }
     }
   }
 })

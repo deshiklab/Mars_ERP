@@ -293,8 +293,9 @@ class ApiClient {
     return this.request<PipelineResponse<Complaint>>('complaints_pipeline')
   }
 
-  async sync(collection: string): Promise<ApiResult<{ rows: number }>> {
-    return this.request<{ rows: number }>('sync', { method: 'POST', body: { [collection]: [] } })
+  /** sync is a PUSH endpoint: upsert collections. Correct body shape: { collections: { leads: [...] } }. */
+  async sync(collections: Record<string, unknown[]>): Promise<ApiResult<{ rows: number }>> {
+    return this.request<{ rows: number }>('sync', { method: 'POST', body: { collections } })
   }
 }
 
