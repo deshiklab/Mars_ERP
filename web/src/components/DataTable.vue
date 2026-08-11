@@ -322,7 +322,7 @@ function onRowClick(e: MouseEvent, r: Record<string, unknown>) {
   const prop = t.closest('.dt-prop') as HTMLElement | null
   if (prop) {
     // 'Click to Property name will show the related property view'
-    router.push('/flats')
+    router.push('/project/' + (prop.dataset.project || encodeURIComponent((prop.textContent || '').trim())))
     return
   }
   const st = t.closest('.dt-status') as HTMLElement | null

@@ -519,6 +519,11 @@ const router = createRouter({
       path: '/customer/:name',
       name: 'customer360',
       component: () => import('../views/Customer360View.vue'),
+    },
+    {
+      path: '/project/:name',
+      name: 'project360',
+      component: () => import('../views/Project360View.vue'),
       meta: { module: 'portal', title: 'Customer Portal' }
     },
     {

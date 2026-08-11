@@ -243,6 +243,17 @@ export interface Contractor {
 }
 
 /** A land/plot proposal. */
+export interface Flat {
+  id: string
+  project?: string
+  unit?: string
+  floor?: string
+  type?: string
+  location?: string
+  area?: string
+  price?: string
+  status: string
+}
 export interface Plot {
   id: string
   plotNo?: string
