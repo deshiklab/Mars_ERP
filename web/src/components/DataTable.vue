@@ -100,6 +100,7 @@ const PHONE_RE = /phone|mobile|tel|contact|cell|whatsapp|hotline/i
 const EMAIL_RE = /email|mail/i
 const INVOICE_RE = /invoice|inv_no|invoice_id|bill/i
 const PROP_RE = /property|project_name|unit|plot|flat|project_id/i
+const EMPLOYEE_RE = /^employee(?:name|id)$|emp_name|^employee$/i
 const CUSTOMER_RE = /^client$|^customer$|custname/i
 const STATUS_RE = /status|stage|bucket/i
 const MONEY_RE = /amount|price|value|total|paid|due|balance|advance|rate|cost|revenue|commission|budget|salary|fee/i
@@ -123,6 +124,10 @@ const cellHtml = (row: any, col: TableColumn<any>): string => {
     }
     if (PROP_RE.test(col.key)) {
       return `<a class="dt-prop" style="color:#2f80ed;cursor:pointer;font-weight:500" title="${_t('View property')}">🏢 ${base}</a>`
+    }
+    if (EMPLOYEE_RE.test(col.key) && typeof raw === 'string' && !raw.startsWith('EMP-')) {
+      const nm = encodeURIComponent(raw)
+      return `<a class="dt-emp" data-name="${nm}" title="Employee 360">🧑‍💼 ${base}</a>`
     }
     if (CUSTOMER_RE.test(col.key)) {
       const nm = encodeURIComponent(raw)
@@ -311,6 +316,11 @@ function onRowClick(e: MouseEvent, r: Record<string, unknown>) {
   const inv = t.closest('.dt-inv') as HTMLElement | null
   if (inv) {
     openRow(r) // invoice number -> view the invoice record
+    return
+  }
+  const emp = t.closest('.dt-emp') as HTMLElement | null
+  if (emp) {
+    router.push('/employee/' + (emp.dataset.name || ''))
     return
   }
   const cust = t.closest('.dt-cust') as HTMLElement | null

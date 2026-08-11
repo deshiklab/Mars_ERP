@@ -27,6 +27,11 @@ const router = createRouter({
       path: '/follow-ups',
       name: 'followups',
       meta: { module: 'followups', title: 'Follow-up Center' },
+      component: () => import('../views/Employee360View.vue'),
+    },
+    {
+      path: '/employee/:name',
+      name: 'employee360',
       component: () => import('../views/FollowUpCenterView.vue'),
     },
     {

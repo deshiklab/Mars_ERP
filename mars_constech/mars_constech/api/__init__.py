@@ -3497,6 +3497,22 @@ def dues_update(id=None, last_follow_up=None, notes=None, promise_date=None,
             doc.db_set("custom_promise_amount", float(promise_amount))
         except Exception:
             pass
+    if promise_date is not None and promise_amount is not None:
+        try:
+            _log = []
+            _raw = doc.get("custom_promise_log") or ""
+            if _raw:
+                try:
+                    _v = json.loads(_raw)
+                    if isinstance(_v, list):
+                        _log = _v
+                except Exception:
+                    pass
+            _log.append({"date": str(promise_date), "amount": float(promise_amount or 0), "kept": 0})
+            doc.db_set("custom_promise_log", json.dumps(_log))
+        except Exception:
+            pass
+            pass
     if late_fee is not None:
         try:
             doc.db_set("custom_late_fee", float(late_fee))
