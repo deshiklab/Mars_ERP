@@ -4,6 +4,9 @@
  * line items table (desc, qty, rate, total), totals, status badge.
  */
 import { computed, ref, watch } from 'vue'
+import { useDataStore } from '@/stores/data'
+import { showToast } from '@/toast'
+import { api } from '@/api/client'
 import type { Invoice } from '@/api/types'
 
 const props = defineProps<{ invoice: Invoice | null }>()
@@ -16,6 +19,29 @@ const bdt = (n: number) => (n >= 10000000 ? `৳ ${(n / 10000000).toFixed(2)} Cr
 function statusColor(s: string): string {
   const map: Record<string, string> = { Draft: '#888', Sent: '#e65100', Paid: '#2e7d32', Overdue: '#c62828' }
   return map[s] ?? '#555'
+}
+
+const data = useDataStore()
+const myPayments = computed(() => {
+  const inv = props.invoice as unknown as { id?: string }
+  return (data.payments as unknown as { invoiceId?: string; date?: string; amount?: number; method?: string }[]).filter((p) => p.invoiceId === inv.id)
+})
+const paidSum = computed(() => myPayments.value.reduce((s, p) => s + (Number(p.amount) || 0), 0))
+const remaining = computed(() => {
+  const inv = props.invoice as unknown as { amount?: number | string; status?: string }
+  return Math.max(0, (Number(inv.amount) || 0) - paidSum.value)
+})
+const isPaid = computed(() => String((props.invoice as unknown as { status?: string }).status ?? '') === 'Paid')
+async function payGateway() {
+  const inv = props.invoice as unknown as { id?: string }
+  if (!inv.id) return
+  const r = await api.startPayment(inv.id)
+  if (r.ok && (r.data as { redirect?: string } | undefined)?.redirect) {
+    window.open((r.data as { redirect: string }).redirect, '_blank')
+    showToast('Payment started — complete it in the gateway window')
+  } else {
+    showToast('Payment could not be started — try again')
+  }
 }
 
 const items = computed<{ desc: string; qty: number; rate: number }[]>(() => {
@@ -72,6 +98,23 @@ const subtotal = computed(() => items.value.reduce((s, i) => s + (i.qty || 1) * 
             </table>
           </div>
           <div v-if="!items.length" style="text-align: center; padding: 20px; color: #999; font-size: 11px; border: 2px dashed #e0e0e0; border-radius: 8px">No line items.</div>
+        </div>
+
+        <!-- payments -->
+        <div style="margin-top: 10px">
+          <h3 style="font-size: 11px; font-weight: 600; color: #555; margin-bottom: 4px">💳 Payments ({{ myPayments.length }})</h3>
+          <div v-if="myPayments.length" style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px">
+            <div v-for="p in myPayments" :key="(p.date || '') + (p.amount ?? '')" style="display: flex; justify-content: space-between; align-items: center; background: #f0f6f0; border-radius: 6px; padding: 4px 8px">
+              <span style="font-size: 11px; color: #333">{{ p.date || '—' }} · {{ p.method || '—' }}</span>
+              <span style="font-size: 11px; font-weight: 700; color: #2e7d32">{{ bdt(Number(p.amount) || 0) }}</span>
+            </div>
+          </div>
+          <div v-else style="font-size: 11px; color: #999; margin-bottom: 8px">No payments recorded against this invoice yet.</div>
+          <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 8px">
+            <span style="color: #666">Paid</span><span style="font-weight: 700; color: #2e7d32">{{ bdt(paidSum) }}</span>
+            <span style="color: #666; margin-left: 12px">Remaining</span><span style="font-weight: 700; color: #d64545">{{ bdt(remaining) }}</span>
+          </div>
+          <button v-if="!isPaid" class="action-btn" style="color: #2f80ed; margin-bottom: 8px" @click="payGateway">💳 Pay via Gateway</button>
         </div>
 
         <!-- desc -->

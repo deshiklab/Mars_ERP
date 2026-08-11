@@ -49,6 +49,16 @@
         <span style="font-size: 10px; font-weight: 700; color: #27ae60; background: #eafaf1; padding: 2px 8px; border-radius: 10px; white-space: nowrap">{{ p.kept ? 'Kept ✓' : 'Open' }}</span>
       </div>
     </div>
+    <div class="card" style="padding: 10px; margin-top: 10px">
+      <div style="font-size: 11px; font-weight: 700; color: #b3261e; margin-bottom: 6px">💰 Collections follow-ups ({{ collections.length }})</div>
+      <div v-if="collections.length" style="display: flex; flex-direction: column; gap: 4px">
+        <div v-for="d in collections" :key="d.customer" class="top-nav-item" style="cursor: pointer; justify-content: space-between; width: 100%" @click="router.push({ path: '/dues', query: { due: d.customer } })">
+          <span>{{ d.customer }}</span>
+          <span style="font-size: 10px; color: #d64545">{{ d.bucket }}</span>
+        </div>
+      </div>
+      <div v-else style="font-size: 11px; color: #888; margin-top: 6px">All dues are being followed up</div>
+    </div>
   </div>
 </template>
 
@@ -75,6 +85,21 @@ const overdueLeads = computed(() =>
 const todayLeads = computed(() =>
   sortedLeads.value.filter((l) => l.nextFollowUpRaw && l.nextFollowUpRaw === todayStr && openStatus(l.status))
 )
+const staleDays = 7
+const collections = computed(() =>
+  data.dues
+    .filter((d) => {
+      const lf = String((d as unknown as { lastFollowUp?: string }).lastFollowUp ?? '')
+      const bucket = String((d as unknown as { bucket?: string }).bucket ?? '')
+      const paid = Number((d as unknown as { paid?: number }).paid ?? 0) > 0
+      if (paid) return false
+      if (!lf) return true
+      const days = (Date.now() - new Date(lf.replace(' ', 'T')).getTime()) / 86400000
+      return days > staleDays || bucket === 'Critical'
+    })
+    .slice(0, 6)
+)
+
 const upcomingPromises = computed(() => {
   const out: { customer: string; project: string; amount: number; date: string; kept?: boolean; due: string }[] = []
   for (const d of data.dues) {
