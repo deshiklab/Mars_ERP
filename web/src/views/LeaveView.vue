@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { showToast } from '@/toast'
+import { api } from '@/api/client'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
@@ -50,6 +52,43 @@ const stats = computed(() => [
   { label: 'Approved', value: String(data.leave.filter(l=>l.status==='Approved').length), color: '#2e7d32' }
 ])
 
+const showApply = ref(false)
+const apEmp = ref('')
+const apType = ref('Annual')
+const apFrom = ref(new Date().toISOString().slice(0, 10))
+const apTo = ref(new Date().toISOString().slice(0, 10))
+const apDays = ref(1)
+const apReason = ref('')
+const apBusy = ref(false)
+const apMsg = ref('')
+const apEmps = computed(() => data.employees)
+async function submitApply() {
+  if (!apEmp.value || !apFrom.value || !apTo.value) { apMsg.value = 'Employee, from and to dates are required'; return }
+  apBusy.value = true; apMsg.value = ''
+  const emp = data.employees.find((e) => e.id === apEmp.value)
+  const r = await api.call('leave_sync', { leave: [{ employeeId: apEmp.value, employeeName: emp?.name || emp?.id || '', type: apType.value, from: apFrom.value, to: apTo.value, days: Number(apDays.value) || 1, reason: apReason.value, status: 'Pending' }] })
+  apBusy.value = false
+  if (r.ok) {
+    await data.loadLeave()
+    showApply.value = false
+    showToast('Leave request submitted')
+  } else {
+    apMsg.value = 'Could not submit the request — check the server'
+  }
+}
+async function decideLeave(lv: Record<string, unknown>, status: string) {
+  const r = await api.call('leave_sync', { leave: [{ employeeId: String(lv.employeeId ?? lv.employee ?? ''), employeeName: String(lv.employeeName ?? ''), type: String(lv.type ?? lv.leave_type ?? 'Annual'), from: String(lv.from ?? lv.from_date ?? ''), to: String(lv.to ?? ''), days: Number(lv.days) || 0, reason: String(lv.reason ?? ''), status }] })
+  if (r.ok) {
+    await data.loadLeave()
+    showToast('Leave ' + status.toLowerCase())
+  } else {
+    showToast('Could not update the request')
+  }
+}
+(window as unknown as { __decideLeave: (id: string, status: string) => void }).__decideLeave = (id: string, status: string) => {
+  const lv = data.leave.find((l) => String(l.id) === id)
+  if (lv) decideLeave(lv as unknown as Record<string, unknown>, status)
+}
 const columns = computed<TableColumn<any>[]>(() => [
   {
     key: 'employeeName',
@@ -85,7 +124,11 @@ const columns = computed<TableColumn<any>[]>(() => [
     key: 'status',
     label: 'Status',
     sortable: true,
-    renderHtml: (x) => `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(x.status||'—')}</span>`
+    renderHtml: (x) => x.status === 'Pending'
+      ? `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(x.status||'—')}</span>
+         <button onclick="event.stopPropagation();window.__decideLeave('${esc(String(x.id))}','Approved')" style="margin-left:6px;padding:3px 8px;background:#2e7d32;color:#fff;border:0;border-radius:4px;font-size:10px;cursor:pointer">✓ Approve</button>
+         <button onclick="event.stopPropagation();window.__decideLeave('${esc(String(x.id))}','Rejected')" style="margin-left:4px;padding:3px 8px;background:#c62828;color:#fff;border:0;border-radius:4px;font-size:10px;cursor:pointer">✕ Reject</button>`
+      : `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(x.status||'—')}</span>`
   },])
 
 const rows = computed(() => data.leave)
@@ -113,5 +156,38 @@ const actions = computed(() => [
       search-placeholder="Search leave…"
     />
   </div>
-    <GenericDetailDrawer :record="detailRec" :title="'Leave Requests'" @close="detailRec = null" :records="detailList" />
+    <div style="display: flex; justify-content: flex-end; margin: 6px 0">
+      <button @click="showApply = true" style="padding: 6px 12px; background: #2F80ED; color: #fff; border: 0; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer">+ Apply leave</button>
+    </div>
+    <div v-if="showApply" class="drawer-sheet" style="z-index: 10001">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px">
+        <span style="font-size: 13px; font-weight: 700">📅 Apply leave</span>
+        <button @click="showApply = false" style="background: none; border: 0; font-size: 15px; cursor: pointer; color: #888">✕</button>
+      </div>
+      <label style="font-size: 10px; color: #888">EMPLOYEE</label>
+      <select v-model="apEmp" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; margin: 3px 0 8px">
+        <option value="">— Select employee —</option>
+        <option v-for="e in apEmps" :key="e.id" :value="e.id">{{ e.name || e.id }}</option>
+      </select>
+      <label style="font-size: 10px; color: #888">TYPE</label>
+      <select v-model="apType" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; margin: 3px 0 8px">
+        <option>Annual</option>
+        <option>Casual</option>
+        <option>Sick</option>
+        <option>Unpaid</option>
+      </select>
+      <div style="display: flex; gap: 8px">
+        <div style="flex: 1"><label style="font-size: 10px; color: #888">FROM</label>
+        <input v-model="apFrom" type="date" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; margin: 3px 0 8px" /></div>
+        <div style="flex: 1"><label style="font-size: 10px; color: #888">TO</label>
+        <input v-model="apTo" type="date" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; margin: 3px 0 8px" /></div>
+        <div style="flex: 1"><label style="font-size: 10px; color: #888">DAYS</label>
+        <input v-model="apDays" type="number" min="1" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; margin: 3px 0 8px" /></div>
+      </div>
+      <label style="font-size: 10px; color: #888">REASON</label>
+      <input v-model="apReason" placeholder="Reason for leave" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; margin: 3px 0 8px" />
+      <p v-if="apMsg" style="font-size: 11px; color: #c62828; margin: 4px 0">{{ apMsg }}</p>
+      <button @click="submitApply" :disabled="apBusy" style="width: 100%; padding: 10px; background: #2F80ED; color: #fff; border: 0; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer">{{ apBusy ? 'Submitting…' : 'Submit request' }}</button>
+    </div>
+    <GenericDetailDrawer :record="detailRec"  :title="'Leave Requests'" @close="detailRec = null" :records="detailList" />
 </template>
