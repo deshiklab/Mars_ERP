@@ -43,8 +43,9 @@ export interface Lead {
   status: string
   priority: 'High' | 'Medium' | 'Low'
   score: number
-  follow_up: string
-  last_contact: string
+  nextFollowUp: string
+  nextFollowUpRaw: string
+  lastContact: string
   owner?: string
   notes?: string
   type?: string

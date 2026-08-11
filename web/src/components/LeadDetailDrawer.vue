@@ -8,6 +8,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import { useDataStore } from '@/stores/data'
+import { showToast } from '@/toast'
 import type { Lead } from '@/api/types'
 
 const props = defineProps<{ lead: Lead | null }>()
@@ -55,6 +56,22 @@ onMounted(async () => {
     payments.value = (r.data.collections.payments as any[]) ?? []
   }
 })
+
+const actType = ref('Call')
+const actText = ref('')
+const logging = ref(false)
+async function logActivity() {
+  if (!actText.value.trim() || logging.value || !props.lead) return
+  logging.value = true
+  const ok = await data.logLeadActivity(props.lead.id, actType.value, actText.value.trim())
+  logging.value = false
+  if (ok) {
+    showToast('✔ Activity logged')
+    actText.value = ''
+  } else {
+    showToast('Log failed — ' + data.error)
+  }
+}
 
 const leadProposals = computed(() => proposals.value.filter((p: any) => String(p.client || '').toLowerCase() === String(props.lead?.name || '').toLowerCase()))
 const leadInvoices = computed(() => invoices.value.filter((i: any) => String(i.client || '').toLowerCase() === String(props.lead?.name || '').toLowerCase()))
@@ -177,7 +194,7 @@ const bdt = (n: number) => (n >= 10000000 ? `৳ ${(n / 10000000).toFixed(2)} Cr
           </div>
           <div class="stats-row" style="grid-template-columns: 1fr 1fr; margin-top: 6px">
             <div class="stat-card"><div class="label">👤 Owner</div><div style="font-size: 12px; font-weight: 600; margin-top: 2px">{{ lead.owner || '—' }}</div></div>
-            <div class="stat-card"><div class="label">📅 Next Follow-up</div><div style="font-size: 12px; font-weight: 600; margin-top: 2px; color: #e65100">{{ lead.follow_up || '—' }}</div></div>
+            <div class="stat-card"><div class="label">📅 Next Follow-up</div><div style="font-size: 12px; font-weight: 600; margin-top: 2px; color: #e65100">{{ lead.nextFollowUp || '—' }}</div></div>
           </div>
           <div class="stats-row" style="grid-template-columns: 1fr 1fr; margin-top: 6px">
             <div class="stat-card"><div class="label">🏘 Property Interest</div><div style="font-size: 12px; font-weight: 600; margin-top: 2px; color: #2f80ed">{{ lead.property || '—' }}</div></div>
@@ -294,6 +311,13 @@ const bdt = (n: number) => (n >= 10000000 ? `৳ ${(n / 10000000).toFixed(2)} Cr
 
         <!-- ══ ACTIVITIES ══ -->
         <div v-else-if="tab === 'activities'">
+          <div style="display: flex; gap: 6px; margin-bottom: 10px; background: #f8f9fa; padding: 8px; border-radius: 8px; flex-wrap: wrap; align-items: center">
+            <select v-model="actType" style="font-size: 11px; padding: 5px 6px; border: 1px solid #e0e0e0; border-radius: 6px; background: #fff">
+              <option>Call</option><option>Meeting</option><option>Site Visit</option><option>WhatsApp</option><option>Email</option><option>Note</option>
+            </select>
+            <input v-model="actText" placeholder="What happened? e.g. Called, wants site visit Saturday…" style="flex: 1 1 160px; min-width: 0; font-size: 11px; padding: 5px 8px; border: 1px solid #e0e0e0; border-radius: 6px" @keyup.enter="logActivity" />
+            <button @click="logActivity" :disabled="logging" style="background: #2F80ED; color: #fff; border: none; border-radius: 6px; padding: 5px 12px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap">{{ logging ? 'Logging…' : '+ Log activity' }}</button>
+          </div>
           <h3 style="font-size: 11px; font-weight: 600; color: #555; margin-bottom: 8px">📊 Activity Log</h3>
           <div v-for="(a, i) in (lead as any).activities || []" :key="i" style="display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f5f5f5">
             <span style="font-size: 14px">{{ a.type === 'Call' ? '📞' : a.type === 'Meeting' ? '👥' : a.type === 'Note' ? '📝' : '📌' }}</span>

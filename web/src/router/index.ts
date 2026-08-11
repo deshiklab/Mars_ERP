@@ -22,7 +22,12 @@ const router = createRouter({
       path: '/leads',
       name: 'leads',
       component: () => import('../views/LeadsView.vue'),
-      meta: { module: 'crm', title: 'CRM & Leads' }
+    },
+    {
+      path: '/follow-ups',
+      name: 'followups',
+      meta: { module: 'followups', title: 'Follow-up Center' },
+      component: () => import('../views/FollowUpCenterView.vue'),
     },
     {
       path: '/bookings',

@@ -803,6 +803,8 @@ def _lead_to_pwa(r):
         "lastContact": _fmt_relative_dt(d.get("custom_rem_last_contact")),
         "owner": d.get("lead_owner") or "",
         "nextFollowUp": _fmt_followup(d.get("custom_rem_next_follow_up")),
+        "nextFollowUpRaw": (d.get("custom_rem_next_follow_up").date().isoformat()
+                            if d.get("custom_rem_next_follow_up") else ""),
         "paymentStatus": d.get("custom_rem_payment_status") or "Up to Date",
         "facingDir": d.get("custom_rem_facing_dir") or "",
         "floorPref": d.get("custom_rem_floor_pref") or "",

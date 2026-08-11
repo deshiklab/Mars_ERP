@@ -42,7 +42,13 @@ const newLead = ref({ name: '', email: '', phone: '', source: 'Website', priorit
 
 onMounted(() => {
   data.loadLeads().then(() => {
-    if (route.query.lead === '1' && data.leads.length) detailLead.value = data.leads[0]
+    if (route.query.lead) {
+      const q = String(route.query.lead)
+      detailLead.value =
+        q === '1'
+          ? (data.leads[0] ?? null)
+          : (data.leads.find((l) => l.id === q || l.name === q) ?? null)
+    }
   })
 })
 
@@ -108,9 +114,9 @@ const columns = computed<TableColumn<Lead>[]>(() => [
       `<span style="display:inline-flex;padding:1px 5px;border-radius:4px;font-size:9px;font-weight:600;background:#eef3ff;color:#2f80ed">${l.score ?? '—'}</span>`
   },
   {
-    key: 'follow_up',
+    key: 'nextFollowUp',
     label: 'Follow-up',
-    renderHtml: (l) => `<span style="font-size:9px;font-weight:500;color:#888">${esc(l.follow_up ?? '—')}</span>`
+    renderHtml: (l) => `<span style="font-size:9px;font-weight:500;color:#888">${esc(l.nextFollowUp ?? '—')}</span>`
   },
   {
     key: 'status',
@@ -170,7 +176,7 @@ const kanbanCards = computed<KanbanCard[]>(() =>
     id: l.id,
     title: l.name,
     subtitle: l.email || l.phone,
-    meta: `${l.source} · ${l.follow_up ?? ''}`,
+    meta: `${l.source} · ${l.nextFollowUp ?? ''}`,
     status: l.status,
     pills: [
       { text: String(l.score ?? ''), color: l.score >= 50 ? '#2e7d32' : l.score >= 25 ? '#e65100' : '#888' },

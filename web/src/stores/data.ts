@@ -229,7 +229,21 @@ export const useDataStore = defineStore('data', {
       this.duesLoading = false
     },
 
-    async recordDueUpdate(
+    async logLeadActivity(name: string, type: string, text: string): Promise<boolean> {
+    const r = await api.addLeadActivity(name, { type, text })
+    if (r.ok) {
+      const lead = this.leads.find((l) => l.id === name)
+      if (lead) {
+        const l2 = lead as { activities?: { type: string; date: string; text: string }[] }
+        l2.activities = [{ type, date: new Date().toISOString(), text }, ...(l2.activities || [])]
+      }
+      return true
+    }
+    this.error = apiErrorText(r)
+    return false
+    },
+
+  async recordDueUpdate(
       id: string,
       fields: {
         lastFollowUp?: string

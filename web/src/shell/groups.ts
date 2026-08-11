@@ -37,6 +37,7 @@ export const GROUPS: ShellGroup[] = [
     mods: [
       { id: 'customers', label: 'Customers' , path: '/customers'},
       { id: 'crm', label: 'CRM & Leads', path: '/leads' },
+      { id: 'followups', label: 'Follow-ups', path: '/follow-ups' },
       { id: 'proposals', label: 'Proposals' , path: '/proposals'},
       { id: 'contacts', label: 'Contact Book' },
       { id: 'brokers', label: 'Brokers', path: '/brokers' },

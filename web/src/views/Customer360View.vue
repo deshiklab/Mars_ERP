@@ -6,7 +6,7 @@
       <div style="flex: 1; min-width: 0">
         <h2 class="page-title" style="margin: 0">{{ me }}</h2>
         <div style="font-size: 10px; color: #8b90a0; margin-top: 2px">
-          {{ lead ? lead.source : '' }}{{ lead && lead.source ? ' · ' : '' }}{{ _t('Customer 360') }} · {{ _t('last contact') }} {{ lead ? (lead.last_contact || '—') : '—' }}
+          {{ lead ? lead.source : '' }}{{ lead && lead.source ? ' · ' : '' }}{{ _t('Customer 360') }} · {{ _t('last contact') }} {{ lead ? (lead.lastContact || '—') : '—' }}
         </div>
       </div>
       <div style="display: flex; gap: 6px; flex-wrap: wrap">
@@ -155,7 +155,7 @@ const initials = computed(() =>
 
 const journey = computed(() => {
   const ev: { icon: string; title: string; detail: string; date: string; t: number }[] = []
-  for (const l of myLeads.value) ev.push({ icon: '🧭', title: l.status, detail: l.source || '', date: l.last_contact || '', t: Date.parse(l.last_contact || '') || 0 })
+  for (const l of myLeads.value) ev.push({ icon: '🧭', title: l.status, detail: l.source || '', date: l.lastContact || '', t: Date.parse(l.lastContact || '') || 0 })
   for (const b of myBookings.value) ev.push({ icon: '📄', title: 'Booking ' + b.id, detail: b.property + ' ' + b.unit, date: b.date || '', t: Date.parse(b.date || '') || 0 })
   for (const inv of myInvoices.value) ev.push({ icon: '🧾', title: inv.id + ' · ' + inv.status, detail: (inv.project || '') + ' ' + (inv.unit || ''), date: inv.dueDate || inv.issuedDate || '', t: Date.parse(inv.dueDate || inv.issuedDate || '') || 0 })
   for (const p of myPayments.value) ev.push({ icon: '💵', title: 'Payment ' + p.id, detail: p.method + ' · ' + (p.reference || ''), date: p.date || '', t: Date.parse(p.date || '') || 0 })
