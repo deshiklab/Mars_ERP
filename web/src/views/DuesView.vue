@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { showToast } from '@/toast'
 import { useDataStore } from '@/stores/data'
 import { _t } from '@/i18n'
@@ -10,9 +10,10 @@ import type { TableAction, TableColumn, TableTab } from '@/components/DataTable.
 import type { Due } from '@/api/types'
 
 const route = useRoute()
+const router = useRouter()
 const data = useDataStore()
 const detailDue = ref<Due | null>(null)
-const tab = ref('all')
+const tab = ref(String(route.query.tab ?? 'all').toLowerCase())
 
 onMounted(() => {
   data.loadDues().then(() => {
@@ -124,6 +125,7 @@ const tabRows = computed(() => {
 
 function onTabChange(t: string) {
   tab.value = t
+  router.replace({ query: { ...route.query, tab: t } })
 }
 
 const aging = computed(() => {
@@ -194,6 +196,7 @@ function onDueStatus(st: string) {
       :tabs="tabs"
       :actions="actions"
       search-placeholder="Search customers, projects…"
+      :tab="tab"
       @tab-change="onTabChange"
      :status-editable="false" />
   </div>

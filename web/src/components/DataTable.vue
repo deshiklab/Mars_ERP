@@ -37,6 +37,8 @@ const props = withDefaults(
     columns: TableColumn<any>[]
     rows: any[]
     tabs?: TableTab[]
+    /** initial active tab (URL-driven deep links) */
+    tab?: string
     pageSizeOptions?: number[]
     defaultPageSize?: number
     actions?: TableAction[]
@@ -47,6 +49,7 @@ const props = withDefaults(
   }>(),
   {
     tabs: () => [],
+    tab: '',
     pageSizeOptions: () => [10, 25, 50, 100],
     defaultPageSize: 10,
     actions: () => [],
@@ -65,7 +68,7 @@ const emit = defineEmits<{
 
 /* ── state ── */
 const search = ref('')
-const activeTab = ref(props.tabs[0]?.id ?? '')
+const activeTab = ref(props.tab || props.tabs[0]?.id || '')
 const sortKey = ref<{ col: number; dir: 'asc' | 'desc' } | null>(null)
 const hiddenCols = ref<Set<number>>(new Set())
 const filterOpen = ref(false)
