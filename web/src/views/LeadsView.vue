@@ -87,6 +87,23 @@ const leadStats = computed(() => [
 ])
 
 /* ── table ── */
+const selectedLeads = ref(new Set<string>())
+const bulkStatus = ref('')
+const bulkBusy = ref(false)
+const bulkStatuses = ['New Inquiry', 'Site Visit', 'Negotiation', 'Booking', 'Downpayment', 'Installments', 'Converted', 'Lost']
+const applyBulk = async () => {
+  if (!bulkStatus.value || selectedLeads.value.size === 0) return
+  bulkBusy.value = true
+  let okCount = 0
+  for (const id of [...selectedLeads.value]) {
+    const r = await api.leadUpdateStatus(id, bulkStatus.value)
+    if (r.ok) okCount++
+  }
+  bulkBusy.value = false
+  showToast(okCount > 0 ? `Bulk update: ${okCount}/${selectedLeads.value.size} leads → ${bulkStatus.value}` : 'Bulk update failed')
+  selectedLeads.value = new Set()
+  await data.loadLeads()
+}
 const columns = computed<TableColumn<Lead>[]>(() => [
   {
     key: 'name',
@@ -238,12 +255,25 @@ async function saveLead() {
 
     <template v-else>
       <!-- TABLE VIEW -->
+      <div v-if="viewMode === 'table' && selectedLeads.size" class="top-nav-item" style="margin-bottom: 6px; gap: 8px; flex-wrap: wrap">
+        <span style="font-size: 12px; font-weight: 700; color: #2F80ED">{{ selectedLeads.size }} selected</span>
+        <select v-model="bulkStatus" style="font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid #d0d7de">
+          <option value="" disabled>Move to…</option>
+          <option v-for="st in bulkStatuses" :key="st" :value="st">{{ st }}</option>
+        </select>
+        <button @click="applyBulk" :disabled="bulkBusy || !bulkStatus" style="font-size: 12px; padding: 4px 14px; border-radius: 6px; border: none; background: #2F80ED; color: #fff; cursor: pointer">
+          {{ bulkBusy ? 'Applying…' : 'Apply' }}
+        </button>
+      </div>
       <DataTable
         v-if="viewMode === 'table'"
         :columns="columns"
         :rows="tabRows"
         :tabs="tabs"
         :actions="actions"
+        selectable
+        :selected="selectedLeads"
+        @select="selectedLeads = $event"
         search-placeholder="Search leads, source, status…"
         @tab-change="onTabChange"
        :status-options="statusOptions" @status-change="onStatusChange" />

@@ -46,6 +46,10 @@ const props = withDefaults(
     statusOptions?: string[]
   /** Derived-status tables (e.g. dues bucket) can disable the inline status dropdown. */
   statusEditable?: boolean
+  /** Row checkboxes (bulk actions). Parent owns the selected set. */
+  selectable?: boolean
+  selected?: Set<string>
+  rowKey?: string
   }>(),
   {
     tabs: () => [],
@@ -54,7 +58,10 @@ const props = withDefaults(
     defaultPageSize: 10,
     actions: () => [],
     searchPlaceholder: 'Search…',
-    statusOptions: () => ['Active', 'Inactive', 'Pending', 'Approved', 'Rejected', 'Paid', 'Overdue', 'Completed', 'Cancelled', 'On Hold']
+    statusOptions: () => ['Active', 'Inactive', 'Pending', 'Approved', 'Rejected', 'Paid', 'Overdue', 'Completed', 'Cancelled', 'On Hold'],
+    selectable: false,
+    selected: () => new Set<string>(),
+    rowKey: 'id'
   }
 )
 
@@ -64,6 +71,7 @@ const emit = defineEmits<{
   (e: 'update', payload: { row: Record<string, unknown>; field: string; value: unknown }): void
   (e: 'link', payload: { type: string; value: string; row: Record<string, unknown> }): void
   (e: 'status-change', payload: { row: Record<string, unknown>; field: string; from: string; to: string }): void
+  (e: 'select', sel: Set<string>): void
 }>()
 
 /* ── state ── */
@@ -297,6 +305,24 @@ function openRow(r: Record<string, unknown>) {
   if (act) act.onClick(r)
 }
 
+const isSel = (r: unknown) => {
+  const v = (r as Record<string, unknown>)[props.rowKey] ?? ''
+  return props.selected.has(String(v))
+}
+const toggleSel = (r: unknown) => {
+  const v = String((r as Record<string, unknown>)[props.rowKey] ?? '')
+  const next = new Set<string>(props.selected)
+  if (next.has(v)) next.delete(v)
+  else next.add(v)
+  emit('select', next)
+}
+const toggleAll = () => {
+  const all = pagedRows.value.map((r) => String((r as Record<string, unknown>)[props.rowKey] ?? ''))
+  const allSel = all.length > 0 && all.every((v) => props.selected.has(v))
+  const next = new Set<string>(props.selected)
+  all.forEach((v) => (allSel ? next.delete(v) : next.add(v)))
+  emit('select', next)
+}
 function onRowClick(e: MouseEvent, r: Record<string, unknown>) {
   const t = e.target as HTMLElement
   if (t.closest('button')) return
@@ -471,11 +497,17 @@ defineExpose({ refresh: () => (page.value = 1) })
                 {{ sortKey?.col === i ? (sortKey.dir === 'asc' ? '▲' : '▼') : '⇅' }}
               </span>
             </th>
+            <th v-if="props.selectable" style="width: 30px" @click.stop>
+              <input type="checkbox" :checked="pagedRows.length > 0 && pagedRows.every((r) => isSel(r))" @change="toggleAll()" style="cursor: pointer" />
+            </th>
             <th v-if="actions.length" style="width: 40px"></th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="(r, ri) in pagedRows" :key="ri" style="cursor: pointer" @click="onRowClick($event, r)">
+            <td v-if="props.selectable" style="width: 30px" @click.stop>
+              <input type="checkbox" :checked="isSel(r)" @change="toggleSel(r)" style="cursor: pointer" />
+            </td>
             <td
               v-for="(c, i) in visibleColumns"
               :key="i"
