@@ -1254,6 +1254,8 @@ def _booking_payment_impl(name=None, amount=None, mode_of_payment="Cash", refere
 		else frappe.get_doc("REM Booking", {"custom_booking_ref": name})
 	)
 	sinv = doc.sales_invoice
+	if sinv and not frappe.db.exists("Sales Invoice", sinv):
+		sinv = None
 	if not sinv:
 		# auto-create invoice for the payment amount
 		inv = booking_invoice(name=name, amount=amount)
