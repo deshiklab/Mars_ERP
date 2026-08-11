@@ -37,7 +37,9 @@ const auth = useAuthStore()
 auth.restore()
 
 api.setOnUnauthorized(() => {
-  // a dead session mid-flight → back to the login gate
+  // a dead session mid-flight → back to the login gate (reset the phase
+  // FIRST or the auth guard sees authenticated=true and bounces back)
+  auth.$patch({ phase: 'guest', user: '', fullName: '', roles: [], tmpId: '', pendingEmail: '', pendingPassword: '', error: '' })
   if (router.currentRoute.value.name !== 'login') {
     router.push('/login')
   }

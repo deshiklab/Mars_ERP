@@ -90,12 +90,16 @@ class ApiClient {
         body: body !== undefined ? JSON.stringify(body) : undefined
       })
       if (timer) clearTimeout(timer)
-      if (res.status === 401) {
+      const data = await res.json().catch(() => ({}))
+      // invalid/expired sid → Frappe replies 403 "...You are not permitted
+      // to access this resource. Login to access" (the "Login to access"
+      // suffix is the invalid-session marker — a real permission denial for
+      // a logged-in user omits it and keeps their session)
+      if (res.status === 401 || (res.status === 403 && /login to access/i.test(String((data as { exception?: string })?.exception ?? '')))) {
         this.token = ''
         localStorage.removeItem('rem_api_token')
         if (this.onUnauthorized) this.onUnauthorized()
       }
-      const data = await res.json().catch(() => ({}))
       const unwrapped = (data && typeof data.message !== 'undefined' ? data.message : data) as T
       return { status: res.status, ok: res.status >= 200 && res.status < 300, data: unwrapped }
     } catch (err) {
