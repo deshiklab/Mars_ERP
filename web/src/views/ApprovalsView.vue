@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
@@ -53,6 +55,26 @@ const stats = computed(() => [
   { label: 'Approved', value: String(data.approvals.filter(a=>a.status==='Approved').length), color: '#2e7d32' }
 ])
 
+const apprBusy = ref(false)
+const decideAppr = async (a: any, st: string) => {
+  if (apprBusy.value) return
+  apprBusy.value = true
+  try {
+    const r = await api.call('approvals_sync', { approvals: [{ ref: a.id ?? '', title: a.title ?? '', type: a.type ?? '', requestedBy: a.requestedBy ?? '', date: a.date ?? '', status: st }] })
+    if (r.ok) {
+      await data.loadApprovals()
+      showToast(`Approval ${st}`)
+    } else {
+      showToast('Update failed — ' + (r.error || 'server error'))
+    }
+  } finally {
+    apprBusy.value = false
+  }
+}
+;(window as unknown as { __apprAct: (id: string, st: string) => void }).__apprAct = (id: string, st: string) => {
+  const a = data.approvals.find((x) => String(x.id ?? '') === id)
+  if (a) void decideAppr(a, st)
+}
 const columns = computed<TableColumn<any>[]>(() => [
   {
     key: 'id',
@@ -88,7 +110,12 @@ const columns = computed<TableColumn<any>[]>(() => [
     key: 'status',
     label: 'Status',
     sortable: true,
-    renderHtml: (x) => `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(x.status||'—')}</span>`
+    renderHtml: (x) => {
+      const s = x.status || '—'
+      let acts = ''
+      if (s === 'Pending') acts = ` <button style="border:0;border-radius:4px;font-size:9px;font-weight:700;padding:2px 6px;cursor:pointer;color:#fff;background:#27ae60;margin-left:4px" onclick="event.stopPropagation();window.__apprAct('${x.id}','Approved')">✓</button><button style="border:0;border-radius:4px;font-size:9px;font-weight:700;padding:2px 6px;cursor:pointer;color:#fff;background:#e74c3c;margin-left:4px" onclick="event.stopPropagation();window.__apprAct('${x.id}','Rejected')">✕</button>`
+      return `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(s)}</span>${acts}`
+    }
   },])
 
 const rows = computed(() => data.approvals)

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
@@ -54,6 +56,26 @@ const stats = computed(() => [
   { label: 'Resolved', value: String(data.complaints.filter(c=>c.status==='Resolved'||c.status==='Closed').length), color: '#2e7d32' }
 ])
 
+const cmpBusy = ref(false)
+const decideCmp = async (c: any, st: string) => {
+  if (cmpBusy.value) return
+  cmpBusy.value = true
+  try {
+    const r = await api.call('complaints_sync', { complaints: [{ id: c.id ?? '', subject: c.subject ?? '', customer: c.customer ?? '', type: c.type ?? '', priority: c.priority ?? '', status: st }] })
+    if (r.ok) {
+      await data.loadComplaints()
+      showToast(`Complaint ${st}`)
+    } else {
+      showToast('Update failed — ' + (r.error || 'server error'))
+    }
+  } finally {
+    cmpBusy.value = false
+  }
+}
+;(window as unknown as { __cmpAct: (id: string, st: string) => void }).__cmpAct = (id: string, st: string) => {
+  const c = data.complaints.find((x) => String(x.id ?? '') === id)
+  if (c) void decideCmp(c, st)
+}
 const columns = computed<TableColumn<any>[]>(() => [
   {
     key: 'id',
@@ -95,7 +117,13 @@ const columns = computed<TableColumn<any>[]>(() => [
     key: 'status',
     label: 'Status',
     sortable: true,
-    renderHtml: (x) => `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(x.status||'—')}</span>`
+    renderHtml: (x) => {
+      const s = x.status || '—'
+      let acts = ''
+      if (s === 'Open') acts = ` <button style="border:0;border-radius:4px;font-size:9px;font-weight:700;padding:2px 6px;cursor:pointer;color:#fff;background:#2f80ed;margin-left:4px" onclick="event.stopPropagation();window.__cmpAct('${x.id}','In Progress')">⚙</button><button style="border:0;border-radius:4px;font-size:9px;font-weight:700;padding:2px 6px;cursor:pointer;color:#fff;background:#27ae60;margin-left:4px" onclick="event.stopPropagation();window.__cmpAct('${x.id}','Resolved')">✓</button>`
+      else if (s === 'In Progress') acts = ` <button style="border:0;border-radius:4px;font-size:9px;font-weight:700;padding:2px 6px;cursor:pointer;color:#fff;background:#27ae60;margin-left:4px" onclick="event.stopPropagation();window.__cmpAct('${x.id}','Resolved')">✓</button>`
+      return `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(s)}</span>${acts}`
+    }
   },])
 
 const rows = computed(() => data.complaints)
