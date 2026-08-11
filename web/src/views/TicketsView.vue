@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
@@ -53,6 +55,35 @@ const stats = computed(() => [
   { label: 'Resolved', value: String(data.tickets.filter(t=>t.status==='Resolved'||t.status==='Closed').length), color: '#2e7d32' }
 ])
 
+const actBusy = ref(false)
+async function tktAct(id: string, status: string, ev?: MouseEvent) {
+  if (ev) ev.stopPropagation()
+  if (actBusy.value) return
+  const t = data.tickets.find((x) => x.id === id)
+  if (!t) return
+  actBusy.value = true
+  try {
+    const r = await api.call('tickets_sync', { tickets: [{ id: '', subject: String(t.subject ?? ''), customer: String(t.customer ?? ''), status, priority: String(t.priority ?? 'Medium'), type: String(t.type ?? 'Enquiry') }] })
+    if (r.ok) {
+      t.status = status
+      showToast(`Ticket ${status}`)
+      await data.loadTickets()
+    } else showToast('Update failed', 'error')
+  } finally { actBusy.value = false }
+}
+;(window as unknown as { __tktAct: (id: string, s: string, e?: MouseEvent) => void }).__tktAct = tktAct
+const showNew = ref(false)
+const nf = ref({ subject: '', customer: '', type: 'Enquiry', priority: 'Medium', desc: '' })
+const nfBusy = ref(false)
+async function createTicket() {
+  if (!nf.value.subject.trim() || !nf.value.customer.trim()) { showToast('Subject and customer are required', 'error'); return }
+  nfBusy.value = true
+  try {
+    const r = await api.call('tickets_sync', { tickets: [{ id: '', subject: nf.value.subject.trim(), customer: nf.value.customer.trim(), type: nf.value.type, priority: nf.value.priority, desc: nf.value.desc.trim(), status: 'Open' }] })
+    if (r.ok) { showToast('Ticket created'); showNew.value = false; nf.value = { subject: '', customer: '', type: 'Enquiry', priority: 'Medium', desc: '' }; await data.loadTickets() }
+    else showToast('Create failed', 'error')
+  } finally { nfBusy.value = false }
+}
 const columns = computed<TableColumn<any>[]>(() => [
   {
     key: 'id',
@@ -88,7 +119,14 @@ const columns = computed<TableColumn<any>[]>(() => [
     key: 'status',
     label: 'Status',
     sortable: true,
-    renderHtml: (x) => `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(x.status||'—')}</span>`
+    renderHtml: (x) => {
+      const s = x.status || '—'
+      let acts = ''
+      if (s === 'Open') acts = ` <button style="border:0;background:#1565c0;color:#fff;font-size:9px;border-radius:6px;padding:2px 6px;cursor:pointer" onclick="event.stopPropagation();window.__tktAct('${x.id}','Replied',event)">⚙ Start</button> <button style="border:0;background:#2e7d32;color:#fff;font-size:9px;border-radius:6px;padding:2px 6px;cursor:pointer" onclick="event.stopPropagation();window.__tktAct('${x.id}','Resolved',event)">✓ Resolve</button>`
+      else if (s === 'Replied') acts = ` <button style="border:0;background:#2e7d32;color:#fff;font-size:9px;border-radius:6px;padding:2px 6px;cursor:pointer" onclick="event.stopPropagation();window.__tktAct('${x.id}','Resolved',event)">✓ Resolve</button>`
+      else if (s === 'Resolved') acts = ` <button style="border:0;background:#455a64;color:#fff;font-size:9px;border-radius:6px;padding:2px 6px;cursor:pointer" onclick="event.stopPropagation();window.__tktAct('${x.id}','Closed',event)">✔ Close</button>`
+      return `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(s)}</span>${acts}`
+    }
   },])
 
 const rows = computed(() => data.tickets)
@@ -108,6 +146,10 @@ const actions = computed(() => [
 
     <p v-if="data.error" style="font-size: 11px; color: #c62828; margin: 6px 0">{{ data.error }}</p>
 
+    <div style="display: flex; align-items: center; gap: 8px; margin: 8px 0">
+      <button class="btn-ghost" style="font-size: 11px" @click="showNew = true">➕ New Ticket</button>
+    </div>
+
     <DataTable
       :actions="actions"
       :columns="columns"
@@ -116,5 +158,25 @@ const actions = computed(() => [
       search-placeholder="Search tickets…"
     />
   </div>
+    <div v-if="showNew" class="drawer-overlay active" @click.self="showNew = false">
+      <div class="drawer-sheet" style="width: 460px">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px">
+          <h3 style="font-size: 13px; margin: 0">➕ New Ticket</h3>
+          <div class="drawer-close" @click="showNew = false">✕</div>
+        </div>
+        <div style="display: grid; gap: 8px; font-size: 11px">
+          <input v-model="nf.subject" placeholder="Subject" class="drawer-input" />
+          <input v-model="nf.customer" placeholder="Customer name" class="drawer-input" />
+          <select v-model="nf.type" class="drawer-input">
+            <option v-for="t in ['Enquiry', 'Complaint', 'Defect', 'Quality', 'Documentation', 'Service Request']" :key="t">{{ t }}</option>
+          </select>
+          <select v-model="nf.priority" class="drawer-input">
+            <option v-for="p in ['Low', 'Medium', 'High', 'Urgent']" :key="p">{{ p }}</option>
+          </select>
+          <textarea v-model="nf.desc" placeholder="Description" rows="3" class="drawer-input" style="resize: vertical"></textarea>
+          <button class="btn-primary" style="font-size: 11px" :disabled="nfBusy" @click="createTicket">Create ticket</button>
+        </div>
+      </div>
+    </div>
     <GenericDetailDrawer :record="detailRec" :title="'Ticketing & Issue'" @close="detailRec = null" :records="detailList" />
 </template>

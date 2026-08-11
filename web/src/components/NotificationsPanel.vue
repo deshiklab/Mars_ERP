@@ -4,6 +4,7 @@
  * header + filter tabs + grouped notifications.
  */
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
 
 defineProps<{ open: boolean }>()
@@ -21,6 +22,22 @@ interface ServerNotif {
 }
 
 const notifs = ref<ServerNotif[]>([])
+const router = useRouter()
+const notifRoutes: Record<string, string> = { lead: '/leads', payment: '/finance', dues: '/dues', due: '/dues', booking: '/bookings', ticket: '/tickets', handover: '/handover', po: '/stock', employee: '/hr', warning: '/tasks', task: '/tasks', approval: '/approvals', add: '/dashboard' }
+function goNotif(n: ServerNotif) {
+  n.read = true
+  const path = notifRoutes[n.type] || notifRoutes[n.type.split('_')[0]] || ''
+  if (path) router.push(path)
+  else emit('close')
+}
+function markAllRead() {
+  notifs.value.forEach((n) => (n.read = true))
+  persistRead()
+}
+function persistRead() {
+  api.call('sync', { collections: { notifications: notifs.value } }).catch(() => {})
+}
+
 
 const notifIcons: Record<string, string> = {
   add: '✅',
@@ -64,7 +81,7 @@ function filtered() {
     <div class="drawer-sheet" style="width: 380px; animation: none">
       <div class="drawer-header">
         <h3>🔔 Notifications <span style="font-size: 9px; color: #888">{{ notifs.filter((n) => !n.read).length }} unread</span>
-          <span v-if="notifs.some((n) => !n.read)" @click="notifs.forEach((n) => (n.read = true))" style="font-size: 9px; color: #2f80ed; cursor: pointer; margin-left: 8px">Mark all read</span>
+          <span v-if="notifs.some((n) => !n.read)" @click="markAllRead()" style="font-size: 9px; color: #2f80ed; cursor: pointer; margin-left: 8px">Mark all read</span>
         </h3>
         <div class="drawer-close" @click="emit('close')">✕</div>
       </div>
@@ -87,7 +104,7 @@ function filtered() {
           :key="i"
           style="display: flex; align-items: flex-start; gap: 10px; padding: 9px 6px; border-bottom: 1px solid #f5f5f5; cursor: pointer"
           :style="!n.read ? 'background:#f7faff' : ''"
-          @click="n.read = true"
+          @click="goNotif(n)"
         >
           <span style="font-size: 16px; width: 24px; text-align: center">{{ notifIcons[n.type] ?? '🔔' }}</span>
           <div style="flex: 1; min-width: 0">
