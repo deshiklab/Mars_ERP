@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
@@ -53,6 +55,18 @@ const stats = computed(() => [
   { label: 'In Service', value: String(data.equipment.filter(e=>e.status==='In Service'||e.status==='Maintenance').length), color: '#e65100' }
 ])
 
+const eqBusy = ref(false)
+;(window as unknown as { __eqAct: (id: string, st: string) => void }).__eqAct = async (id: string, st: string) => {
+  if (eqBusy.value) return
+  eqBusy.value = true
+  try {
+    const e = data.equipment.find((x) => String(x.id ?? '') === id)
+    if (!e) return
+    const r = await api.call('equipment_sync', { equipment: [{ id: e.id ?? '', name: e.name ?? '', model: e.model ?? '', site: e.site ?? '', operator: e.operator ?? '', status: st }] })
+    if (r.ok) { showToast('Equipment ' + st); await data.loadCollection('equipment') }
+    else showToast('Update failed — ' + (r.error || 'server error'))
+  } finally { eqBusy.value = false }
+}
 const columns = computed<TableColumn<any>[]>(() => [
   {
     key: 'name',
@@ -88,7 +102,13 @@ const columns = computed<TableColumn<any>[]>(() => [
     key: 'status',
     label: 'Status',
     sortable: true,
-    renderHtml: (x) => `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(x.status||'—')}</span>`
+    renderHtml: (x) => {
+      const s2 = statusColor(x.status)
+      let acts = ''
+      if (x.status === 'Operational') acts = ` <button style="border:0;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;background:#f57c00;color:#fff" onclick="event.stopPropagation();window.__eqAct('${x.id}','Maintenance')">Maintenance</button>`
+      else if (x.status === 'Maintenance') acts = ` <button style="border:0;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;background:#2e7d32;color:#fff" onclick="event.stopPropagation();window.__eqAct('${x.id}','Operational')">Back in service</button><button style="border:0;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;background:#c62828;color:#fff;margin-left:3px" onclick="event.stopPropagation();window.__eqAct('${x.id}','Idle')">Idle</button>`
+      return `<span class='pill' style='background:${s2.bg};color:${s2.fg}'>${x.status}</span>${acts}`
+    }
   },])
 
 const rows = computed(() => data.equipment)

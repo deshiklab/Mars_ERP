@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
@@ -53,6 +55,18 @@ const stats = computed(() => [
   { label: 'Completed', value: String(data.workOrders.filter(w=>w.status==='Completed').length), color: '#2e7d32' }
 ])
 
+const woBusy = ref(false)
+;(window as unknown as { __woAct: (id: string, st: string) => void }).__woAct = async (id: string, st: string) => {
+  if (woBusy.value) return
+  woBusy.value = true
+  try {
+    const w = data.workOrders.find((x) => String(x.id ?? '') === id)
+    if (!w) return
+    const r = await api.call('work_orders_sync', { workOrders: [{ id: w.id ?? '', scope: w.title ?? '', project: w.project ?? '', assignee: w.assignee ?? '', status: st }] })
+    if (r.ok) { showToast('Work order ' + st); await data.loadCollection('workOrders') }
+    else showToast('Update failed — ' + (r.error || 'server error'))
+  } finally { woBusy.value = false }
+}
 const columns = computed<TableColumn<any>[]>(() => [
   {
     key: 'id',
@@ -82,7 +96,13 @@ const columns = computed<TableColumn<any>[]>(() => [
     key: 'status',
     label: 'Status',
     sortable: true,
-    renderHtml: (x) => `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(x.status||'—')}</span>`
+    renderHtml: (x) => {
+      const s2 = statusColor(x.status)
+      let acts = ''
+      if (x.status === 'Pending' || x.status === 'Draft') acts = ` <button style="border:0;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;background:#1565c0;color:#fff" onclick="event.stopPropagation();window.__woAct('${x.id}','In Progress')">Start</button><button style="border:0;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;background:#2e7d32;color:#fff;margin-left:3px" onclick="event.stopPropagation();window.__woAct('${x.id}','Completed')">Complete</button>`
+      else if (x.status === 'In Progress') acts = ` <button style="border:0;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;background:#2e7d32;color:#fff" onclick="event.stopPropagation();window.__woAct('${x.id}','Completed')">Complete</button>`
+      return `<span class='pill' style='background:${s2.bg};color:${s2.fg}'>${x.status}</span>${acts}`
+    }
   },])
 
 const rows = computed(() => data.workOrders)

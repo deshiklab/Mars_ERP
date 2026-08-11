@@ -1968,16 +1968,36 @@ def equipment_sync(equipment=None):
 		st = str(item.get("status") or "Operational")
 		doc.custom_rem_status = st if st in ("Operational", "Under Repair", "Idle", "Maintenance") else "Operational"
 		doc.custom_rem_hours = str(item.get("hours") or "")
+		if not existing:
+			cat = frappe.db.get_value("Asset Category", {}, "name")
+			if not cat:
+				cat = frappe.get_doc({"doctype": "Asset Category", "asset_category_name": "Equipment"}).insert(ignore_permissions=True).name
+			doc.asset_category = cat
+			doc.gross_purchase_amount = 1
+			doc.purchase_date = frappe.utils.today()
+			doc.company = _get_company()
 		doc.custom_rem_fuel_cost = parse_bdt(item.get("fuelCost")) if isinstance(item.get("fuelCost"), str) else (item.get("fuelCost") or 0)
 		doc.custom_rem_operator = str(item.get("operator") or "")
 		if item.get("lastService"):
 			doc.custom_rem_last_service = str(item["lastService"])[:10]
-		# Asset requires the linked Item to be a Fixed Asset item
-		_itm = _get_sales_item()
-		frappe.db.set_value("Item", _itm, "is_fixed_asset", 1)
+		# Asset requires a dedicated Fixed Asset item
+		_itm = frappe.db.get_value("Item", {"item_name": "Equipment (Fixed Asset)"}, "name")
+		if not _itm:
+			_it = frappe.new_doc("Item")
+			_it.item_code = "REM-Fixed-Equipment"
+			_it.item_name = "Equipment (Fixed Asset)"
+			_it.item_group = "Products"
+			_it.is_stock_item = 0
+			_it.is_fixed_asset = 1
+			_it.asset_category = frappe.db.get_value("Asset Category", {}, "name") or doc.asset_category
+			_it.flags.ignore_mandatory = True
+			_it.save(ignore_permissions=True)
+			_itm = _it.name
+		else:
+			frappe.db.set_value("Item", _itm, "is_fixed_asset", 1)
 		doc.item_code = _itm
 		# Asset has mandatory gross_purchase_amount + purchase_date
-		doc.gross_purchase_amount = doc.custom_rem_fuel_cost or 0
+		doc.gross_purchase_amount = doc.custom_rem_fuel_cost or 1
 		doc.purchase_date = frappe.utils.today()
 		loc = frappe.db.get_value("Location", {}, "name")
 		if not loc:
