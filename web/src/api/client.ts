@@ -108,7 +108,10 @@ class ApiClient {
   /** Two-step 2FA login. Stage 1 returns a challenge; call verifyOtp next. */
   /** Generic public call for views that need raw endpoints (settings, bootstrap, etc.). */
   async call<T>(endpoint: string, body?: Record<string, unknown>): Promise<ApiResult<T>> {
-    return this.request<T>(endpoint, body ? { body } : {})
+    // a body without a method used to go out as GET (body dropped) — every
+    // generic POST (the signup UI) failed with 'Name, email and password are
+    // required'. A body implies POST.
+    return this.request<T>(endpoint, body ? { method: 'POST', body } : {})
   }
 
   async login(email: string, password: string, timeout = 10000): Promise<ApiResult<LoginResponse>> {

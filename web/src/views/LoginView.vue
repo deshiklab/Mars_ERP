@@ -7,6 +7,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { showToast } from '@/toast'
 import { api } from '@/api/client'
 
 const auth = useAuthStore()
@@ -18,6 +19,9 @@ const otp = ref('')
 const showOtp = ref(false)
 const otpError = ref('')
 const showSignup = ref(false)
+const showSetup = ref(false)
+const setupSecret = ref('')
+const setupUri = ref('')
 const svcVer = ref('')
 const svcReady = ref(false)
 
@@ -51,6 +55,18 @@ async function onSignIn() {
   await auth.signIn(email.value, password.value)
   if (auth.needsOtp) showOtp.value = true
   if (auth.authenticated) router.push('/')
+}
+
+function copySetup() {
+  void navigator.clipboard?.writeText(setupSecret.value).then(() => showToast('Secret copied'))
+}
+
+function onSetupDone() {
+  showSetup.value = false
+  void auth.signIn(email.value, password.value).then(() => {
+    if (auth.needsOtp) showOtp.value = true
+    if (auth.authenticated) router.push('/')
+  })
 }
 
 async function onVerify() {
@@ -90,15 +106,28 @@ async function onSignup() {
   suBusy.value = true
   suError.value = ''
   try {
+    // api.call(endpoint, body) takes the body directly — passing the options
+    // shape { method, body } made the server receive `method`/`body` kwargs
+    // and every UI signup failed with 'Name, email and password are required'
     const r = await api.call<{ ok?: boolean }>('signup', {
-      method: 'POST',
-      body: { name: suName.value, email: suEmail.value, password: suPass.value, phone: suPhone.value || null }
+      name: suName.value,
+      email: suEmail.value,
+      password: suPass.value,
+      phone: suPhone.value || null
     })
     if (r.ok && r.data && r.data.ok) {
       showSignup.value = false
       email.value = suEmail.value
       password.value = suPass.value
       suName.value = suPass.value = suPhone.value = ''
+      const secret = (r.data as { otp_secret?: string }).otp_secret
+      if (secret) {
+        // one-time on-screen setup replaces the setup email
+        setupSecret.value = secret
+        setupUri.value = (r.data as { otpauth?: string }).otpauth || ''
+        showSetup.value = true
+        return
+      }
       await auth.signIn(email.value, password.value)
       if (auth.needsOtp) showOtp.value = true
       if (auth.authenticated) router.push('/')
@@ -142,7 +171,7 @@ async function onSignup() {
       <div style="font-size: 11px; color: #888; margin: 3px 0 20px">REM ERP — Secure Sign In</div>
 
       <!-- Password stage -->
-      <form v-if="!showOtp && !showSignup" @submit.prevent="onSignIn">
+      <form v-if="!showOtp && !showSignup && !showSetup" @submit.prevent="onSignIn">
         <div class="form-group" style="text-align: left">
           <label class="form-label">Email</label>
           <input v-model="email" type="email" class="form-input" placeholder="you@mars.com" autocomplete="username" style="padding: 10px 12px" />
@@ -189,7 +218,22 @@ async function onSignup() {
       </form>
 
       <!-- Signup stage -->
-      <form v-else-if="showSignup" @submit.prevent="onSignup">
+      <!-- one-time authenticator setup (server returned a secret) -->
+      <div v-else-if="showSetup" style="text-align: left">
+        <div style="font-size: 13px; font-weight: 600; color: #222; margin-bottom: 4px">📱 Set up your authenticator</div>
+        <div style="font-size: 11px; color: #666; margin-bottom: 10px">Add this secret to your authenticator app (Google Authenticator, Authy…) — you will need the 6-digit code to sign in.</div>
+        <div style="background: #f4f7fa; border: 1px dashed #b7c9dd; border-radius: 8px; padding: 12px; margin-bottom: 8px">
+          <div style="font-size: 10px; color: #888; margin-bottom: 4px">Secret</div>
+          <div style="font-family: monospace; font-size: 13px; letter-spacing: 2px; word-break: break-all; cursor: pointer" @click="copySetup()">{{ setupSecret }}</div>
+          <div style="font-size: 9px; color: #999; margin-top: 4px">click to copy</div>
+        </div>
+        <a v-if="setupUri" :href="setupUri" style="font-size: 11px; color: #2f80ed">Open as otpauth:// link</a>
+        <div style="margin-top: 12px">
+          <button type="button" style="width: 100%; padding: 10px; background: #2f80ed; color: #fff; border: none; border-radius: 8px; font-size: 13px; cursor: pointer" @click="onSetupDone()">I saved the secret — Continue</button>
+        </div>
+      </div>
+
+      <form v-else-if="showSignup && !showSetup" @submit.prevent="onSignup">
         <div style="font-size: 13px; font-weight: 600; color: #222; margin-bottom: 14px">Create your account</div>
         <div class="form-group" style="text-align: left">
           <label class="form-label">Full name</label>

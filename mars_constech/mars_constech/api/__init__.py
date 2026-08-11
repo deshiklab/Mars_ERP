@@ -43,18 +43,34 @@ def login(usr=None, pwd=None, email=None, password=None):
 		frappe.throw(_("Invalid login"), frappe.AuthenticationError)
 
 	# M1: honor 2FA when the user has it enabled (mirrors LoginManager.login()).
-	from frappe.twofactor import two_factor_is_enabled, authenticate_for_2factor, confirm_otp_token
+	from frappe.twofactor import two_factor_is_enabled, confirm_otp_token
+	from frappe.twofactor import get_otpsecret_for_, cache_2fa_data
+	from frappe.defaults import set_default as _set_default
+	import pyotp
 	otp = frappe.form_dict.get("otp")
 	if two_factor_is_enabled(user) and not otp:
-		# stage 1: password ok — mint the OTP challenge, do NOT create a session
+		# stage 1: password ok — mint the TOTP challenge directly (the app's
+		# gate is TOTP-native; signup shows the secret on screen, so the
+		# one-time setup EMAIL from Frappe's authenticate_for_2factor is
+		# skipped — it would fail on benches without an outgoing SMTP)
+		otp_secret = ""
+		try:
+			otp_secret = get_otpsecret_for_(user) or ""
+		except Exception:
+			otp_secret = ""
+		if not otp_secret:
+			frappe.throw(_("2FA is not set up for this account"), frappe.AuthenticationError)
+		token = int(pyotp.TOTP(otp_secret).now())
+		tmp_id = frappe.generate_hash(length=8)
+		# cache_2fa_data persists form_dict.pwd into the challenge — set it
 		frappe.form_dict["usr"] = user
 		frappe.form_dict["pwd"] = passwd
-		authenticate_for_2factor(user)
-		frappe.db.rollback()
+		cache_2fa_data(user, token, otp_secret, tmp_id)
+		_set_default(user + "_otplogin", "1", "__default")
+		frappe.db.commit()
 		return {
 			"two_factor_required": True,
-			"tmp_id": frappe.local.response.get("tmp_id"),
-			"verification": frappe.local.response.get("verification"),
+			"tmp_id": tmp_id,
 			"user": user,
 		}
 
@@ -338,8 +354,30 @@ def signup(name=None, email=None, password=None, phone=None, company=None):
 	user.flags.ignore_permissions = True
 	user.insert(ignore_permissions=True)
 	user.add_roles("MARS Customer", "Customer")
+	# Complete the OTP-App 2FA setup so the first login asks for the TOTP
+	# code instead of sending the one-time setup email (no SMTP on some
+	# benches). The secret is auto-generated on insert; return it so the
+	# app can show it once for the authenticator.
+	import pyotp
+	from frappe.twofactor import get_otpsecret_for_
+	from frappe.utils.password import encrypt as _enc
+	secret = ""
+	try:
+		secret = get_otpsecret_for_(user.name) or ""
+	except Exception:
+		secret = ""
+	if not secret:
+		secret = pyotp.random_base32()
+		frappe.db.set_default(user.name + "_otpsecret", _enc(secret, key=f"{user.name}.otpsecret"))
+	frappe.db.set_default(user.name + "_otplogin", "1")
 	frappe.db.commit()
-	return {"ok": True, "message": _("Account created — you can now sign in"), "user": email}
+	return {
+		"ok": True,
+		"message": _("Account created — you can now sign in"),
+		"user": email,
+		"otp_secret": secret,
+		"otpauth": f"otpauth://totp/MARS%20ERP:{email}?secret={secret}&issuer=MARS%20ERP",
+	}
 
 @frappe.whitelist()
 def pay_invoice(invoice_name, gateway="bkash"):
