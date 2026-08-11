@@ -7,6 +7,8 @@ import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
 import type { TableColumn } from '@/components/DataTable.vue'
 import type { PurchaseOrder, StockItem } from '@/api/types'
+import { api } from '@/api/client'
+import { showToast } from '@/toast'
 
 const route = useRoute()
 const router = useRouter()
@@ -77,12 +79,56 @@ const invCols = computed<TableColumn<StockItem>[]>(() => [
     sortable: true,
     renderHtml: (x) => {
       const s = statusStyle(x.status)
-      return `<span class="pill" style="background:${s.bg};color:${s.fg}">${esc(x.status)}</span>`
+      const b = (st: string, lbl: string, col: string) =>
+        `<button onclick="event.stopPropagation();window.__poAct('${x.id}','${st}')" style="font-size:9px;font-weight:700;color:#fff;background:${col};border:none;border-radius:8px;padding:2px 7px;cursor:pointer;margin-left:4px">${lbl}</button>`
+      let acts = ''
+      if (x.status === 'Pending Approval') acts = b('Approved', '✓ Approve', '#2e7d32') + b('Cancelled', '✕', '#d64545')
+      else if (x.status === 'Approved') acts = b('Delivered', '📦 Delivered', '#2f80ed')
+      else if (x.status === 'Delivered') acts = b('Completed', '✓ Complete', '#2e7d32')
+      return `<span class="pill" style="background:${s.bg};color:${s.fg}">${esc(x.status)}</span>${acts}`
     }
   }
 ])
 
 /* PO table */
+const showPo = ref(false)
+const showIt = ref(false)
+const poBusy = ref(false)
+const poFields = ref({ vendor: '', category: '', site: '', date: '', due: '', amount: '' })
+const itFields = ref({ item: '', unit: '', site: '', qty: '', value: '' })
+const vendors = computed(() => Array.from(new Set((data.pos as { vendor?: string }[]).map((p) => p.vendor || '').filter(Boolean))))
+const sites = computed(() => Array.from(new Set((data.pos as { site?: string }[]).map((p) => p.site || '').filter(Boolean))))
+
+async function poAct(id: string, status: string) {
+  const row = (data.pos as { id?: string }[]).find((p) => p.id === id)
+  if (!row) return
+  poBusy.value = true
+  const r = await api.call('po_sync', { pos: [{ id, vendor: (row as { vendor?: string }).vendor || '', date: (row as { date?: string }).date || '', dueDate: (row as { dueDate?: string }).dueDate || '', site: (row as { site?: string }).site || '', category: (row as { category?: string }).category || '', amount: (row as { amount?: number }).amount || 0, status }] })
+  poBusy.value = false
+  if (r.ok) {
+    await data.loadPos()
+    showToast(`PO ${id} → ${status}`)
+  } else showToast('PO update failed — try again')
+}
+
+async function submitPo() {
+  poBusy.value = true
+  const r = await api.call('po_sync', { pos: [{ id: 'PO-' + Date.now().toString().slice(-6), vendor: poFields.value.vendor, category: poFields.value.category, site: poFields.value.site, date: poFields.value.date, dueDate: poFields.value.due, amount: Number(poFields.value.amount) || 0, status: 'Pending Approval' }] })
+  poBusy.value = false
+  if (r.ok) { await data.loadPos(); showPo.value = false; showToast('Purchase order created') }
+  else showToast('Could not create PO')
+}
+
+async function submitItem() {
+  poBusy.value = true
+  const r = await api.call('inventory_sync', { inventory: [{ id: 'ITM-' + Date.now().toString().slice(-6), item: itFields.value.item, unit: itFields.value.unit || 'Nos', site: itFields.value.site, qty: Number(itFields.value.qty) || 0, value: Number(itFields.value.value) || 0 }] })
+  poBusy.value = false
+  if (r.ok) { await data.loadInventory(); showIt.value = false; showToast('Item added to inventory') }
+  else showToast('Could not add item')
+}
+
+;(window as unknown as { __poAct: (id: string, status: string) => void }).__poAct = poAct
+
 const poCols = computed<TableColumn<PurchaseOrder>[]>(() => [
   {
     key: 'id',
@@ -154,7 +200,48 @@ const actions = computed(() => [
     <div style="display: flex; border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden; margin-bottom: 10px; width: fit-content">
       <button class="action-btn" :style="{ border: 'none', borderRadius: 0, background: tab === 'inventory' ? '#f0f4ff' : '#fff', color: '#2f80ed' }" @click="setTab('inventory')">📦 Inventory</button>
       <button class="action-btn" :style="{ border: 'none', borderRadius: 0, borderLeft: '1px solid #e0e0e0', background: tab === 'pos' ? '#f0f4ff' : '#fff', color: '#2f80ed' }" @click="setTab('pos')">📄 Purchase Orders</button>
+      <button class="action-btn" :style="{ border: 'none', borderRadius: 0, borderLeft: '1px solid #e0e0e0', background: '#fff', color: '#2e7d32' }" @click="showPo = true">+ New PO</button>
+      <button class="action-btn" :style="{ border: 'none', borderRadius: 0, borderLeft: '1px solid #e0e0e0', background: '#fff', color: '#2e7d32' }" @click="showIt = true">+ New Item</button>
     </div>
   </div>
     <GenericDetailDrawer :record="detailRec" :title="'Stock & Procurement'" @close="detailRec = null" :records="detailList" />
+
+    <!-- New PO drawer -->
+    <div v-if="showPo" class="drawer-sheet" style="position: fixed; top: 0; right: 0; width: 720px; max-width: 100%; height: 100%; background: #fff; z-index: 10001; box-shadow: -4px 0 20px rgba(0,0,0,.15); overflow-y: auto">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid #eee">
+        <h3 style="margin: 0; font-size: 14px">📄 New Purchase Order</h3>
+        <button class="action-btn" @click="showPo = false">✕</button>
+      </div>
+      <div style="padding: 16px; display: flex; flex-direction: column; gap: 10px">
+        <input v-model="poFields.vendor" placeholder="Vendor name *" style="padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 12px" list="po-vendors" />
+        <datalist id="po-vendors"><option v-for="v in vendors" :key="v" :value="v" /></datalist>
+        <input v-model="poFields.category" placeholder="Category (e.g. Cement, Steel…)" style="padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 12px" />
+        <input v-model="poFields.site" placeholder="Site" style="padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 12px" list="po-sites" />
+        <datalist id="po-sites"><option v-for="s in sites" :key="s" :value="s" /></datalist>
+        <div style="display: flex; gap: 8px">
+          <input v-model="poFields.date" type="date" style="flex: 1; padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 12px" />
+          <input v-model="poFields.due" type="date" style="flex: 1; padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 12px" />
+        </div>
+        <input v-model="poFields.amount" type="number" placeholder="Amount (৳)" style="padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 12px" />
+        <button class="action-btn" style="background: #2e7d32; color: #fff" :disabled="poBusy || !poFields.vendor" @click="submitPo">{{ poBusy ? 'Saving…' : 'Create PO' }}</button>
+      </div>
+    </div>
+
+    <!-- New Item drawer -->
+    <div v-if="showIt" class="drawer-sheet" style="position: fixed; top: 0; right: 0; width: 720px; max-width: 100%; height: 100%; background: #fff; z-index: 10001; box-shadow: -4px 0 20px rgba(0,0,0,.15); overflow-y: auto">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid #eee">
+        <h3 style="margin: 0; font-size: 14px">📦 New Inventory Item</h3>
+        <button class="action-btn" @click="showIt = false">✕</button>
+      </div>
+      <div style="padding: 16px; display: flex; flex-direction: column; gap: 10px">
+        <input v-model="itFields.item" placeholder="Item name *" style="padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 12px" />
+        <input v-model="itFields.unit" placeholder="Unit (Nos, Bags, Cft…)" style="padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 12px" />
+        <input v-model="itFields.site" placeholder="Site" style="padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 12px" list="po-sites" />
+        <div style="display: flex; gap: 8px">
+          <input v-model="itFields.qty" type="number" placeholder="Quantity" style="flex: 1; padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 12px" />
+          <input v-model="itFields.value" type="number" placeholder="Value (৳)" style="flex: 1; padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 12px" />
+        </div>
+        <button class="action-btn" style="background: #2e7d32; color: #fff" :disabled="poBusy || !itFields.item" @click="submitItem">{{ poBusy ? 'Saving…' : 'Add Item' }}</button>
+      </div>
+    </div>
 </template>

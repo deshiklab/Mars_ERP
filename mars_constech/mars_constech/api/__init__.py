@@ -2910,8 +2910,11 @@ def po_sync(pos=None):
     if not pos or not isinstance(pos, list):
         frappe.throw(_("pos must be a list"), frappe.ValidationError)
     created = updated = 0
-    for po in pos:
-        ref = po.get("id") or ""
+    _prev_user = frappe.session.user
+    frappe.set_user("Administrator")
+    try:
+        for po in pos:
+            ref = po.get("id") or ""
         name = frappe.db.get_value("Purchase Order", {"custom_rem_ref": ref}, "name")
         doc = frappe.get_doc("Purchase Order", name) if name else frappe.new_doc("Purchase Order")
         if not name:
@@ -2921,22 +2924,56 @@ def po_sync(pos=None):
             doc.transaction_date = po.get("date") or po.get("dueDate") or frappe.utils.today()
             doc.schedule_date = po.get("dueDate") or doc.transaction_date
             doc.custom_rem_ref = ref
+            _it_name = po.get("category") or po.get("vendor") or "Goods"
+            _item = frappe.db.get_value("Item", {"item_name": _it_name}, "name")
+            if not _item:
+                _it = frappe.new_doc("Item")
+                _it.item_code = "REM-" + _it_name[:40].replace(" ", "-")
+                _it.item_name = _it_name
+                _it.item_group = "Products"
+                _it.is_stock_item = 1
+                _it.stock_uom = "Nos"
+                _it.flags.ignore_mandatory = True
+                _it.save(ignore_permissions=True)
+                _item = _it.name
+            doc.append("items", {
+                "item_code": _item,
+                "item_name": _it_name,
+                "qty": 1,
+                "rate": po.get("amount") or 0,
+                "uom": "Nos",
+            })
         if po.get("site"):
             doc.custom_rem_site = po.get("site")
         if po.get("category"):
             doc.custom_rem_category = po.get("category")
         if po.get("approvedBy"):
             doc.custom_rem_approved_by = po.get("approvedBy")
-        if po.get("status"):
-            doc.status = {"Pending Approval": "Draft", "Approved": "To Receive and Bill",
-                          "Delivered": "Delivered", "Completed": "Completed",
-                          "Cancelled": "Cancelled"}.get(po.get("status"), "Draft")
-        doc.flags.ignore_mandatory = True
-        doc.save(ignore_permissions=True)
+        pwa_status = po.get("status")
+        if pwa_status:
+            st = {"Pending Approval": "Draft", "Approved": "To Receive and Bill",
+                  "Delivered": "To Receive and Bill", "Completed": "Completed",
+                  "Cancelled": "Cancelled"}.get(pwa_status, "Draft")
+            # ERPNext derives the PO status from the doc state - submit/cancel to move it
+            if name and pwa_status == "Approved" and doc.status == "Draft" and not doc.docstatus:
+                doc.flags.ignore_mandatory = True
+                doc.save(ignore_permissions=True)
+                doc.submit()
+            elif name and pwa_status == "Cancelled" and doc.docstatus == 1:
+                doc.cancel()
+            else:
+                doc.status = st
+                doc.flags.ignore_mandatory = True
+                doc.save(ignore_permissions=True)
+        else:
+            doc.flags.ignore_mandatory = True
+            doc.save(ignore_permissions=True)
         if name:
             updated += 1
         else:
             created += 1
+    finally:
+        frappe.set_user(_prev_user)
     frappe.db.commit()
     return {"created": created, "updated": updated}
 
