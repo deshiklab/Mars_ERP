@@ -2,6 +2,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
+import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import DataTable from '@/components/DataTable.vue'
 import BrokerDetailDrawer from '@/components/BrokerDetailDrawer.vue'
 import type { Broker } from '@/api/types'
@@ -58,6 +60,25 @@ const stats = computed(() => [
   { label: 'Deals Closed', value: String(data.brokers.reduce((s,b)=>s+(b.dealsClosed??0),0)), color: '#e65100' }
 ])
 
+const brkBusy = ref(false)
+const decideBrk = async (id: string, st: string) => {
+  if (brkBusy.value) return
+  brkBusy.value = true
+  try {
+    const b = data.brokers.find((x: any) => String(x.id ?? '') === id || String(x.name ?? '') === id)
+    if (!b) return
+    const r = await api.call('brokers_sync', { brokers: [{ id: b.id ?? '', name: b.name ?? '', region: b.region ?? '', tier: b.tier ?? '', status: st }] })
+    if (r.ok) {
+      showToast(`Broker ${st}`)
+      await data.loadCollection('brokers')
+    } else {
+      showToast('Update failed — ' + (r.error || 'server error'))
+    }
+  } finally {
+    brkBusy.value = false
+  }
+}
+;(window as unknown as { __brkAct: (id: string, st: string) => void }).__brkAct = decideBrk
 const columns = computed<TableColumn<any>[]>(() => [
   {
     key: 'name',
@@ -99,7 +120,14 @@ const columns = computed<TableColumn<any>[]>(() => [
     key: 'status',
     label: 'Status',
     sortable: true,
-    renderHtml: (x) => `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(x.status||'—')}</span>`
+    renderHtml: (x: any) => {
+      const s = x.status || 'Active'
+      const acts =
+        s === 'Active'
+          ? ` <button style="font-size:9px;padding:2px 6px;border:0;border-radius:4px;cursor:pointer;background:#ef5350;color:#fff" onclick="event.stopPropagation();window.__brkAct('${x.id ?? ''}','Inactive')">Deactivate</button>`
+          : ` <button style="font-size:9px;padding:2px 6px;border:0;border-radius:4px;cursor:pointer;background:#2e7d32;color:#fff" onclick="event.stopPropagation();window.__brkAct('${x.id ?? ''}','Active')">Activate</button>`
+      return `<span class='pill' style='background:${statusColor(s).bg};color:${statusColor(s).fg}'>${esc(s)}</span>${acts}`
+    },
   },])
 
 const rows = computed(() => data.brokers)

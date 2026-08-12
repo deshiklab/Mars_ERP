@@ -2886,6 +2886,8 @@ def inventory_sync(inventory=None):
             doc.is_stock_item = 1
             doc.is_purchase_item = 1
             doc.stock_uom = row.get("unit") or "Nos"
+            if not frappe.db.exists("UOM", doc.stock_uom):
+                doc.stock_uom = "Nos"
         doc.custom_rem_ref = str(row.get("id") or "")
         if row.get("site"):
             doc.custom_rem_site = row.get("site")

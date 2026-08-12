@@ -14,7 +14,37 @@ const route = useRoute()
 const router = useRouter()
 const data = useDataStore()
 const detailRec = ref<Record<string, unknown> | null>(null)
+
 const detailList = ref<Record<string, unknown>[]>([])
+const adjustItem = ref<any>(null)
+const adjQty = ref(0)
+const adjPrice = ref(0)
+const adjBusy = ref(false)
+const openAdjust = (row: any) => {
+  adjustItem.value = row
+  adjQty.value = Number(row.qty ?? 0)
+  adjPrice.value = Number(row.price ?? 0)
+}
+;(window as unknown as { __adjAct: (id: string) => void }).__adjAct = (id: string) => {
+  const row = data.inventory.find((x: any) => String(x.id ?? '') === id)
+  if (row) openAdjust(row)
+}
+const saveAdjust = async () => {
+  if (!adjustItem.value || adjBusy.value) return
+  adjBusy.value = true
+  try {
+    const r = await api.call('inventory_sync', { inventory: [{ id: adjustItem.value.id ?? '', item: adjustItem.value.item ?? '', unit: adjustItem.value.unit ?? '', site: adjustItem.value.site ?? '', qty: Number(adjQty.value) || 0, price: Number(adjPrice.value) || 0, value: (Number(adjQty.value) || 0) * (Number(adjPrice.value) || 0), status: adjustItem.value.status ?? 'In Stock' }] })
+    if (r.ok) {
+      showToast(`Stock adjusted — ${adjustItem.value.item}`)
+      adjustItem.value = null
+      await data.loadCollection('inventory')
+    } else {
+      showToast('Adjust failed — ' + (r.error || 'server error'))
+    }
+  } finally {
+    adjBusy.value = false
+  }
+}
 const tab = ref(String(route.query.tab ?? 'inventory').toLowerCase())
 function setTab(t: string) {
   tab.value = t
@@ -85,7 +115,7 @@ const invCols = computed<TableColumn<StockItem>[]>(() => [
       if (x.status === 'Pending Approval') acts = b('Approved', '✓ Approve', '#2e7d32') + b('Cancelled', '✕', '#d64545')
       else if (x.status === 'Approved') acts = b('Delivered', '📦 Delivered', '#2f80ed')
       else if (x.status === 'Delivered') acts = b('Completed', '✓ Complete', '#2e7d32')
-      return `<span class="pill" style="background:${s.bg};color:${s.fg}">${esc(x.status)}</span>${acts}`
+      return `<span class="pill" style="background:${s.bg};color:${s.fg}">${esc(x.status)}</span>${acts} <button style="font-size:9px;padding:2px 6px;border:0;border-radius:4px;cursor:pointer;background:#1976d2;color:#fff" onclick="event.stopPropagation();window.__adjAct('${x.id ?? ''}')">Adjust</button>`
     }
   }
 ])
@@ -204,6 +234,24 @@ const actions = computed(() => [
       <button class="action-btn" :style="{ border: 'none', borderRadius: 0, borderLeft: '1px solid #e0e0e0', background: '#fff', color: '#2e7d32' }" @click="showIt = true">+ New Item</button>
     </div>
   </div>
+    <div v-if="adjustItem" style="position:fixed;top:0;right:0;bottom:0;width:360px;max-width:92vw;background:#fff;z-index:1200;box-shadow:-4px 0 24px rgba(0,0,0,.18);display:flex;flex-direction:column;border-left:3px solid #1976d2">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #eee">
+        <h3 style="margin:0;font-size:13px;color:#111">📦 Adjust stock — {{ adjustItem.item }}</h3>
+        <button style="background:none;border:0;font-size:16px;cursor:pointer;color:#666" @click="adjustItem = null">✕</button>
+      </div>
+      <div style="padding:18px;display:flex;flex-direction:column;gap:12px;flex:1;overflow-y:auto">
+        <div>
+          <label style="font-size:10px;color:#666;display:block;margin-bottom:4px">Quantity ({{ adjustItem.unit || 'units' }})</label>
+          <input v-model.number="adjQty" type="number" min="0" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:12px" />
+        </div>
+        <div>
+          <label style="font-size:10px;color:#666;display:block;margin-bottom:4px">Unit price (৳)</label>
+          <input v-model.number="adjPrice" type="number" min="0" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:12px" />
+        </div>
+        <div style="font-size:11px;color:#333;background:#f5f8ff;padding:10px;border-radius:6px">New stock value: <b>৳ {{ (adjQty || 0) * (adjPrice || 0) }}</b></div>
+        <button :disabled="adjBusy" @click="saveAdjust" style="margin-top:auto;padding:10px;border:0;border-radius:6px;background:#1976d2;color:#fff;font-size:12px;font-weight:600;cursor:pointer">{{ adjBusy ? 'Saving…' : 'Save adjustment' }}</button>
+      </div>
+    </div>
     <GenericDetailDrawer :record="detailRec" :title="'Stock & Procurement'" @close="detailRec = null" :records="detailList" />
 
     <!-- New PO drawer -->
