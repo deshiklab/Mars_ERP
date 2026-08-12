@@ -122,6 +122,27 @@ def logout():
 
 
 @frappe.whitelist()
+def _live_notifications():
+	"""Live pending-work notifications computed from the ERP backend."""
+	try:
+		out = []
+		now = frappe.utils.now()
+		nid = 0
+		def _add(typ, title, sub):
+			nonlocal nid
+			nid += 1
+			out.append({"id": "live-" + str(nid), "type": typ, "title": title, "sub": str(sub)[:90], "time": now, "read": False})
+		for a in frappe.get_all("REM Approval", filters={"status": "Pending"}, fields=["reference", "title"], limit_page_length=6):
+			_add("approval", "Approval pending", a.title or a.reference or "")
+		for t in frappe.get_all("Issue", filters={"status": ["in", ["Open", "Replied"]]}, fields=["name", "subject", "status"], limit_page_length=8):
+			_add("ticket", "Ticket " + ("open" if t.status == "Open" else "replied"), t.subject or t.name)
+		for l in frappe.get_all("REM Leave", filters={"status": "Pending"}, fields=["name", "employee_name", "leave_type"], limit_page_length=6):
+			_add("leave", "Leave request pending", (l.employee_name or "") + " — " + (l.leave_type or ""))
+		for d in frappe.get_all("REM Booking", fields=["name", "custom_booking_ref", "customer_name"], limit_page_length=6):
+			_add("due", "Due pending", (d.customer_name or "") + " — " + (d.custom_booking_ref or d.name or ""))
+		return out
+	except Exception:
+		return []
 def bootstrap():
 	"""Return every stored collection, mirroring the PWA's localStorage keys."""
 	collections = {}
@@ -135,6 +156,9 @@ def bootstrap():
 			collections[r.collection_key] = json.loads(r.json_data or "[]")
 		except Exception:
 			collections[r.collection_key] = []
+	live = _live_notifications()
+	if live:
+		collections["notifications"] = live
 	return {
 		"collections": collections,
 		"meta": {

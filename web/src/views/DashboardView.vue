@@ -81,13 +81,19 @@ const duePipeline = computed(() => {
   return { t, crit, over, curr, pct }
 })
 
+const pendingApprovals = computed(() => (data.approvals as any[]).filter((a: any) => a.status === 'Pending').length)
+const openTickets = computed(() => (data.tickets as any[]).filter((t: any) => t.status === 'Open' || t.status === 'Replied').length)
+const pendingLeaves = computed(() => (data.leave as any[]).filter((l: any) => l.status === 'Pending').length)
 const quick = computed(() =>
   [
-    { title: _t('CRM & Leads'), count: '', module: 'crm', path: '/leads', bg: '#fff3e0', fg: '#e65100', icon: '🎯' },
-    { title: _t('Bookings'), count: '', module: 'bookings', path: '/bookings', bg: '#e3f2fd', fg: '#1565c0', icon: '📋' },
-    { title: _t('Dues & Recovery'), count: '', module: 'dues', path: '/dues', bg: '#fce4ec', fg: '#c62828', icon: '💰' },
-    { title: _t('Projects'), count: '', module: 'projects', path: '/projects', bg: '#e0f2f1', fg: '#00695c', icon: '🏗️' },
-    { title: _t('HR & Employees'), count: '', module: 'hr', path: '/hr', bg: '#f3e5f5', fg: '#7b1fa2', icon: '👥' }
+    { title: _t('CRM & Leads'), count: String((data.leads as any[]).length), module: 'crm', path: '/leads', bg: '#fff3e0', fg: '#e65100', icon: '🎯' },
+    { title: _t('Bookings'), count: String((data.bookings as any[]).length), module: 'bookings', path: '/bookings', bg: '#e3f2fd', fg: '#1565c0', icon: '📋' },
+    { title: _t('Dues & Recovery'), count: String((data.dues as any[]).length), module: 'dues', path: '/dues', bg: '#fce4ec', fg: '#c62828', icon: '💰' },
+    { title: _t('Projects'), count: String((data.projects as any[]).length), module: 'projects', path: '/projects', bg: '#e0f2f1', fg: '#00695c', icon: '🏗️' },
+    { title: _t('Approvals'), count: String(pendingApprovals.value), module: 'approvals', path: '/approvals', bg: '#e8f5e9', fg: '#2e7d32', icon: '⚡' },
+    { title: _t('Tickets'), count: String(openTickets.value), module: 'support', path: '/tickets', bg: '#fff8e1', fg: '#f57f17', icon: '🎫' },
+    { title: _t('Leave requests'), count: String(pendingLeaves.value), module: 'hr', path: '/leave', bg: '#f3e5f5', fg: '#7b1fa2', icon: '🌴' },
+    { title: _t('HR & Employees'), count: String((data.employees as any[]).length), module: 'hr', path: '/hr', bg: '#ede7f6', fg: '#4527a0', icon: '👥' }
   ].filter((q) => auth.canAccess(q.module))
 )
 

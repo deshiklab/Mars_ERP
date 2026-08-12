@@ -23,7 +23,7 @@ interface ServerNotif {
 
 const notifs = ref<ServerNotif[]>([])
 const router = useRouter()
-const notifRoutes: Record<string, string> = { lead: '/leads', payment: '/finance', dues: '/dues', due: '/dues', booking: '/bookings', ticket: '/tickets', handover: '/handover', po: '/stock', employee: '/hr', warning: '/tasks', task: '/tasks', approval: '/approvals', add: '/dashboard' }
+const notifRoutes: Record<string, string> = { lead: '/leads', payment: '/finance', dues: '/dues', due: '/dues', booking: '/bookings', ticket: '/tickets', handover: '/handover', po: '/stock', employee: '/hr', warning: '/tasks', task: '/tasks', leave: '/leave', leave_req: '/leave', approval: '/approvals', add: '/dashboard' }
 function goNotif(n: ServerNotif) {
   n.read = true
   const path = notifRoutes[n.type] || notifRoutes[n.type.split('_')[0]] || ''
