@@ -1,12 +1,28 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
 import type { TableColumn } from '@/components/DataTable.vue'
 
 const items = ref<any[]>([])
+
+async function setTaxEntriesStatus(r: unknown) {
+  const id = String((r as any).id ?? '')
+  const rows = [...items.value]
+  const idx = rows.findIndex((x: any) => String(x.id ?? '') === id)
+  if (idx < 0) return
+  rows[idx] = { ...(rows[idx] as any), status: 'Filed' }
+  const res = await api.sync({ tax_entries: rows })
+  if (res.ok) {
+    showToast(`Tax entry filed`)
+    items.value = rows as any
+  } else {
+    showToast('Update failed — ' + (res.error || 'server error'))
+  }
+}
 const loading = ref(true)
 
 onMounted(async () => {
@@ -105,6 +121,7 @@ const columns = computed<TableColumn<any>[]>(() => [
     renderHtml: (x) => `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(x.status||'—')}</span>`
   },])
 const actions = computed(() => [
+  { label: '✓ Mark Filed', icon: '📄', show: (r: any) => !['Filed','Paid'].includes(String(r.status ?? '')), onClick: (r: unknown) => setTaxEntriesStatus(r) },
   { label: 'View Details', icon: '👁', onClick: (r: unknown) => { detailRec.value = r as Record<string, unknown>; detailList.value = rows.value as Record<string, unknown>[] } }
 ])
 </script>
