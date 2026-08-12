@@ -2576,6 +2576,9 @@ def fixed_assets_sync(assets=None):
             doc.asset_name = (a.get("name") or "Asset")[:140]
             doc.is_existing_asset = 1
             doc.company = _get_company()
+            item_code = frappe.db.get_value("Item", {"item_name": "Equipment (Fixed Asset)"}, "name")
+            if item_code:
+                doc.item_code = item_code
             doc.calculate_depreciation = 0
             doc.gross_purchase_amount = a.get("cost") or 0
             doc.purchase_date = a.get("purchaseDate") or frappe.utils.today()

@@ -2,6 +2,8 @@
 import { useRoute, useRouter } from 'vue-router'
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
@@ -84,6 +86,24 @@ const stats = computed(() => [
   { label: 'Completed', value: String(data.handover.filter(h=>h.status==='Completed'||h.status==='Handed Over').length), color: '#2e7d32' }
 ])
 
+
+const hoBusy = ref(false)
+const decideHo = async (id: string, st: string) => {
+  if (hoBusy.value) return
+  hoBusy.value = true
+  try {
+    const h = data.handover.find((x) => String(x.id ?? '') === id)
+    if (!h) return
+    const r = await api.call('handover_sync', { handover: [{ id: h.id ?? '', unit: h.unit ?? '', customer: h.customer ?? '', project: h.project ?? '', type: (h.type === 'Flat' ? 'Apartment' : h.type === 'Plot' ? 'Plot' : h.type === 'Commercial' ? 'Commercial' : 'Other'), status: st }] })
+    if (r.ok) {
+      showToast('Handover ' + st)
+      await data.loadCollection('handover')
+    } else showToast('Update failed - ' + (r.error || 'server error'))
+  } finally {
+    hoBusy.value = false
+  }
+}
+;(window as unknown as { __hoAct: (id: string, st: string) => void }).__hoAct = decideHo
 const columns = computed<TableColumn<any>[]>(() => [
   {
     key: 'id',
@@ -119,7 +139,13 @@ const columns = computed<TableColumn<any>[]>(() => [
     key: 'status',
     label: 'Status',
     sortable: true,
-    renderHtml: (x) => `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(x.status||'—')}</span>`
+    renderHtml: (x) => {
+      const s = x.status || '—'
+      let acts = ''
+      if (s === 'Construction Ongoing') acts = `<button style="margin-left:6px;border:0;border-radius:4px;padding:2px 7px;font-size:9px;cursor:pointer;background:#2f80ed;color:#fff" onclick="event.stopPropagation();window.__hoAct('${x.id}','Handover Scheduled')">⚙ Schedule</button><button style="margin-left:4px;border:0;border-radius:4px;padding:2px 7px;font-size:9px;cursor:pointer;background:#27ae60;color:#fff" onclick="event.stopPropagation();window.__hoAct('${x.id}','Completed')">✓ Complete</button>`
+      else if (s === 'Inspection Pending' || s === 'Handover Scheduled') acts = `<button style="margin-left:6px;border:0;border-radius:4px;padding:2px 7px;font-size:9px;cursor:pointer;background:#27ae60;color:#fff" onclick="event.stopPropagation();window.__hoAct('${x.id}','Completed')">✓ Complete</button>`
+      return `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(s)}</span>${acts}`
+    }
   },])
 
 const rows = computed(() => data.handover)
