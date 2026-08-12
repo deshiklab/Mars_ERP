@@ -1,12 +1,26 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
 import type { TableColumn } from '@/components/DataTable.vue'
 
 const items = ref<any[]>([])
+
+const actBusy = ref(false)
+async function setCloseStatus(r: unknown, st: string) {
+  const id = String((r as any)?.id ?? '')
+  if (!id || actBusy.value) return
+  actBusy.value = true
+  try {
+    const rows = [...items.value].map((x: any) => (String(x.id ?? '') === id ? { ...x, status: st } : x))
+    const res = await api.sync({ bank_accounts: rows })
+    if (res.ok) { items.value = rows; showToast('Close applied') }
+    else showToast('Update failed — ' + (res.error || 'server error'))
+  } finally { actBusy.value = false }
+}
 const loading = ref(true)
 
 onMounted(async () => {
