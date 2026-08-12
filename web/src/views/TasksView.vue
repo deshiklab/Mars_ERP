@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
@@ -60,6 +61,24 @@ const stats = computed(() => [
   { label: 'Done', value: String(rows.value.filter((t: any) => t.status === 'Done').length), color: '#2e7d32' }
 ])
 
+const actBusy = ref(false)
+const taskAct = async (id: string, st: string) => {
+  const t = rows.value.find((x: any) => String(x.id ?? '') === id)
+  if (!t) return
+  actBusy.value = true
+  try {
+    const r = await api.call('tasks_sync', { tasks: [{ id: t.id ?? '', title: t.title ?? '', assignee: t.assignee ?? '', priority: t.priority ?? '', deadline: t.deadline ?? '', status: st }] })
+    if (r.ok) {
+      showToast(`Task ${st}`)
+
+    } else {
+      showToast('Update failed — ' + (r.error || 'server error'))
+    }
+  } finally {
+    actBusy.value = false
+  }
+}
+;(window as unknown as { __taskAct?: (id: string, st: string) => void }).__taskAct = taskAct
 const columns = computed<TableColumn<any>[]>(() => [
   {
     key: 'title',
@@ -95,8 +114,16 @@ const columns = computed<TableColumn<any>[]>(() => [
     key: 'status',
     label: 'Status',
     sortable: true,
-    renderHtml: (x) => `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(x.status||'—')}</span>`
-  },])
+    renderHtml: (x: any) => {
+      const c = statusColor(x.status)
+      let acts = ''
+      if (x.status === 'To Do') acts = ` <button style="background:#1976d2;color:#fff;border:0;border-radius:6px;padding:2px 8px;font-size:10px;cursor:pointer" onclick="event.stopPropagation();window.__taskAct('${x.id}','In Progress')">Start</button> <button style="background:#2e7d32;color:#fff;border:0;border-radius:6px;padding:2px 8px;font-size:10px;cursor:pointer" onclick="event.stopPropagation();window.__taskAct('${x.id}','Done')">Done</button>`
+      else if (x.status === 'In Progress') acts = ` <button style="background:#2e7d32;color:#fff;border:0;border-radius:6px;padding:2px 8px;font-size:10px;cursor:pointer" onclick="event.stopPropagation();window.__taskAct('${x.id}','Done')">Done</button>`
+      return `<span class="pill" style="background:${c.bg};color:${c.fg}">${esc(x.status)}</span>${acts}`
+    }
+  },
+])
+
 const actions = computed(() => [
   { label: 'View Details', icon: '👁', onClick: (r: unknown) => { detailRec.value = r as Record<string, unknown>; detailList.value = rows.value as Record<string, unknown>[] } }
 ])

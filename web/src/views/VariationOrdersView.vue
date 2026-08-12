@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
@@ -53,6 +55,24 @@ const stats = computed(() => [
   { label: 'Pending', value: String(data.variations.filter(v=>v.status==='Pending').length), color: '#ff8f00' }
 ])
 
+const actBusy = ref(false)
+const voAct = async (id: string, st: string) => {
+  const v = rows.value.find((x: any) => String(x.id ?? '') === id)
+  if (!v) return
+  actBusy.value = true
+  try {
+    const r = await api.call('variation_orders_sync', { variationOrders: [{ id: v.id ?? '', project: v.project ?? '', title: v.title ?? '', originator: v.originator ?? '', status: st }] })
+    if (r.ok) {
+      showToast(`Variation ${st}`)
+
+    } else {
+      showToast('Update failed — ' + (r.error || 'server error'))
+    }
+  } finally {
+    actBusy.value = false
+  }
+}
+;(window as unknown as { __voAct?: (id: string, st: string) => void }).__voAct = voAct
 const columns = computed<TableColumn<any>[]>(() => [
   {
     key: 'id',
@@ -88,8 +108,15 @@ const columns = computed<TableColumn<any>[]>(() => [
     key: 'status',
     label: 'Status',
     sortable: true,
-    renderHtml: (x) => `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(x.status||'—')}</span>`
-  },])
+    renderHtml: (x: any) => {
+      const c = statusColor(x.status)
+      let acts = ''
+      if (x.status === 'Pending') acts = ` <button style="background:#2e7d32;color:#fff;border:0;border-radius:6px;padding:2px 8px;font-size:10px;cursor:pointer" onclick="event.stopPropagation();window.__voAct('${x.id}','Approved')">Approve</button> <button style="background:#d32f2f;color:#fff;border:0;border-radius:6px;padding:2px 8px;font-size:10px;cursor:pointer" onclick="event.stopPropagation();window.__voAct('${x.id}','Rejected')">Reject</button>`
+      return `<span class="pill" style="background:${c.bg};color:${c.fg}">${esc(x.status)}</span>${acts}`
+    }
+  },
+])
+
 
 const rows = computed(() => data.variations)
 const actions = computed(() => [
