@@ -1,12 +1,26 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
 import type { TableColumn } from '@/components/DataTable.vue'
 
 const items = ref<any[]>([])
+
+const actBusy = ref(false)
+async function setDeactivateStatus(r: unknown, st: string) {
+  const id = String((r as any)?.id ?? '')
+  if (!id || actBusy.value) return
+  actBusy.value = true
+  try {
+    const rows = [...items.value].map((x: any) => (String(x.id ?? '') === id ? { ...x, status: st } : x))
+    const res = await api.sync({ users: rows })
+    if (res.ok) { items.value = rows; showToast('Deactivate applied') }
+    else showToast('Update failed — ' + (res.error || 'server error'))
+  } finally { actBusy.value = false }
+}
 const loading = ref(true)
 
 onMounted(async () => {
@@ -89,6 +103,7 @@ const columns = computed<TableColumn<any>[]>(() => [
     renderHtml: (x) => `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(x.status||'—')}</span>`
   },])
 const actions = computed(() => [
+  { label: '✓ Deactivate', icon: '✅', show: (r: any) => r.status === 'Active', onClick: (r: any) => setDeactivateStatus(r, 'Inactive') },
   { label: 'View Details', icon: '👁', onClick: (r: unknown) => { detailRec.value = r as Record<string, unknown>; detailList.value = rows.value as Record<string, unknown>[] } }
 ])
 </script>
