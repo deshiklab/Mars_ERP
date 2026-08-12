@@ -1,12 +1,23 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
 import type { TableColumn } from '@/components/DataTable.vue'
 
 const data = useDataStore()
+async function receiptInspect(name: string, status: string) {
+  const r = await api.call('receipt_inspect', { name, status })
+  if (r.ok) {
+    showToast(`Inspection → ${status}`)
+    await data.loadReceipts()
+  } else {
+    showToast('Inspection update failed — ' + (r.error || 'server error'))
+  }
+}
 const detailRec = ref<Record<string, unknown> | null>(null)
 const detailList = ref<Record<string, unknown>[]>([])
 
@@ -90,6 +101,8 @@ const columns = computed<TableColumn<any>[]>(() => [
 
 const rows = computed(() => data.receipts)
 const actions = computed(() => [
+  { label: '✓ Pass', icon: '✅', show: (r: any) => String(r.inspection ?? '') !== 'Pass', onClick: (r: unknown) => receiptInspect(String((r as any).id ?? ''), 'Pass') },
+  { label: '✕ Fail', icon: '⛔', show: (r: any) => String(r.inspection ?? '') !== 'Fail', onClick: (r: unknown) => receiptInspect(String((r as any).id ?? ''), 'Fail') },
   { label: 'View Details', icon: '👁', onClick: (r: unknown) => { detailRec.value = r as Record<string, unknown>; detailList.value = rows.value as Record<string, unknown>[] } }
 ])
 </script>

@@ -3086,11 +3086,21 @@ def receipts_pipeline():
             "qty": sum((i.qty or 0) for i in items),
             "unit": items[0].uom if items else "",
             "date": str(se.posting_date or "")[:10],
-            "inspection": "Pass",
+            "inspection": str(getattr(se, "custom_inspection_status", "") or "Pending"),
             "receivedBy": se.supplier_name or "",
             "amount": se.total_incoming_value or 0,
         })
     return {"count": len(out), "receipts": out}
+
+def receipt_inspect(name=None, status=None):
+    """Set the inspection status on a submitted Stock Entry (Material Receipt)."""
+    if not name or status not in ("Pass", "Fail", "Pending"):
+        frappe.throw("receipt_inspect needs name + status in Pass/Fail/Pending", frappe.ValidationError)
+    se = frappe.get_doc("Stock Entry", name)
+    se.db_set("custom_inspection_status", status)
+    frappe.db.commit()
+    return {"ok": True, "name": name, "status": status}
+
 
 # ═══ HR BRIDGE (Milestone B) ═══
 _HR_STATUS_MAP = {
