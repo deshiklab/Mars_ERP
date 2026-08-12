@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
@@ -83,7 +85,15 @@ const columns = computed<TableColumn<any>[]>(() => [
   },])
 
 const rows = computed(() => data.investments)
+const invClose = async (r: unknown) => {
+  const x = r as Record<string, unknown>
+  if (!x.investorName || x.status === 'Closed') return
+  const res = await api.call('investments_sync', { investments: [{ investorName: String(x.investorName ?? ''), amount: Number(x.amount ?? 0), rate: Number(x.rate ?? 0), status: 'Closed' }] })
+  if (res.ok) { showToast('Investment marked as closed'); await data.loadInvestments() }
+  else showToast('Failed — ' + (res.error || 'server error'))
+}
 const actions = computed(() => [
+  { label: 'Close Investment', icon: '✓', show: (r: unknown) => (r as Record<string, unknown>).status !== 'Closed', onClick: (r: unknown) => invClose(r) },
   { label: 'View Details', icon: '👁', onClick: (r: unknown) => { detailRec.value = r as Record<string, unknown>; detailList.value = rows.value as Record<string, unknown>[] } }
 ])
 </script>

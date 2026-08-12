@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
@@ -77,7 +79,15 @@ const columns = computed<TableColumn<any>[]>(() => [
   },])
 
 const rows = computed(() => data.boq)
+const boqApprove = async (r: unknown) => {
+  const x = r as Record<string, unknown>
+  if (!x.item || x.status === 'Approved') return
+  const res = await api.call('boq_sync', { boq: [{ item: String(x.item ?? ''), project: String(x.project ?? ''), category: String(x.category ?? ''), qty: Number(x.qty ?? 0), rate: Number(x.rate ?? 0), status: 'Approved' }] })
+  if (res.ok) { showToast('BOQ line approved'); await data.loadBoq() }
+  else showToast('Failed — ' + (res.error || 'server error'))
+}
 const actions = computed(() => [
+  { label: 'Approve', icon: '✓', show: (r: unknown) => (r as Record<string, unknown>).status !== 'Approved', onClick: (r: unknown) => boqApprove(r) },
   { label: 'View Details', icon: '👁', onClick: (r: unknown) => { detailRec.value = r as Record<string, unknown>; detailList.value = rows.value as Record<string, unknown>[] } }
 ])
 </script>

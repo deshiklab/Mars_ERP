@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
+import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
@@ -57,7 +59,21 @@ const stats = computed(() => [
   { label: 'Active', value: String(data.contractors.filter((c) => (c.status || '').toLowerCase() === 'active').length), color: '#2e7d32' },
   { label: 'On Hold', value: String(data.contractors.filter((c) => (c.status || '').toLowerCase() === 'on hold').length), color: '#e65100' }
 ])
+const ctrBusy = ref(false)
+const ctrToggle = async (r: unknown) => {
+  const x = r as Record<string, unknown>
+  if (!x.name || ctrBusy.value) return
+  const st = x.status === 'Blocked' ? 'Active' : 'Blocked'
+  ctrBusy.value = true
+  try {
+    const res = await api.call('contractors_sync', { contractors: [{ name: String(x.name ?? ''), status: st }] })
+    if (res.ok) { showToast('Contractor ' + (st === 'Blocked' ? 'blocked' : 'activated')); await data.loadContractors() }
+    else showToast('Failed — ' + (res.error || 'server error'))
+  } finally { ctrBusy.value = false }
+}
 const actions = computed(() => [
+  { label: 'Block', icon: '⛔', show: (r: unknown) => (r as Record<string, unknown>).status !== 'Blocked', onClick: (r: unknown) => ctrToggle(r) },
+  { label: 'Activate', icon: '✓', show: (r: unknown) => (r as Record<string, unknown>).status === 'Blocked', onClick: (r: unknown) => ctrToggle(r) },
   { label: 'View Details', icon: '👁', onClick: (r: unknown) => { detailRec.value = r as Record<string, unknown>; detailList.value = data.contractors as Record<string, unknown>[] } }
 ])
 </script>
