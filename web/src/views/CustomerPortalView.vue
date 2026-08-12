@@ -13,7 +13,27 @@ import { showToast } from '@/toast'
 
 const auth = useAuthStore()
 const bookings = ref<any[]>([])
-const detailBk = ref<any | null>(null)
+const detailBk = ref<any>(null)
+const showTicketForm = ref(false)
+const tktBusy = ref(false)
+const tktFields = ref({ subject: '', type: 'Service Request', priority: 'Medium', desc: '' })
+const submitTicket = async () => {
+  if (!tktFields.value.subject.trim() || tktBusy.value) return
+  tktBusy.value = true
+  try {
+    const r = await api.call('tickets_sync', { tickets: [{ subject: tktFields.value.subject.trim(), customer: myName.value, type: tktFields.value.type, priority: tktFields.value.priority, desc: tktFields.value.desc || 'Raised from the customer portal' }] })
+    if (r.ok) {
+      showToast('Ticket raised — our team will follow up')
+      tktFields.value = { subject: '', type: 'Service Request', priority: 'Medium', desc: '' }
+      const rr = await api.call('supportTickets_pipeline')
+      if (rr.ok) tickets.value = ((rr.data as any)?.tickets ?? []) as any[]
+    } else {
+      showToast('Failed to raise the ticket — ' + (r.error || 'server error'))
+    }
+  } finally {
+    tktBusy.value = false
+  }
+}
 const payBusy = ref<string | null>(null)
 async function payInst(bk: any, amt: number) {
   if (payBusy.value) return
@@ -199,7 +219,10 @@ const dueCols = computed<TableColumn<any>[]>(() => [
               style="border: 0; background: #2f80ed; color: #fff; font-size: 11px; font-weight: 700; padding: 6px 12px; border-radius: 8px; cursor: pointer">Pay</button>
           </div>
         </div>
-        <div class="card-header" style="margin-top: 4px"><h3>🎫 My Tickets</h3></div>
+        <div class="card-header" style="margin-top: 4px; display: flex; align-items: center; justify-content: space-between">
+          <h3>🎫 My Tickets</h3>
+          <button class="btn btn-primary" style="padding: 4px 10px; font-size: 11px" @click="showTicketForm = true">＋ Raise a ticket</button>
+        </div>
         <div class="card-body" style="padding: 6px 10px">
           <div v-for="t in myTickets" :key="t.id" style="display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f5f5f5">
             <span style="font-size: 13px">🎫</span>
@@ -210,6 +233,38 @@ const dueCols = computed<TableColumn<any>[]>(() => [
             <span class="pill" :style="{ background: statusColor(t.status) + '22', color: statusColor(t.status) }">{{ t.status }}</span>
           </div>
           <div v-if="!myTickets.length" style="padding: 16px; text-align: center; color: #999; font-size: 11px">No tickets.</div>
+        </div>
+      </div>
+
+      <!-- raise ticket drawer -->
+      <div v-if="showTicketForm" class="drawer-overlay" @click.self="showTicketForm = false">
+        <div class="drawer-sheet" style="width: 720px">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px">
+            <h3 style="margin: 0">🎫 Raise a support ticket</h3>
+            <button class="btn btn-ghost" @click="showTicketForm = false">✕</button>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px">
+            <label class="field"><span>Subject</span>
+              <input v-model="tktFields.subject" placeholder="What do you need help with?" />
+            </label>
+            <label class="field"><span>Type</span>
+              <select v-model="tktFields.type">
+                <option>Service Request</option><option>Complaint</option><option>Enquiry</option><option>Defect</option><option>Quality</option><option>Documentation</option>
+              </select>
+            </label>
+            <label class="field"><span>Priority</span>
+              <select v-model="tktFields.priority">
+                <option>Low</option><option>Medium</option><option>High</option><option>Urgent</option>
+              </select>
+            </label>
+            <label class="field" style="grid-column: 1 / -1"><span>Details</span>
+              <textarea v-model="tktFields.desc" rows="3" placeholder="Describe the issue…"></textarea>
+            </label>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px">
+            <button class="btn btn-ghost" @click="showTicketForm = false">Cancel</button>
+            <button class="btn btn-primary" :disabled="tktBusy || !tktFields.subject.trim()" @click="submitTicket">{{ tktBusy ? 'Submitting…' : 'Submit ticket' }}</button>
+          </div>
         </div>
       </div>
     </template>

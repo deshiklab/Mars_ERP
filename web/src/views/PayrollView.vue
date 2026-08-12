@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import DataTable from '@/components/DataTable.vue'
 import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
@@ -55,6 +56,19 @@ function statusColor(status: string): { bg: string; fg: string } {
 
 const rows = computed(() => items.value)
 const detailRec = ref<Record<string, unknown> | null>(null)
+const markPaid = async (r: unknown) => {
+  const p = r as Record<string, unknown>
+  if (!p.id || p.status === 'Paid') return
+  const next = [...rows.value].map((x: any) => (String(x.id ?? '') === String(p.id ?? '') ? { ...x, status: 'Paid' } : x))
+  items.value = next as any[]
+  try {
+    const res = await api.call('sync', { collections: { payroll: next.map((x: any) => ({ ...x, status: x.status ?? 'Draft' })) } })
+    if (res.ok) showToast('Payslip marked as paid')
+    else showToast('Failed — ' + (res.error || 'server error'))
+  } catch {
+    showToast('Failed to update the payslip')
+  }
+}
 const detailList = ref<Record<string, unknown>[]>([])
 
 const stats = computed(() => [
@@ -107,7 +121,8 @@ const columns = computed<TableColumn<any>[]>(() => [
     renderHtml: (x) => `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(x.status||'—')}</span>`
   },])
 const actions = computed(() => [
-  { label: 'View Details', icon: '👁', onClick: (r: unknown) => { detailRec.value = r as Record<string, unknown>; detailList.value = rows.value as Record<string, unknown>[] } }
+  { label: 'View Details', icon: '👁', onClick: (r: unknown) => { detailRec.value = r as Record<string, unknown>; detailList.value = rows.value as Record<string, unknown>[] } },
+  { label: 'Mark Paid', icon: '✓', show: (r: unknown) => (r as Record<string, unknown>).status !== 'Paid', onClick: (r: unknown) => markPaid(r) }
 ])
 </script>
 
