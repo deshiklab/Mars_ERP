@@ -39,7 +39,7 @@ export const GROUPS: ShellGroup[] = [
       { id: 'crm', label: 'CRM & Leads', path: '/leads' },
       { id: 'followups', label: 'Follow-ups', path: '/follow-ups' },
       { id: 'proposals', label: 'Proposals' , path: '/proposals'},
-      { id: 'contacts', label: 'Contact Book' },
+      { id: 'contacts', label: 'Contact Book', path: '/customers' },
       { id: 'brokers', label: 'Brokers', path: '/brokers' },
       { id: 'complaints', label: 'Complaints', path: '/complaints' },
       { id: 'sales_marketing', label: 'Sales & Marketing' , path: '/sales-config'}
@@ -53,8 +53,8 @@ export const GROUPS: ShellGroup[] = [
     mods: [
       { id: 'land_mgmt', label: 'Project Acquisition' },
       { id: 'properties_units', label: 'Flats & Units' , path: '/properties'},
-      { id: 'plots', label: 'Flats & Units' , path: '/flats'},
-      { id: 'layout_builder', label: 'Layout & Unit Builder' },
+      { id: 'plots', label: 'Plots & Land' , path: '/flats'},
+      { id: 'layout_builder', label: 'Layout & Unit Builder', path: '/flats' },
       { id: 'projects', label: 'Projects', path: '/projects' }
     ]
   },
@@ -129,7 +129,7 @@ export const GROUPS: ShellGroup[] = [
     module: 'dashboard',
     mods: [
       { id: 'tasks', label: 'Tasks' , path: '/tasks'},
-      { id: 'workspace', label: 'Team Workspace' },
+      { id: 'workspace', label: 'Team Workspace', path: '/employees' },
       { id: 'calendar', label: 'Calendar' , path: '/calendar'},
       { id: 'announcements', label: 'Announcements' , path: '/announcements'},
       { id: 'notifications_page', label: 'Notifications' },

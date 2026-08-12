@@ -439,7 +439,7 @@ const router = createRouter({
     {
       path: '/support-tickets',
       name: 'supporttickets',
-      component: () => import('../views/SupportTicketsView.vue'),
+      component: () => import('../views/TicketsView.vue'),
       meta: { module: 'support-tickets', title: 'Support Tickets' }
     },
     {
