@@ -2,7 +2,7 @@
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
 import DataTable from '@/components/DataTable.vue'
-import CustomerDetailDrawer from '@/components/GenericDetailDrawer.vue'
+const CustomerDetailDrawer = defineAsyncComponent(() => import('@/components/CustomerDetailDrawer.vue'))
 import StatsRow from '@/components/StatsRow.vue'
 import type { TableColumn } from '@/components/DataTable.vue'
 
@@ -138,6 +138,6 @@ const actions = computed(() => [
       :tabs="[{ id: 'all', label: 'All', count: rows.length }]"
       search-placeholder="Search customers…"
     />
-    <CustomerDetailDrawer :record="custRec" :title="'Customer'" :records="detailList" @close="custRec = null" />
+    <CustomerDetailDrawer :customer="custRec" @close="custRec = null" @status="custStatus" />
   </div>
 </template>
