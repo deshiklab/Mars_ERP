@@ -138,6 +138,6 @@ const actions = computed(() => [
       :tabs="[{ id: 'all', label: 'All', count: rows.length }]"
       search-placeholder="Search customers…"
     />
-  </div>
     <CustomerDetailDrawer :customer="custRec" :bookings="rows" @close="custRec = null" @status="custStatus" />
+  </div>
 </template>

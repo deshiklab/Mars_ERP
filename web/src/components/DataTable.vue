@@ -23,6 +23,8 @@ export interface TableColumn<T> {
 export interface TableAction {
   label: string
   icon?: string
+  /** Optional guard: show this action only for matching rows (row-click prefers the unguarded details action). */
+  show?: (row: Record<string, unknown>) => boolean
   onClick: (row: Record<string, unknown>) => void
 }
 
@@ -301,7 +303,11 @@ function legacyCopy(text: string): boolean {
   }
 }
 function openRow(r: Record<string, unknown>) {
-  const act = props.actions.find((a) => typeof a.onClick === 'function')
+  // Row-click must open DETAILS, never trigger a guarded status action:
+  // prefer the action without a `show` guard (the details action).
+  const act =
+    props.actions.find((a) => !a.show && typeof a.onClick === 'function') ||
+    props.actions.find((a) => typeof a.onClick === 'function')
   if (act) act.onClick(r)
 }
 

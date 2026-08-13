@@ -8,6 +8,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
 import { useDataStore } from '@/stores/data'
+import DataTable, { type TableColumn } from '@/components/DataTable.vue'
 import { showToast } from '@/toast'
 
 const route = useRoute()
@@ -25,6 +26,17 @@ const payments = ref<any[]>([])
 const invoices = ref<any[]>([])
 const loading = ref(true)
 const props_ = ref<{ units: { id: string; status: string; price: number }[] }[]>([])
+const drill = ref<{ title: string; rows: Record<string, unknown>[] } | null>(null)
+const drillCols: TableColumn<Record<string, unknown>>[] = [
+  { key: 'name', label: 'Name', sortable: true },
+  { key: 'customer', label: 'Customer', sortable: true },
+  { key: 'phone', label: 'Phone' },
+  { key: 'source', label: 'Source', sortable: true },
+  { key: 'status', label: 'Status', sortable: true },
+]
+const openDrill = (title: string, rows: Record<string, unknown>[]) => {
+  drill.value = { title, rows }
+}
 
 onMounted(async () => {
   const r = await api.call<{ collections: Record<string, unknown> }>('bootstrap')
@@ -179,7 +191,7 @@ function exportCSV(name: string, rows: Record<string, unknown>[]) {
         <div class="card">
           <div class="card-header"><h3>🔻 Funnel by Stage</h3></div>
           <div class="card-body" style="padding: 10px">
-            <div v-for="st in pipe.stages" :key="st.s" style="display: flex; align-items: center; gap: 6px; padding: 3px 0">
+            <div v-for="st in pipe.stages" :key="st.s" style="display: flex; align-items: center; gap: 6px; padding: 3px 0; cursor: pointer" @click="openDrill('Leads — ' + st.s, data.leads.filter((l: any) => String(l.status ?? '').toLowerCase() === String(st.s).toLowerCase()))">
               <div style="font-size: 9px; width: 110px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ st.s }}</div>
               <div style="flex: 1; height: 9px; background: #eef1f5; border-radius: 4px; overflow: hidden">
                 <div :style="{ height: '100%', width: (st.pct || 0.5) + '%', minWidth: st.count ? '6px' : '0', background: st.s === 'Converted' ? '#2e7d32' : st.s === 'Lost' ? '#c62828' : '#2f80ed', borderRadius: '4px' }"></div>
@@ -194,7 +206,7 @@ function exportCSV(name: string, rows: Record<string, unknown>[]) {
             <table class="rem-table" style="border: none">
               <thead><tr><th>Source</th><th class="num">Leads</th></tr></thead>
               <tbody>
-                <tr v-for="s in pipe.sources" :key="s.k"><td>{{ s.k }}</td><td class="num" style="font-weight: 600">{{ s.count }}</td></tr>
+                <tr v-for="s in pipe.sources" :key="s.k" style="cursor: pointer" @click="openDrill('Leads — ' + s.k, data.leads.filter((l: any) => String(l.source ?? '').toLowerCase() === String(s.k).toLowerCase()))"><td>{{ s.k }}</td><td class="num" style="font-weight: 600">{{ s.count }}</td></tr>
                 <tr v-if="!pipe.sources.length"><td colspan="2" style="text-align: center; color: #999; padding: 20px">No data</td></tr>
               </tbody>
             </table>
@@ -315,5 +327,15 @@ function exportCSV(name: string, rows: Record<string, unknown>[]) {
         </div>
       </div>
     </template>
+    <!-- drill-down drawer -->
+    <div v-if="drill" class="drawer-overlay" @click.self="drill = null" style="position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 60; display: flex; justify-content: flex-end">
+      <div class="drawer-sheet" style="width: 720px; max-width: 96vw; background: #fff; height: 100%; overflow-y: auto; padding: 14px">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px">
+          <h3 style="margin: 0; flex: 1">{{ drill.title }} ({{ drill.rows.length }})</h3>
+          <button @click="drill = null" style="background: #f0f0f0; border: none; border-radius: 6px; padding: 5px 12px; cursor: pointer; font-size: 11px">✕ Close</button>
+        </div>
+        <DataTable :columns="drillCols" :rows="drill.rows" search-placeholder="Search…" :page-size-options="[10, 25, 50]" :default-page-size="25" />
+      </div>
+    </div>
   </div>
 </template>
