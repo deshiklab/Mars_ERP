@@ -140,6 +140,9 @@ def _live_notifications():
 			_add("leave", "Leave request pending", (l.employee_name or "") + " — " + (l.leave_type or ""))
 		for d in frappe.get_all("REM Booking", fields=["name", "custom_booking_ref", "customer_name"], limit_page_length=6):
 			_add("due", "Due pending", (d.customer_name or "") + " — " + (d.custom_booking_ref or d.name or ""))
+		for n in _get_stored("notifications"):
+			if isinstance(n, dict) and n.get("type") and not n.get("read"):
+				out.append(n)
 		return out
 	except Exception:
 		return []
@@ -277,6 +280,78 @@ _KNOWN_COLLECTIONS = {
 	"workspace_chat",
 }
 
+
+def _get_stored(key):
+	"""Read a stored REM collection."""
+	try:
+		existing = frappe.db.exists(REM_COLLECTION_DOCTYPE, key)
+		if existing:
+			return json.loads(frappe.db.get_value(REM_COLLECTION_DOCTYPE, key, "json_data") or "[]")
+	except Exception:
+		pass
+	return []
+
+def _store_collection(key, rows):
+	"""Persist a REM collection."""
+	existing = frappe.db.exists(REM_COLLECTION_DOCTYPE, key)
+	if existing:
+		doc = frappe.get_doc(REM_COLLECTION_DOCTYPE, existing)
+	else:
+		doc = frappe.new_doc(REM_COLLECTION_DOCTYPE)
+		doc.collection_key = key
+	doc.json_data = json.dumps(rows, default=str)
+	doc.save(ignore_permissions=True)
+
+@frappe.whitelist()
+def run_daily_jobs():
+	"""Server-side daily engine: overdue dues, stale lead follow-ups, aging tickets -> alert notifications."""
+	today = frappe.utils.today()
+	now = frappe.utils.now()
+	alerts = []
+	seen = set()
+	def _alert(typ, title, sub):
+		key = typ + "|" + str(sub)[:60]
+		if key not in seen:
+			seen.add(key)
+			alerts.append({"type": typ, "title": title, "sub": str(sub)[:90], "time": now, "read": False})
+	# 1. overdue dues from booking payment terms
+	for b in frappe.get_all("REM Booking", filters=[["total_due", ">", 0]], fields=["name", "custom_booking_ref", "customer_name", "total_due", "payment_terms"], limit_page_length=50):
+		overdue = []
+		pts = b.payment_terms or []
+		if isinstance(pts, str):
+			try:
+				pts = json.loads(pts)
+			except Exception:
+				pts = []
+		for pt in pts if isinstance(pts, list) else []:
+			if isinstance(pt, dict) and pt.get("due_date") and str(pt.get("due_date")) < today:
+				try:
+					amt = float(pt.get("amount") or 0)
+				except Exception:
+					amt = 0
+				if amt > 0:
+					overdue.append(amt)
+		if overdue:
+			_alert("due", "Payment overdue", (b.customer_name or "") + " — " + (b.custom_booking_ref or b.name) + " — " + ("{:,.0f}".format(sum(overdue))))
+	# 2. stale lead follow-ups
+	for l in frappe.get_all("Lead", filters=[["custom_rem_next_follow_up", "<", today]], fields=["name", "lead_name", "custom_rem_next_follow_up"], limit_page_length=20):
+		_alert("lead", "Follow-up due", (l.lead_name or l.name) + " — was " + str(l.custom_rem_next_follow_up)[:10])
+	# 3. aging open tickets (> 3 days)
+	import datetime as _dt
+	cutoff = (_dt.datetime.now() - _dt.timedelta(days=3)).strftime("%Y-%m-%d")
+	for t in frappe.get_all("Issue", filters=[["status", "=", "Open"], ["creation", "<", cutoff]], fields=["name", "subject", "creation"], limit_page_length=20):
+		_alert("ticket", "Ticket aging", (t.subject or t.name) + " — opened " + str(t.creation)[:10])
+	# merge with the existing stored alerts (dedupe, cap at 25)
+	existing = _get_stored("notifications")
+	merged = list(alerts)
+	for n in existing:
+		if isinstance(n, dict) and n.get("type") and not n.get("read") and len(merged) < 25:
+			k = str(n.get("type")) + "|" + str(n.get("sub"))[:60]
+			if k not in seen:
+				seen.add(k)
+				merged.append(n)
+	_store_collection("notifications", merged[:25])
+	return {"ok": True, "alerts": len(alerts), "stored": len(merged)}
 
 @frappe.whitelist()
 @rate_limit(limit=60, seconds=60)

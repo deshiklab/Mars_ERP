@@ -108,6 +108,14 @@ web_include_js = "/assets/mars_constech/js/rem_pwa_login_link.js"
 # before_app_uninstall = "mars_constech.utils.before_app_uninstall"
 # after_app_uninstall = "mars_constech.utils.after_app_uninstall"
 
+# Scheduler Events
+# -----------------
+scheduler_events = {
+	"daily": [
+		"mars_constech.mars_constech.api.run_daily_jobs",
+	],
+}
+
 # Desk Notifications
 # ------------------
 # See frappe.core.notifications.get_notification_config
