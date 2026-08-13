@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
 import DataTable from '@/components/DataTable.vue'
-import GenericDetailDrawer from '@/components/GenericDetailDrawer.vue'
+import CustomerDetailDrawer from '@/components/CustomerDetailDrawer.vue'
 import StatsRow from '@/components/StatsRow.vue'
 import type { TableColumn } from '@/components/DataTable.vue'
 
@@ -51,6 +51,8 @@ function statusColor(status: string): { bg: string; fg: string } {
 }
 
 const rows = computed(() => items.value)
+const custRec = ref<any | null>(null)
+const custBusy = ref(false)
 const detailRec = ref<Record<string, unknown> | null>(null)
 const detailList = ref<Record<string, unknown>[]>([])
 
@@ -97,8 +99,23 @@ const columns = computed<TableColumn<any>[]>(() => [
     sortable: true,
     renderHtml: (x) => `<span class='pill' style='background:${statusColor(x.status).bg};color:${statusColor(x.status).fg}'>${esc(x.status||'—')}</span>`
   },])
+const custStatus = async (st: string) => {
+  if (!custRec.value || custBusy.value) return
+  custBusy.value = true
+  try {
+    const next = [...rows.value].map((x: any) => (String(x.id ?? '') === String(custRec.value?.id ?? '') ? { ...x, status: st } : x))
+    const res = await api.sync({ customers: next })
+    if (res.ok) {
+      items.value = next as any[]
+      custRec.value = { ...custRec.value, status: st }
+    }
+  } finally {
+    custBusy.value = false
+  }
+}
+
 const actions = computed(() => [
-  { label: 'View Details', icon: '👁', onClick: (r: unknown) => { detailRec.value = r as Record<string, unknown>; detailList.value = rows.value as Record<string, unknown>[] } }
+  { label: 'View Details', icon: '👁', onClick: (r: unknown) => { custRec.value = r as any; detailList.value = rows.value as Record<string, unknown>[] } }
 ])
 </script>
 
@@ -122,5 +139,5 @@ const actions = computed(() => [
       search-placeholder="Search customers…"
     />
   </div>
-    <GenericDetailDrawer :record="detailRec" :title="'Customers'" @close="detailRec = null" :records="detailList" />
+    <CustomerDetailDrawer :customer="custRec" :bookings="rows" @close="custRec = null" @status="custStatus" />
 </template>
