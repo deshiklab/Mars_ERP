@@ -77,6 +77,14 @@ const router = createRouter({
       meta: { module: 'contractors', title: 'Contractors' }
     },
     {
+      path: '/project-acquisition', redirect: '/plots' },
+    {
+      path: '/construction-engineering', redirect: '/work-orders' },
+    {
+      path: '/land-&-plot-management', redirect: '/plots' },
+    {
+      path: '/flat-unit-management', redirect: '/properties' },
+    {
       path: '/plots',
       name: 'plots',
       component: () => import('../views/PlotsView.vue'),
