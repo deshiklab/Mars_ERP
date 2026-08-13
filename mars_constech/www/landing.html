@@ -1,0 +1,121 @@
+{% extends "templates/web.html" %}
+
+{% block title %}{{ _("MARS Constech — Building Tomorrow") }}{% endblock %}
+
+{% block page_content %}
+<style>
+	.mars-landing { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+	.mars-hero { background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #0f172a 100%); color: #fff; padding: 88px 24px 72px; text-align: center; position: relative; overflow: hidden; }
+	.mars-hero::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 20% 20%, rgba(59,130,246,.25) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(16,185,129,.18) 0%, transparent 50%); pointer-events: none; }
+	.mars-hero .inner { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; }
+	.mars-hero .logo { font-size: 15px; letter-spacing: .18em; text-transform: uppercase; color: #93c5fd; font-weight: 600; margin-bottom: 18px; }
+	.mars-hero h1 { font-size: clamp(34px, 5vw, 56px); font-weight: 800; line-height: 1.12; margin: 0 0 14px; }
+	.mars-hero h1 .accent { color: #fbbf24; }
+	.mars-hero p { font-size: clamp(15px, 2vw, 18px); color: #cbd5e1; max-width: 620px; margin: 0 auto 30px; line-height: 1.6; }
+	.mars-cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+	.mars-btn { display: inline-block; padding: 13px 28px; border-radius: 10px; font-weight: 700; font-size: 15px; text-decoration: none; transition: transform .12s, box-shadow .12s; }
+	.mars-btn:hover { transform: translateY(-2px); text-decoration: none; }
+	.mars-btn.primary { background: #fbbf24; color: #0f172a; box-shadow: 0 6px 18px rgba(251,191,36,.35); }
+	.mars-btn.ghost { background: rgba(255,255,255,.1); color: #fff; border: 1px solid rgba(255,255,255,.3); }
+	.mars-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0; background: #fff; border-bottom: 1px solid #e2e8f0; }
+	.mars-strip .cell { padding: 22px 16px; text-align: center; border-right: 1px solid #f1f5f9; }
+	.mars-strip .cell:last-child { border-right: none; }
+	.mars-strip .n { font-size: 28px; font-weight: 800; color: #1e3a8a; }
+	.mars-strip .l { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; margin-top: 4px; }
+	.mars-section { max-width: 1080px; margin: 0 auto; padding: 64px 24px; }
+	.mars-section h2 { font-size: 30px; font-weight: 800; color: #0f172a; margin: 0 0 8px; text-align: center; }
+	.mars-section .lead { color: #64748b; text-align: center; font-size: 15px; margin-bottom: 36px; }
+	.mars-services { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+	.mars-svc { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 26px 22px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+	.mars-svc .ic { font-size: 28px; }
+	.mars-svc h3 { font-size: 17px; font-weight: 700; color: #0f172a; margin: 12px 0 8px; }
+	.mars-svc p { font-size: 13.5px; color: #64748b; line-height: 1.55; margin: 0; }
+	.mars-projects { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+	.mars-proj { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+	.mars-proj .head { background: linear-gradient(135deg, #1e3a8a, #2563eb); color: #fff; padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; }
+	.mars-proj .head .nm { font-weight: 700; font-size: 15px; }
+	.mars-proj .head .st { font-size: 11px; background: rgba(255,255,255,.18); padding: 3px 10px; border-radius: 20px; }
+	.mars-proj .body { padding: 16px 20px; }
+	.mars-proj .body .row { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; }
+	.mars-proj .body .row .k { color: #94a3b8; }
+	.mars-proj .body .row .v { color: #0f172a; font-weight: 600; }
+	.mars-contact { background: #0f172a; color: #e2e8f0; padding: 56px 24px; }
+	.mars-contact .inner { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; }
+	.mars-contact h3 { font-size: 18px; font-weight: 700; color: #fff; margin: 0 0 12px; }
+	.mars-contact p { font-size: 14px; color: #94a3b8; margin: 4px 0; line-height: 1.6; }
+	.mars-footer { text-align: center; padding: 22px 16px; font-size: 13px; color: #94a3b8; background: #0b1220; border-top: 1px solid #1e293b; }
+</style>
+
+<div class="mars-landing">
+	<div class="mars-hero">
+		<div class="inner">
+			<div class="logo">🏗 MARS Construction &amp; Development</div>
+			<h1>Building Tomorrow,<br><span class="accent">Delivering Today</span></h1>
+			<p>MARS Constech develops residential and commercial landmarks across Bangladesh — from handover-ready apartments to thriving commercial spaces, backed by transparent construction and dependable after-sales service.</p>
+			<div class="mars-cta">
+				<a class="mars-btn primary" href="/customer_portal">Customer Portal</a>
+				<a class="mars-btn ghost" href="/login">Staff Login</a>
+			</div>
+		</div>
+	</div>
+
+	<div class="mars-strip">
+		{% for s in stats %}
+		<div class="cell"><div class="n">{{ s.n }}</div><div class="l">{{ s.l }}</div></div>
+		{% endfor %}
+	</div>
+
+	<div class="mars-section">
+		<h2>What We Do</h2>
+		<p class="lead">Full-cycle real estate and construction — one accountable partner from land to handover.</p>
+		<div class="mars-services">
+			<div class="mars-svc"><div class="ic">🏢</div><h3>Real Estate Development</h3><p>Residential towers, apartments and commercial spaces developed to modern standards with clear documentation.</p></div>
+			<div class="mars-svc"><div class="ic">🔨</div><h3>Construction Works</h3><p>Site execution, structural works, finishing and MEP — managed by experienced engineers with quality checks at every stage.</p></div>
+			<div class="mars-svc"><div class="ic">📐</div><h3>Design &amp; Planning</h3><p>Unit layouts, interior planning and project design tailored to the Bangladeshi market.</p></div>
+			<div class="mars-svc"><div class="ic">🤝</div><h3>After-Sales Service</h3><p>Handover support, snag resolution and maintenance — because our relationship outlasts the keys.</p></div>
+		</div>
+	</div>
+
+	{% if projects %}
+	<div class="mars-section">
+		<h2>Ongoing Projects</h2>
+		<p class="lead">Live from our project portfolio.</p>
+		<div class="mars-projects">
+			{% for p in projects %}
+			<div class="mars-proj">
+				<div class="head"><span class="nm">{{ p.name }}</span><span class="st">{{ p.status or "Active" }}</span></div>
+				<div class="body">
+					{% if p.location %}<div class="row"><span class="k">Location</span><span class="v">{{ p.location }}</span></div>{% endif %}
+					{% if p.total_units %}<div class="row"><span class="k">Units</span><span class="v">{{ p.total_units }}</span></div>{% endif %}
+					{% if p.booked %}<div class="row"><span class="k">Booked</span><span class="v">{{ p.booked }}</span></div>{% endif %}
+				</div>
+			</div>
+			{% endfor %}
+		</div>
+	</div>
+	{% endif %}
+
+	<div class="mars-contact">
+		<div class="inner">
+			<div>
+				<h3>🏗 MARS Constech</h3>
+				<p>Mars Construction &amp; Development Ltd.</p>
+				<p>Building relationships on every floor.</p>
+			</div>
+			<div>
+				<h3>Contact</h3>
+				<p>📞 +880 1700-000000</p>
+				<p>✉ info@marsconstech.com</p>
+				<p>📍 Dhaka, Bangladesh</p>
+			</div>
+			<div>
+				<h3>Quick Links</h3>
+				<p>▶ <a href="/customer_portal" style="color:#93c5fd">Customer Portal</a></p>
+				<p>▶ <a href="/login" style="color:#93c5fd">Staff Login</a></p>
+			</div>
+		</div>
+	</div>
+
+	<div class="mars-footer">© {{ now.year }} MARS Construction &amp; Development Ltd. — Powered by ERPNext</div>
+</div>
+{% endblock %}

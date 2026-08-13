@@ -1,0 +1,75 @@
+/* MARS Constech — brand layer for the default ERPNext frontend */
+:root {
+	--mars-blue: #1e3a8a;
+	--mars-blue-2: #2563eb;
+	--mars-gold: #fbbf24;
+	--mars-ink: #0f172a;
+}
+
+/* ---------- Login page ---------- */
+body[data-route="login"] {
+	background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #0f172a 100%) !important;
+}
+body[data-route="login"] .login-content {
+	background: rgba(255, 255, 255, 0.97);
+	border-radius: 18px;
+	box-shadow: 0 24px 60px rgba(2, 6, 23, 0.55);
+}
+body[data-route="login"] .login-content .form-signin {
+	padding-top: 12px;
+}
+body[data-route="login"] .login-content img,
+body[data-route="login"] .login-content .navbar-brand img {
+	max-height: 56px;
+}
+body[data-route="login"] .login-content .btn-primary {
+	background: var(--mars-blue) !important;
+	border-color: var(--mars-blue) !important;
+}
+body[data-route="login"] .login-content .btn-primary:hover {
+	background: var(--mars-blue-2) !important;
+}
+body[data-route="login"] .login-content a {
+	color: var(--mars-blue) !important;
+}
+body[data-route="login"] #login-page h4 {
+	color: var(--mars-ink);
+	font-weight: 700;
+}
+
+/* ---------- Website pages (portal / landing) ---------- */
+.web-footer {
+	background: #0f172a !important;
+	color: #94a3b8 !important;
+	border-top: 1px solid #1e293b !important;
+}
+.web-footer a {
+	color: #93c5fd !important;
+}
+.navbar {
+	background: #fff !important;
+	box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+.navbar .navbar-brand {
+	font-weight: 700;
+	color: var(--mars-ink) !important;
+}
+
+/* ---------- Desk (ERPNext workspace) ---------- */
+body[data-route^="app"] .desk-sidebar,
+body[data-route^="app"] .layout-side-section {
+	background: #f8fafc;
+}
+body[data-route^="app"] .navbar {
+	background: #0f172a !important;
+}
+body[data-route^="app"] .navbar .navbar-brand,
+body[data-route^="app"] .navbar a,
+body[data-route^="app"] .navbar .icon {
+	color: #e2e8f0 !important;
+}
+body[data-route^="app"] .navbar .form-control {
+	background: rgba(255, 255, 255, 0.1) !important;
+	color: #fff !important;
+	border-color: rgba(255, 255, 255, 0.2) !important;
+}

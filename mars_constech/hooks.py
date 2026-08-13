@@ -25,11 +25,11 @@ app_license = "mit"
 # ------------------
 
 # include js, css files in header of desk.html
-# app_include_css = "/assets/mars_constech/css/mars_constech.css"
+app_include_css = "/assets/mars_constech/css/mars_constech.css"
 # app_include_js = "/assets/mars_constech/js/mars_constech.js"
 
 # include js, css files in header of web template
-# web_include_css = "/assets/mars_constech/css/mars_constech.css"
+web_include_css = "/assets/mars_constech/css/mars_constech.css"
 # REM ERP: adds the 'Open REM ERP PWA' shortcut to the ERPNext login page
 web_include_js = "/assets/mars_constech/js/rem_pwa_login_link.js"
 
