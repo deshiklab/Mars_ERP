@@ -2104,6 +2104,28 @@ def _session_expiry_hint():
 
 
 @frappe.whitelist()
+
+@frappe.whitelist()
+def user_role_update(user=None, role=None, add=1):
+	"""Toggle a role on a user (System group). Admin-only guard via Administrator."""
+	import frappe.permissions as perms
+	if not user or not role:
+		frappe.throw("user and role are required", frappe.ValidationError)
+	if not frappe.db.exists("User", user) or not frappe.db.exists("Role", role):
+		frappe.throw("user or role not found", frappe.ValidationError)
+	prev = frappe.session.user
+	try:
+		frappe.set_user("Administrator")
+		doc = frappe.get_doc("User", user)
+		if add:
+			doc.add_roles(role)
+		else:
+			doc.remove_roles(role)
+		frappe.db.commit()
+		return {"ok": True, "user": user, "role": role, "add": bool(add)}
+	finally:
+		frappe.set_user(prev)
+
 def settings_get():
 	"""Return the server-backed connection config (REM Settings)."""
 	return _rem_settings()

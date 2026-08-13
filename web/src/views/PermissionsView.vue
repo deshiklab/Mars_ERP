@@ -5,8 +5,23 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
+import { showToast } from '@/toast'
 
 const users = ref<any[]>([])
+
+const roleBusy = ref(false)
+async function toggleRole(u: any, role: string, has: boolean) {
+  if (roleBusy.value) return
+  roleBusy.value = true
+  try {
+    const res = await api.call('user_role_update', { user: u.email ?? u.id, role, add: has ? 0 : 1 })
+    if (res.ok) {
+      if (has) u.roles = (u.roles ?? []).filter((r: string) => r !== role)
+      else u.roles = [...(u.roles ?? []), role]
+      showToast(has ? 'Role removed' : 'Role granted')
+    } else showToast('Update failed — ' + (res.error || 'server error'))
+  } finally { roleBusy.value = false }
+}
 const loading = ref(true)
 
 onMounted(async () => {

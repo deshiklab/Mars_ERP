@@ -7,6 +7,7 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
+import { showToast } from '@/toast'
 import StatsRow from '@/components/StatsRow.vue'
 
 const territories = ref<any[]>([])
@@ -15,6 +16,21 @@ const stages = ref<any[]>([])
 const rates = ref<Record<string, any>>({})
 const loading = ref(true)
 
+const settings = ref<Record<string, unknown>>({})
+const busy = ref(false)
+const saved = ref(false)
+async function saveSettings() {
+  busy.value = true; saved.value = false
+  try {
+    const res = await api.call('settings_set', { settings: { ...settings.value } })
+    if (res.ok) { saved.value = true; showToast('Settings saved'); setTimeout(() => (saved.value = false), 2500) }
+    else showToast('Save failed — ' + (res.error || 'server error'))
+  } finally { busy.value = false }
+}
+onMounted(async () => {
+  const r = await api.call('settings_get')
+  if (r.ok) settings.value = (r.data as any) ?? {}
+})
 onMounted(async () => {
   const r = await api.call<{ collections: Record<string, unknown> }>('bootstrap')
   if (r.ok && r.data) {
@@ -27,7 +43,6 @@ onMounted(async () => {
   }
   loading.value = false
 })
-
 const julTarget = computed(() => targets.value.filter((t) => t.month === '2026-07').reduce((s, t) => s + (t.target ?? 0), 0))
 
 const stats = computed(() => [
@@ -44,85 +59,37 @@ const maxTarget = computed(() => Math.max(...targets.value.map((t) => t.target ?
 
 <template>
   <div class="fade-in">
-    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px">
-      <span class="page-title">Sales Config</span>
-      <span class="page-subtitle">Territories · Targets · Pipeline stages · Plot pricing</span>
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 12px">
+      <div>
+        <h2 class="page-title" style="margin: 0 0 2px">⚙️ Sales & System Config</h2>
+        <span class="page-subtitle">Server-backed connection & workflow settings</span>
+      </div>
+      <button class="btn primary" :disabled="busy" @click="saveSettings" style="padding: 6px 18px; font-size: 12px">
+        {{ busy ? 'Saving…' : '💾 Save settings' }}
+      </button>
     </div>
-
-    <p v-if="loading" style="font-size: 11px; color: #888; padding: 16px">Loading config…</p>
-
-    <template v-else>
-      <StatsRow :stats="stats" />
-
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px">
-        <!-- territories -->
-        <div class="card">
-          <div class="card-header"><h3>🌍 Territories</h3></div>
-          <div class="card-body">
-            <div v-for="t in territories" :key="t.id" style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f5f5f5">
-              <span style="font-size: 11px; font-weight: 500; color: #333">{{ t.name }}</span>
-              <span class="pill" style="background: #f0f4ff; color: #2f80ed">{{ t.region || '—' }}</span>
-            </div>
-            <div v-if="!territories.length" style="text-align: center; padding: 16px; color: #999; font-size: 11px">No territories.</div>
-          </div>
-        </div>
-
-        <!-- pipeline stages -->
-        <div class="card">
-          <div class="card-header"><h3>🔷 Pipeline Stages</h3></div>
-          <div class="card-body">
-            <div style="display: flex; flex-wrap: wrap; gap: 4px">
-              <span
-                v-for="s in stages"
-                :key="s.name"
-                class="pill"
-                :style="{ background: (s.color || '#2f80ed') + '22', color: s.color || '#2f80ed' }"
-              >{{ s.name }}</span>
-            </div>
-            <div v-if="!stages.length" style="text-align: center; padding: 16px; color: #999; font-size: 11px">No stages.</div>
-          </div>
-        </div>
+    <div v-if="saved" style="background:#e8f5e9;color:#2e7d32;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:10px">✓ Settings saved to the server</div>
+    <div class="card" style="max-width: 560px">
+      <div class="card-header"><h3>Connection</h3></div>
+      <div style="padding: 12px 16px">
+        <label style="font-size: 11px; color: #555; display: block; margin-bottom: 4px">API base override (leave empty for auto)</label>
+        <input v-model="settings.api_base_override" placeholder="https://erp.mars-constech.com" style="width: 100%; padding: 7px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px" />
       </div>
-
-      <!-- sales targets -->
-      <div class="card" style="margin-bottom: 8px">
-        <div class="card-header"><h3>🎯 Sales Targets</h3></div>
-        <div class="card-body">
-          <div v-for="t in targets" :key="t.id" style="padding: 6px 0; border-bottom: 1px solid #f5f5f5">
-            <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 3px">
-              <span style="font-weight: 600; color: #333">{{ t.salesperson }}</span>
-              <span style="color: #888">{{ t.month }}</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 8px">
-              <div style="flex: 1; height: 6px; background: #f0f0f0; border-radius: 3px; overflow: hidden">
-                <div :style="{ width: Math.min(100, ((t.target ?? 0) / maxTarget) * 100) + '%', background: '#2f80ed', height: '100%' }"></div>
-              </div>
-              <span style="font-size: 10px; font-weight: 700; color: #2f80ed; white-space: nowrap">{{ bdt(t.target) }}</span>
-            </div>
-          </div>
-          <div v-if="!targets.length" style="text-align: center; padding: 16px; color: #999; font-size: 11px">No targets.</div>
-        </div>
+      <div class="card-header"><h3>Workflow toggles</h3></div>
+      <div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 10px">
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer">
+          <input type="checkbox" v-model="settings.auto_connect" style="width: 15px; height: 15px" /> Auto-connect to the server on load
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer">
+          <input type="checkbox" v-model="settings.push_on_save" style="width: 15px; height: 15px" /> Push changes to the server on save
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer">
+          <input type="checkbox" v-model="settings.auto_heal" style="width: 15px; height: 15px" /> Auto-heal stale API connections
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer">
+          <input type="checkbox" v-model="settings.live_land" style="width: 15px; height: 15px" /> Live land-acquisition updates
+        </label>
       </div>
-
-      <!-- plot pricing rates -->
-      <div class="card">
-        <div class="card-header"><h3>💰 Plot Pricing Rates (per katha)</h3></div>
-        <div class="card-body" style="padding: 0">
-          <div class="table-wrap">
-            <table class="rem-table" style="font-size: 10px; width: 100%">
-              <thead><tr><th>Grade</th><th class="num">Katha Rate</th><th class="num">Corner %</th><th class="num">Road %</th></tr></thead>
-              <tbody>
-                <tr v-for="(r, grade) in rates" :key="grade">
-                  <td><span class="pill" style="background: #f0f4ff; color: #2f80ed">{{ grade }}</span></td>
-                  <td class="num" style="font-weight: 700; color: #2e7d32">{{ bdt(r.katha) }}</td>
-                  <td class="num">+{{ r.cornerPct }}%</td>
-                  <td class="num">+{{ r.roadPct }}%</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </template>
+    </div>
   </div>
 </template>
