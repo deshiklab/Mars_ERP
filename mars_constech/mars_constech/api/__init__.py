@@ -143,6 +143,7 @@ def _live_notifications():
 		return out
 	except Exception:
 		return []
+@frappe.whitelist()
 def bootstrap():
 	"""Return every stored collection, mirroring the PWA's localStorage keys."""
 	collections = {}
